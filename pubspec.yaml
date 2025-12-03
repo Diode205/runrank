@@ -32,7 +32,7 @@ dependencies:
     sdk: flutter
   yaml: ^3.1.2
   package_info_plus: ^5.0.1
-  supabase_flutter: ^2.0.0
+  supabase_flutter: ^2.3.3
   image_picker: ^1.0.7
 
 

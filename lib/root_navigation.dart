@@ -4,7 +4,6 @@ import 'package:runrank/widgets/training_events_calendar.dart';
 import 'package:runrank/notifications_screen.dart';
 import 'package:runrank/menu_screen.dart';
 import 'package:runrank/services/notification_service.dart';
-import 'package:runrank/app_routes.dart';
 
 class RootNavigation extends StatefulWidget {
   const RootNavigation({super.key});
@@ -15,10 +14,9 @@ class RootNavigation extends StatefulWidget {
 
 class _RootNavigationState extends State<RootNavigation> {
   int _selectedIndex = 0;
-
   int _unread = 0;
 
-  final List<Widget> _screens = const [
+  final List<Widget> _screens = [
     ClubStandardsView(),
     TrainingEventsCalendar(),
     NotificationsScreen(),
@@ -28,16 +26,21 @@ class _RootNavigationState extends State<RootNavigation> {
   @override
   void initState() {
     super.initState();
+
+    // Initial load
     _loadUnread();
-    NotificationService.setListener((count) {
-      setState(() => _unread = count);
+
+    // Live listener
+    NotificationService.watchUnreadCount((count) {
+      if (mounted) {
+        setState(() => _unread = count);
+      }
     });
-    NotificationService.listenRealtime();
   }
 
   Future<void> _loadUnread() async {
-    final c = await NotificationService.unreadCount();
-    setState(() => _unread = c);
+    final count = await NotificationService.unreadCount();
+    setState(() => _unread = count);
   }
 
   void _onItemTapped(int index) {
@@ -77,9 +80,9 @@ class _RootNavigationState extends State<RootNavigation> {
                       child: Text(
                         _unread.toString(),
                         style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                     ),

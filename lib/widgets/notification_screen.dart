@@ -21,18 +21,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> loadData() async {
-    final data = await NotificationService.fetchNotifications();
-    setState(() {
-      notifications = data;
-      loading = false;
-    });
+    try {
+      final data = await NotificationService.fetchNotifications();
 
-    // mark everything read
-    await NotificationService.markAllRead();
+      print("DEBUG: NotificationsScreen received: $data"); // 🔥 Add this
+
+      await NotificationService.markAllRead(); // mark first
+
+      if (!mounted) return;
+      setState(() {
+        notifications = data;
+        loading = false;
+      });
+    } catch (e) {
+      print("DEBUG ERROR in loadData(): $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    print("DEBUG: NotificationsScreen BUILD triggered");
+
     return Scaffold(
       appBar: AppBar(title: const Text("Notifications")),
       body: loading
