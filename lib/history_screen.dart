@@ -34,7 +34,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _loading = true;
   bool _error = false;
 
-  // distance → list of records (sorted newest → oldest)
   Map<String, List<RaceRecord>> _byDistance = {};
 
   @override
@@ -68,8 +67,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             distance,
             time_seconds,
             raceDate,
-            gender,
-            age,
             level,
             age_grade,
             created_at
@@ -83,45 +80,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
       for (final row in rows) {
         final raceName =
             (row['race_name'] as String?)?.trim().isNotEmpty == true
-            ? row['race_name'] as String
+            ? row['race_name']
             : 'Untitled race';
 
-        // distance stored as text (your Supabase table uses text)
         final distance = row['distance'] as String? ?? '';
-
-        // Supabase uses "time_seconds"
-        final finishSeconds = row['time_seconds'] as int? ?? 0;
-
-        // build user-friendly time format
+        final finishSeconds = row['time_seconds'] ?? 0;
         final timeText = formatTime(finishSeconds);
 
-        // level is text
         final level = row['level'] as String? ?? 'Unknown';
 
-        // age_grade numeric
         final ageGradeRaw = row['age_grade'];
         final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
 
         DateTime raceDate;
-
-        // parse raceDate column
         if (row['raceDate'] != null) {
           raceDate = DateTime.parse(row['raceDate']);
-        }
-        // if created_at available
-        else if (row['created_at'] != null) {
-          if (row['created_at'] is String) {
-            raceDate = DateTime.parse(row['created_at']);
-          } else if (row['created_at'] is DateTime) {
-            raceDate = row['created_at'];
-          } else {
-            raceDate = DateTime.now();
-          }
+        } else if (row['created_at'] != null) {
+          raceDate = DateTime.parse(row['created_at']);
         } else {
           raceDate = DateTime.now();
         }
 
-        // finally add to list
         allRecords.add(
           RaceRecord(
             raceName: raceName,
@@ -135,7 +114,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         );
       }
 
-      // Group by distance and sort newest → oldest for each
       final Map<String, List<RaceRecord>> grouped = {
         for (final d in _distances) d: [],
       };
@@ -156,9 +134,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _loading = false;
       });
     } catch (e) {
-      // ignore: avoid_print
-      print('Error fetching race history: $e');
-      if (!mounted) return;
       setState(() {
         _error = true;
         _loading = false;
@@ -171,14 +146,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return DefaultTabController(
       length: _distances.length,
       child: Scaffold(
+        backgroundColor: Colors.black,
         appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
           title: const Text(
             'Race Records',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           bottom: TabBar(
             isScrollable: true,
-            tabAlignment: TabAlignment.start,
+            indicatorColor: Colors.yellow,
+            labelColor: Colors.yellow,
+            unselectedLabelColor: Colors.white70,
             tabs: _distances.map((d) => Tab(text: d)).toList(),
           ),
         ),
@@ -194,19 +175,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (_error) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Could not load race records.',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _fetchRaceHistory,
-              child: const Text('Retry'),
-            ),
-          ],
+        child: ElevatedButton(
+          onPressed: _fetchRaceHistory,
+          child: const Text('Retry'),
         ),
       );
     }
@@ -222,7 +193,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Text(
           'No records yet for $distance.\nSubmit some results to see them here!',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
+          style: const TextStyle(fontSize: 14, color: Colors.white70),
         ),
       );
     }
@@ -231,34 +202,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
       onRefresh: _fetchRaceHistory,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: records.length + 1, // +1 for summary card
+        itemCount: records.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
             return _buildSummaryCard(distance, records);
           }
-          final record = records[index - 1];
-          return _buildRecordCard(record);
+          return _buildRecordCard(records[index - 1]);
         },
       ),
     );
   }
 
+  // 🟦 ELECTRIC BLUE SUMMARY CARD
   Widget _buildSummaryCard(String distance, List<RaceRecord> records) {
     if (records.isEmpty) return const SizedBox.shrink();
 
-    // Best time (smallest finishSeconds with non-null)
-    final recordsWithTime = records
-        .where((r) => r.finishSeconds != null)
-        .toList();
-    recordsWithTime.sort(
-      (a, b) => (a.finishSeconds ?? 0).compareTo(b.finishSeconds ?? 0),
+    final bestTime = records.reduce(
+      (a, b) =>
+          (a.finishSeconds ?? 999999) < (b.finishSeconds ?? 999999) ? a : b,
     );
-    final bestTime = recordsWithTime.isNotEmpty ? recordsWithTime.first : null;
-
-    // Best age grade
     final bestAge = records.reduce((a, b) => a.ageGrade >= b.ageGrade ? a : b);
-
-    // Most recent (already sorted newest → oldest)
     final mostRecent = records.first;
 
     // Count standards
@@ -272,151 +235,153 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .join('   •   ');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF4A78FF),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$distance Summary',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+            ),
           ),
           const SizedBox(height: 10),
-          if (bestTime != null) ...[
-            Row(
-              children: [
-                const Icon(Icons.timer, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  'Best time: ${formatTime(bestTime.finishSeconds, fallback: bestTime.timeText ?? '-')}',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
-          Row(
-            children: [
-              const Icon(Icons.leaderboard, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Best age grade: ${bestAge.ageGrade.toStringAsFixed(1)}%',
-                style: const TextStyle(fontSize: 14),
-              ),
-            ],
+
+          _summaryRow(
+            Icons.timer,
+            'Best time: ${formatTime(bestTime.finishSeconds)}',
           ),
           const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.event, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Most recent: ${_formatDate(mostRecent.raceDate)}',
-                style: const TextStyle(fontSize: 14),
-              ),
-            ],
+
+          _summaryRow(
+            Icons.leaderboard,
+            'Best age grade: ${bestAge.ageGrade.toStringAsFixed(1)}%',
           ),
-          if (standardsText.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.workspace_premium, size: 18),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    standardsText,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          const SizedBox(height: 6),
+
+          _summaryRow(
+            Icons.event,
+            'Most recent: ${_formatDate(mostRecent.raceDate)}',
+          ),
+          const SizedBox(height: 8),
+
+          if (standardsText.isNotEmpty)
+            _summaryRow(Icons.workspace_premium, standardsText),
         ],
       ),
     );
   }
 
+  Widget _summaryRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.white),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ▶️ INDIVIDUAL RECORD CARD — DARK FLOATING GREY
   Widget _buildRecordCard(RaceRecord r) {
-    final timeString = formatTime(r.finishSeconds, fallback: r.timeText ?? '-');
+    final timeString = formatTime(r.finishSeconds);
     final ageGradeString = '${r.ageGrade.toStringAsFixed(1)}%';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF2A2A2A), // lighter grey
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 8,
             offset: const Offset(0, 3),
           ),
         ],
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Race name
           Text(
             r.raceName,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
           const SizedBox(height: 4),
-          // Date + distance line
+
           Row(
             children: [
-              const Icon(Icons.event, size: 16, color: Colors.black54),
+              const Icon(Icons.event, size: 16, color: Colors.white70),
               const SizedBox(width: 4),
               Text(
                 _formatDate(r.raceDate),
-                style: const TextStyle(fontSize: 13, color: Colors.black54),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(width: 10),
-              const Icon(Icons.straighten, size: 16, color: Colors.black54),
+              const Icon(Icons.straighten, size: 16, color: Colors.white70),
               const SizedBox(width: 4),
-              Text(
-                r.distance,
-                style: const TextStyle(fontSize: 13, color: Colors.black54),
-              ),
+              Text(r.distance, style: const TextStyle(color: Colors.white70)),
             ],
           ),
+
           const SizedBox(height: 8),
-          // Time + level + age-grade
+
           Row(
             children: [
-              const Icon(Icons.timer, size: 18),
-              const SizedBox(width: 4),
+              const Icon(Icons.timer, size: 18, color: Colors.white),
+              const SizedBox(width: 6),
               Text(
                 timeString,
                 style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(width: 16),
-              Chip(
-                label: Text(
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.yellow.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
                   r.level,
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black, // readable
                   ),
                 ),
-                backgroundColor: Colors.yellow.shade200,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+
               const Spacer(),
+
               Text(
                 ageGradeString,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -426,9 +391,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  // ⏱ Format HH:MM:SS or MM:SS
   String formatTime(int? seconds, {String fallback = '-'}) {
     if (seconds == null) return fallback;
-
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     final s = seconds % 60;
@@ -438,8 +403,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           '${m.toString().padLeft(2, '0')}:'
           '${s.toString().padLeft(2, '0')}';
     } else {
-      return '${m.toString().padLeft(2, '0')}:'
-          '${s.toString().padLeft(2, '0')}';
+      return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
   }
 

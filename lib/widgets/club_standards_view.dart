@@ -12,16 +12,57 @@ class ClubStandardsView extends StatefulWidget {
   State<ClubStandardsView> createState() => _ClubStandardsViewState();
 }
 
-class _ClubStandardsViewState extends State<ClubStandardsView> {
-  // Form inputs
+class _ClubStandardsViewState extends State<ClubStandardsView>
+    with TickerProviderStateMixin {
+  // ---------------------------------------------------------
+  // Animation for subtitle fade + slide
+  // ---------------------------------------------------------
+  late AnimationController _subTitleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  late ScrollController _scrollController;
+  double _scrollOffset = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _subTitleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _subTitleController,
+      curve: Curves.easeOut,
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(
+          CurvedAnimation(parent: _subTitleController, curve: Curves.easeOut),
+        );
+    _scrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _scrollOffset = _scrollController.offset * 0.25;
+        });
+      });
+
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) _subTitleController.forward();
+    });
+  }
+
+  // ---------------------------------------------------------
+  // Controllers
+  // ---------------------------------------------------------
   final TextEditingController _raceNameController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
 
   String _selectedGender = 'M';
   String _selectedDistance = '5K';
-
-  // Optional race date
   DateTime? _selectedRaceDate;
 
   String? _resultMessage;
@@ -31,29 +72,59 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
     _raceNameController.dispose();
     _timeController.dispose();
     _ageController.dispose();
+    _dateController.dispose();
+    _subTitleController.dispose();
+    _scrollController.dispose();
+
     super.dispose();
   }
 
-  // -----------------------------
-  // DATE PICKER
-  // -----------------------------
+  // ---------------------------------------------------------
+  // Month formatting
+  // ---------------------------------------------------------
+  String _monthShort(int m) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[m - 1];
+  }
+
+  // ---------------------------------------------------------
+  // Date picker
+  // ---------------------------------------------------------
   Future<void> _pickRaceDate() async {
-    final now = DateTime.now();
-    final selected = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
-      initialDate: now,
-      firstDate: DateTime(now.year - 5),
-      lastDate: now,
-      helpText: "Select Race Date",
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
-    if (selected != null) {
-      setState(() => _selectedRaceDate = selected);
+
+    if (picked != null) {
+      _selectedRaceDate = picked;
+      setState(() {
+        _dateController.text =
+            "${picked.day.toString().padLeft(2, '0')} "
+            "${_monthShort(picked.month)} "
+            "${picked.year % 100}";
+      });
     }
   }
 
-  // -----------------------------
-  // SUBMIT TO SUPABASE
-  // -----------------------------
+  // ---------------------------------------------------------
+  // Submit to Supabase
+  // ---------------------------------------------------------
   Future<void> _submitToSupabase({
     required String race,
     required int age,
@@ -77,9 +148,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
     );
   }
 
-  // -----------------------------
-  // CALCULATE + SHOW DIALOG
-  // -----------------------------
+  // ---------------------------------------------------------
+  // Calculate
+  // ---------------------------------------------------------
   Future<void> _onCalculate() async {
     final timeText = _timeController.text.trim();
     final seconds = RunCalculator.parseTimeToSeconds(timeText);
@@ -118,23 +189,48 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('WELL DONE!'),
-        content: ResultCard(
-          standard: level,
-          ageGrade: ageGrade,
-          ageGradeMessage: ageGradeMessage,
-          guidance:
-              'Age-grade compares your performance to world-class standards.\n\n'
-              '90%+ World Class/Elite\n'
-              '80–89% National Class\n'
-              '70–79% Regional Class\n'
-              '60–69% Local Level\n'
-              '50–59% Good Skill Level',
+        backgroundColor: Colors.grey.shade900,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('WELL DONE!', style: TextStyle(color: Colors.white)),
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 66, 66, 66),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: const Color.fromARGB(60, 23, 7, 173),
+              width: 1,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ResultCard(
+            standard: level,
+            ageGrade: ageGrade,
+            ageGradeMessage: ageGradeMessage,
+            guidance:
+                'Age-grade compares your performance to world-class standards.\n\n'
+                '90%+ World Class/Elite\n'
+                '80–89% National Class\n'
+                '70–79% Regional Class\n'
+                '60–69% Local Level\n'
+                '50–59% Good Skill Level',
+            // ← Add this optional flag inside ResultCard (next section)
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -149,6 +245,13 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
                 ageGrade: ageGrade,
               );
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.yellow,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(40),
+              ),
+            ),
             child: const Text('Submit Result'),
           ),
         ],
@@ -156,66 +259,45 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
     );
   }
 
-  // -----------------------------
-  // INPUT FORM (inside card)
-  // -----------------------------
+  // ---------------------------------------------------------
+  // INPUT FORM — now restored with "Race" field
+  // ---------------------------------------------------------
   Widget _buildInputForm() {
     return Column(
       children: [
-        // Race + Date row
+        // --------------------------------------
+        // RACE NAME + DATE
+        // --------------------------------------
         Row(
           children: [
             Expanded(
-              flex: 3,
+              flex: 2,
               child: TextField(
                 controller: _raceNameController,
-                decoration: const InputDecoration(labelText: 'Running Event'),
+                decoration: const InputDecoration(labelText: 'Race/Event'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              flex: 3,
-              child: InkWell(
-                onTap: _pickRaceDate,
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 18,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _selectedRaceDate == null
-                              ? 'Date'
-                              : '${_selectedRaceDate!.day}/${_selectedRaceDate!.month}/${_selectedRaceDate!.year}',
-                          style: TextStyle(
-                            color: _selectedRaceDate == null
-                                ? Colors.grey.shade600
-                                : Colors.black,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              flex: 2,
+              child: TextFormField(
+                controller: _dateController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Race Date',
+                  suffixIcon: Icon(Icons.calendar_today),
                 ),
+                onTap: _pickRaceDate,
               ),
             ),
           ],
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // Distance + Time row
+        // --------------------------------------
+        // DISTANCE + TIME
+        // --------------------------------------
         Row(
           children: [
             Expanded(
@@ -223,36 +305,33 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
               child: DropdownButtonFormField<String>(
                 value: _selectedDistance,
                 items: distances
-                    .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
                 onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _selectedDistance = v);
+                  if (v != null) setState(() => _selectedDistance = v);
                 },
                 decoration: const InputDecoration(labelText: 'Distance'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              flex: 3,
+              flex: 2,
               child: TextField(
                 controller: _timeController,
-                decoration: const InputDecoration(
-                  labelText: 'Time (hh:mm:ss)',
-                  hintText: 'e.g. 1:12:45 or 22:30',
-                ),
+                decoration: const InputDecoration(labelText: 'Time (hh:mm:ss)'),
               ),
             ),
           ],
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // Gender + Age row
+        // --------------------------------------
+        // GENDER + AGE
+        // --------------------------------------
         Row(
           children: [
             Expanded(
-              flex: 2,
               child: DropdownButtonFormField<String>(
                 value: _selectedGender,
                 items: const [
@@ -260,15 +339,13 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
                   DropdownMenuItem(value: 'F', child: Text('Female')),
                 ],
                 onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _selectedGender = v);
+                  if (v != null) setState(() => _selectedGender = v);
                 },
                 decoration: const InputDecoration(labelText: 'Gender'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              flex: 2,
               child: TextField(
                 controller: _ageController,
                 decoration: const InputDecoration(labelText: 'Age'),
@@ -278,40 +355,39 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
           ],
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
+        // --------------------------------------
+        // INFO TEXT
+        // --------------------------------------
         const Text(
           'NNBR Club Standards require members to achieve qualifying times '
-          'in four of six distances over a calendar year to earn an award. '
-          'Qualifying races must be UKA licensed, or Club Handicap events. '
-          'Parkruns and training runs do not count. Awards are based on '
-          'runners’ performances within their Age Group category. Higher '
-          'standard award is given if a runner achieved different levels '
-          'in their qualifying races.',
-          style: TextStyle(fontSize: 12, color: Colors.black54),
+          'in four of six distances over a calendar year to earn an award.\n'
+          'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n'
+          'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n'
+          'Awards will be presented at the Annual Awards evening.',
+          style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
           textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  // -----------------------------
-  // BUTTONS ROW
-  // -----------------------------
+  // ---------------------------------------------------------
+  // Buttons
+  // ---------------------------------------------------------
   Widget _buildButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Check Achievement (now shows dialog with optional submit)
           Expanded(
             child: ElevatedButton(
               onPressed: _onCalculate,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellowAccent,
+                backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -323,21 +399,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
               ),
             ),
           ),
-
           const SizedBox(width: 10),
-
-          Flexible(
-            child: Image.asset(
-              'assets/images/runners_group.JPG',
-              height: 70,
-              fit: BoxFit.contain,
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Blue Club Training & Events button
-          // Blue button → Check Race Records
           Expanded(
             child: ElevatedButton(
               onPressed: () {
@@ -348,7 +410,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -365,96 +428,133 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
     );
   }
 
-  // -----------------------------
-  // BUILD
-  // -----------------------------
+  // ---------------------------------------------------------
+  // BUILD UI
+  // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            // 🟨 FIXED TOP HEADER (original look)
-            Container(
-              width: double.infinity,
-              color: Colors.yellowAccent,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
-              margin: const EdgeInsets.only(top: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Image.asset('assets/images/rank_logo.png', height: 60),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'CLUB STANDARDS',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.red.shade700,
-                        letterSpacing: 1.0,
+            // HEADER (unchanged except spacing)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 22,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Image.asset('assets/images/rank_logo.png', height: 70),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'CLUB STANDARDS',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.w900,
+                              color: Color.fromARGB(255, 77, 3, 224),
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: SlideTransition(
+                              position: _slideAnimation,
+                              child: const Text(
+                                'Race & Team Admin On The Go',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color.fromARGB(221, 235, 81, 5),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-
-            // 🔳 SCROLLABLE CONTENT
+            //SCROLL AREA
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom,
                 ),
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
-
-                    // 🖼 COVER IMAGE (original behaviour)
+                    // Cover Image
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.white,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.asset(
-                          'assets/images/nnbr_cover.png',
-                          fit: BoxFit.cover,
-                          alignment: Alignment.centerRight,
-                          width: double.infinity,
-                          height: 170,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          height: 170, // visible height
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final parallax = (_scrollOffset * 0.25).clamp(
+                                0.0,
+                                60.0,
+                              );
+
+                              return Transform.translate(
+                                offset: Offset(
+                                  0,
+                                  parallax,
+                                ), // <<< REAL PARALLAX
+                                child: Image.asset(
+                                  'assets/images/nnbr_cover.png',
+                                  height: 230, // larger than container
+                                  width: constraints.maxWidth,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment(
+                                    1.0,
+                                    0,
+                                  ), // keeps NNBR logo visible
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 10),
-
-                    // 📦 INPUT CARD
+                    // INPUT FORM
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Colors.grey.shade900,
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 16),
+                            BoxShadow(color: Colors.black45, blurRadius: 12),
                           ],
                         ),
                         child: _buildInputForm(),
                       ),
                     ),
-
+                    // RESULT MESSAGE
                     if (_resultMessage != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -462,20 +562,72 @@ class _ClubStandardsViewState extends State<ClubStandardsView> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 13,
+                            color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: 5),
-
-                    // 🔘 BUTTONS
-                    _buildButtons(),
-
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 10),
                   ],
                 ),
+              ),
+            ),
+            // FIXED BUTTON BAR
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.black,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _onCalculate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.yellow,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Check\nAchievement',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => HistoryScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Check\nRace Records',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

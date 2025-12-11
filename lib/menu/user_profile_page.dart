@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:runrank/menu/membership_page.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -13,16 +12,21 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
-  final _client = Supabase.instance.client;
+  final _supabase = Supabase.instance.client;
 
   bool _loading = true;
-  Map<String, dynamic>? _profile;
+  bool _saving = false;
+  String? _error;
 
-  // Controllers
-  final TextEditingController _fullName = TextEditingController();
-  final TextEditingController _uka = TextEditingController();
+  String? _fullName;
+  String? _email;
+  String? _ukaNumber;
+  String? _club;
+  DateTime? _dob;
+  DateTime? _createdAt;
   String? _avatarUrl;
-  DateTime? _memberSince;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -31,221 +35,503 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _loadProfile() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
-    final data = await _client
-        .from('user_profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (!mounted) return;
-
     setState(() {
-      _profile = data;
-      _fullName.text = data?['full_name'] ?? '';
-      _uka.text = data?['uka_number'] ?? '';
-      _avatarUrl = data?['avatar_url'];
-      _memberSince = DateTime.tryParse(data?['created_at'] ?? '');
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
-  }
 
-  Future<void> _saveProfile() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
-    await _client
-        .from('user_profiles')
-        .update({
-          "full_name": _fullName.text.trim(),
-          "uka_number": _uka.text.trim(),
-          "avatar_url": _avatarUrl,
-        })
-        .eq("id", user.id);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Profile updated")));
-  }
-
-  Future<void> _pickAvatar() async {
-    final picker = ImagePicker();
-    final img = await picker.pickImage(source: ImageSource.gallery);
-
-    if (img == null) return;
-
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
-    final file = File(img.path);
-
-    final fileExt = img.path.split('.').last;
-    final fileName = "avatar_${user.id}.$fileExt";
-
-    await _client.storage
-        .from("avatars")
-        .upload(fileName, file, fileOptions: const FileOptions(upsert: true));
-
-    final publicUrl = _client.storage.from("avatars").getPublicUrl(fileName);
-
-    setState(() => _avatarUrl = publicUrl);
-
-    await _saveProfile();
-  }
-
-  String _formatMemberSince(DateTime? d) {
-    if (d == null) return "Unknown";
-
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${months[d.month - 1]} ${d.year}";
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Not logged in';
+      });
+      return;
     }
 
-    final email = _client.auth.currentUser?.email ?? "";
+    try {
+      final response = await _supabase
+          .from('user_profiles')
+          .select('''
+            full_name,
+            email,
+            uka_number,
+            club,
+            date_of_birth,
+            avatar_url,
+            created_at
+          ''')
+          .eq('id', user.id)
+          .limit(1);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Your Profile")),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // ------------------------------
-          // Avatar
-          // ------------------------------
-          Center(
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 60,
-                  backgroundImage: _avatarUrl != null
-                      ? NetworkImage(_avatarUrl!)
-                      : null,
-                  child: _avatarUrl == null
-                      ? const Icon(Icons.person, size: 60)
-                      : null,
+      if (response.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Profile not found';
+        });
+        return;
+      }
+
+      final row = response.first as Map<String, dynamic>;
+
+      setState(() {
+        _fullName = row['full_name'] as String?;
+        _email = row['email'] as String?;
+        _ukaNumber = row['uka_number'] as String?;
+        _club = row['club'] as String?;
+        _avatarUrl = row['avatar_url'] as String?;
+
+        final dobStr = row['date_of_birth'] as String?;
+        if (dobStr != null && dobStr.isNotEmpty) {
+          _dob = DateTime.tryParse(dobStr);
+        }
+
+        final createdStr = row['created_at']?.toString();
+        if (createdStr != null && createdStr.isNotEmpty) {
+          _createdAt = DateTime.tryParse(createdStr);
+        }
+
+        _loading = false;
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading profile: $e');
+      setState(() {
+        _loading = false;
+        _error = 'Failed to load profile';
+      });
+    }
+  }
+
+  String _initials() {
+    final name = _fullName?.trim();
+    if (name == null || name.isEmpty) return '?';
+    final parts = name.split(' ');
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts[0].isNotEmpty ? parts[0][0] : '') +
+        (parts[1].isNotEmpty ? parts[1][0] : '');
+  }
+
+  String _memberSinceText() {
+    if (_createdAt == null) return 'Member';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final m = months[_createdAt!.month - 1];
+    final y = _createdAt!.year;
+    return 'Member since $m $y';
+  }
+
+  String _formatDob() {
+    if (_dob == null) return 'Not set';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final m = months[_dob!.month - 1];
+    return '${_dob!.day} $m ${_dob!.year}';
+  }
+
+  Future<void> _changeAvatar() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+
+      setState(() => _saving = true);
+
+      final file = File(picked.path);
+      final path = 'avatars/${user.id}.jpg';
+
+      // Upload to Supabase Storage (bucket: avatars)
+      await _supabase.storage
+          .from('avatars')
+          .upload(path, file, fileOptions: const FileOptions(upsert: true));
+
+      final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+
+      // Save URL to profile
+      await _supabase
+          .from('user_profiles')
+          .update({'avatar_url': publicUrl})
+          .eq('id', user.id);
+
+      setState(() {
+        _avatarUrl = publicUrl;
+        _saving = false;
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error updating avatar: $e');
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update photo')));
+    }
+  }
+
+  Future<void> _showEditProfileSheet() async {
+    final nameController = TextEditingController(text: _fullName ?? '');
+    final ukaController = TextEditingController(text: _ukaNumber ?? '');
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: InkWell(
-                    onTap: _pickAvatar,
+              ),
+              const Text(
+                'Edit profile',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Full name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ukaController,
+                decoration: const InputDecoration(labelText: 'UKA number'),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final user = _supabase.auth.currentUser;
+                    if (user == null) return;
+
+                    final newName = nameController.text.trim();
+                    final newUka = ukaController.text.trim();
+
+                    try {
+                      await _supabase
+                          .from('user_profiles')
+                          .update({'full_name': newName, 'uka_number': newUka})
+                          .eq('id', user.id);
+
+                      setState(() {
+                        _fullName = newName;
+                        _ukaNumber = newUka;
+                      });
+
+                      if (!mounted) return;
+                      Navigator.pop(context);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Profile updated')),
+                      );
+                    } catch (e) {
+                      // ignore: avoid_print
+                      print('Error updating profile: $e');
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to update profile'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.save),
+                  label: const Text('Save changes'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHexAvatar() {
+    final initials = _initials();
+
+    return GestureDetector(
+      onTap: _saving ? null : _changeAvatar,
+      child: Column(
+        children: [
+          SizedBox(
+            width: 110,
+            height: 110,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer blue hexagon border
+                ClipPath(
+                  clipper: _HexagonClipper(),
+                  child: Container(
+                    color: const Color(0xFF0057B7), // Blue border
+                  ),
+                ),
+                // Inner dark hexagon with image / initials
+                Padding(
+                  padding: const EdgeInsets.all(6.0),
+                  child: ClipPath(
+                    clipper: _HexagonClipper(),
                     child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.edit, color: Colors.white),
+                      color: Colors.grey.shade900,
+                      child: _avatarUrl != null
+                          ? Image.network(_avatarUrl!, fit: BoxFit.cover)
+                          : Center(
+                              child: Text(
+                                initials,
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 20),
-
-          // ------------------------------
-          // Member since
-          // ------------------------------
-          Center(
-            child: Text(
-              "Member since ${_formatMemberSince(_memberSince)}",
-              style: const TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ------------------------------
-          // Email (read only)
-          // ------------------------------
-          TextFormField(
-            initialValue: email,
-            readOnly: true,
-            decoration: const InputDecoration(
-              labelText: "Email",
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ------------------------------
-          // Full Name
-          // ------------------------------
-          TextField(
-            controller: _fullName,
-            decoration: const InputDecoration(
-              labelText: "Full Name",
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ------------------------------
-          // UKA Number
-          // ------------------------------
-          TextField(
-            controller: _uka,
-            decoration: const InputDecoration(
-              labelText: "UKA Number",
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 30),
-
-          // ------------------------------
-          // Save Btn
-          // ------------------------------
-          ElevatedButton.icon(
-            onPressed: _saveProfile,
-            icon: const Icon(Icons.save),
-            label: const Text("Save Changes"),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ------------------------------
-          // Membership / Renewal Shortcut
-          // ------------------------------
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MembershipPage()),
-              );
-            },
-            icon: const Icon(Icons.card_membership),
-            label: const Text("Membership & Renewal"),
+          const SizedBox(height: 8),
+          Text(
+            _saving ? 'Updating photo…' : 'Tap to change photo',
+            style: const TextStyle(fontSize: 12, color: Colors.white60),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _fullName ?? 'Your Profile';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: _loading ? null : _showEditProfileSheet,
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  _buildHexAvatar(),
+                  const SizedBox(height: 16),
+
+                  // Name + email
+                  Text(
+                    _fullName ?? 'Runner',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (_email != null)
+                    Text(
+                      _email!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+
+                  // Member since chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFD300).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFFFD300),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      _memberSinceText(),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFFFD300),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Info card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF0057B7),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0057B7).withOpacity(0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildInfoRow('UKA number', _ukaNumber ?? 'Not set'),
+                        const Divider(color: Colors.white24),
+                        _buildInfoRow('Club', _club ?? 'NNBR'),
+                        const Divider(color: Colors.white24),
+                        _buildInfoRow('Date of birth', _formatDob()),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Placeholder action for renewal (for later integration)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Membership renewal coming soon.'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.card_membership),
+                      label: const Text('Membership & renewal'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+/// Custom hexagon clipper for the avatar
+class _HexagonClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    final path = Path();
+
+    final double side = w / 2;
+    final double triangleHeight = (h / 2);
+
+    path.moveTo(w * 0.25, 0);
+    path.lineTo(w * 0.75, 0);
+    path.lineTo(w, triangleHeight);
+    path.lineTo(w * 0.75, h);
+    path.lineTo(w * 0.25, h);
+    path.lineTo(0, triangleHeight);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_HexagonClipper oldClipper) => false;
 }

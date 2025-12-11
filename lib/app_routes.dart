@@ -48,7 +48,6 @@ class AppRoutes {
     root: (_) => const RootNavigation(),
     history: (_) => const HistoryScreen(),
     clubHub: (_) => const TrainingEventsCalendar(),
-    adminCreateEvent: (_) => const AdminCreateEventPage(),
     userProfile: (_) => const UserProfilePage(),
     membership: (_) => const MembershipPage(),
     charity: (_) => const CharityPage(),
