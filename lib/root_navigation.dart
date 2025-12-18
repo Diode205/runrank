@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/widgets/club_standards_view.dart';
-import 'package:runrank/widgets/training_events_calendar.dart';
+import 'package:runrank/widgets/club_events_calendar.dart';
 import 'package:runrank/notifications_screen.dart';
 import 'package:runrank/menu_screen.dart';
 import 'package:runrank/services/notification_service.dart';
@@ -19,7 +19,7 @@ class _RootNavigationState extends State<RootNavigation>
 
   final List<Widget> _screens = [
     ClubStandardsView(),
-    TrainingEventsCalendar(),
+    ClubEventsCalendar(),
     NotificationsScreen(),
     MenuScreen(),
   ];

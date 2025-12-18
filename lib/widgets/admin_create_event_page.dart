@@ -1,547 +1,426 @@
 import 'package:flutter/material.dart';
-import 'package:runrank/services/event_service.dart';
-import 'package:runrank/services/notification_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminCreateEventPage extends StatefulWidget {
-  final String userRole; // ⭐ NEW
+  final String userRole;
 
-  const AdminCreateEventPage({
-    super.key,
-    required this.userRole, // ⭐ NEW
-  });
+  const AdminCreateEventPage({super.key, required this.userRole});
 
   @override
   State<AdminCreateEventPage> createState() => _AdminCreateEventPageState();
 }
 
 class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
+  final supabase = Supabase.instance.client;
+
   final _formKey = GlobalKey<FormState>();
 
-  // ⭐ UPDATED: No longer a single dropdown.
-  // Instead we'll track two sources:
-  String? _adminEventType; // training, event, race, handicap, relay
-  String? _socialEventType; // Social Run, Meet & Drink, etc.
+  late List<String> adminTypes;
+  late List<String> socialTypes;
 
-  // Shared fields
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _leadHostDirectorController =
-      TextEditingController();
-  final TextEditingController _venueController = TextEditingController();
-  final TextEditingController _venueAddressController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
 
-  // Training-specific
-  int _trainingNumber = 1;
+    adminTypes = [
+      "Training 1",
+      "Training 2",
+      "Race",
+      "Handicap Series",
+      "Relay",
+      "Special Event",
+    ];
 
-  // Race-specific
-  String _selectedRaceName = 'Holt 10K';
+    socialTypes = ["Social Run", "Meet & Drink", "Swim or Cycle", "Others"];
 
-  // Handicap-specific
-  String _selectedHandicapDistance = '5 km';
+    selectedCategory = widget.userRole == "admin" ? "admin" : "social";
+    selectedEventType = selectedCategory == "admin"
+        ? adminTypes.first
+        : socialTypes.first;
+  }
 
-  // Relay-specific
-  String _relayTeam = 'A';
+  String selectedEventType = "";
+  String selectedCategory = "";
 
-  // Dates & times
-  DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
-  DateTime? _marshalCallDate;
+  // Controllers
+  final hostCtrl = TextEditingController();
+  final venueCtrl = TextEditingController();
+  final venueAddressCtrl = TextEditingController();
+  final descriptionCtrl = TextEditingController();
+
+  // Date fields
+  DateTime? selectedDate;
+  DateTime? marshalCallDate;
+  TimeOfDay? selectedTime;
+
+  // Handicap dropdown
+  final handicapDistances = const ["5K", "5M", "10K", "10M", "7M", "Beach Run"];
+  String? selectedHandicapDistance;
+
+  // Relay Team
+  String selectedRelayTeam = "A";
+
+  // RACE LIST
+  final raceNames = const ["Holt 10K", "Worstead 5M", "Chase The Train"];
+  String? selectedRace;
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _leadHostDirectorController.dispose();
-    _venueController.dispose();
-    _venueAddressController.dispose();
-    _descriptionController.dispose();
+    hostCtrl.dispose();
+    venueCtrl.dispose();
+    venueAddressCtrl.dispose();
+    descriptionCtrl.dispose();
     super.dispose();
   }
 
-  static const _raceNames = [
-    'Holt 10K',
-    'Worstead 5M',
-    'Chase The Train',
-    'Boxing Day Dip',
-  ];
-
-  static const _handicapDistances = [
-    '5 km',
-    '5 miles',
-    'Beach Race',
-    '10 km',
-    '10 miles',
-    '7 miles',
-  ];
-
-  // SOCIAL OPTIONS ⭐ NEW
-  static const _socialTypes = [
-    'Social Run',
-    'Meet & Drink',
-    'Walk / Cycle / Swim',
-    'Other',
-  ];
-
-  // ADMIN OPTIONS ⭐ NEW
-  static const _adminTypes = ['training', 'event', 'race', 'handicap', 'relay'];
-
-  // -------------------------------
-  // Date / Time Pickers
-  // -------------------------------
-
-  Future<void> _pickDate() async {
+  // Date pickers
+  Future<void> pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 2),
+      initialDate: selectedDate ?? now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 3)),
     );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked != null) setState(() => selectedDate = picked);
   }
 
-  Future<void> _pickTime() async {
-    final now = TimeOfDay.now();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? now,
-    );
-    if (picked != null) {
-      setState(() => _selectedTime = picked);
-    }
-  }
-
-  Future<void> _pickMarshalCallDate() async {
+  Future<void> pickMarshalDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _marshalCallDate ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 2),
+      initialDate: marshalCallDate ?? now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 2)),
     );
-    if (picked != null) {
-      setState(() => _marshalCallDate = picked);
+    if (picked != null) setState(() => marshalCallDate = picked);
+  }
+
+  String buildTitle() {
+    switch (selectedEventType) {
+      case "Training 1":
+        return "Training 1";
+      case "Training 2":
+        return "Training 2";
+      case "Race":
+        return "Race: $selectedRace";
+      case "Handicap Series":
+        return "Handicap (${selectedHandicapDistance ?? ""})";
+      case "Relay":
+        return "RNR Relay – Team $selectedRelayTeam";
+      case "Special Event":
+        return "Special Event";
+      default:
+        return selectedEventType;
     }
   }
 
-  String _formatDate(DateTime? d) {
-    if (d == null) return 'Pick date';
-    return '${d.day.toString().padLeft(2, '0')}/'
-        '${d.month.toString().padLeft(2, '0')}/'
-        '${d.year}';
-  }
-
-  String _formatTime(TimeOfDay? t) {
-    if (t == null) return 'Pick time';
-    final hh = t.hour.toString().padLeft(2, '0');
-    final mm = t.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
-  }
-
-  // -------------------------------
-  // Save Logic (UPDATED FOR ROLES)
-  // -------------------------------
-
-  Future<void> _onSave() async {
+  Future<void> saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date and time')),
-      );
-      return;
-    }
-
-    // Determine actual event type
-    final isAdmin = widget.userRole == 'admin';
-
-    String? finalType = _adminEventType ?? _socialEventType;
-
-    if (finalType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an activity type')),
-      );
-      return;
-    }
-
-    // ⭐ BLOCK readers from selecting admin-only types
-    if (!isAdmin && _adminEventType != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Only admins can create Training, Event, Race, Handicap, Relay',
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Convert social names to lowercase DB types
-    if (!isAdmin) {
-      finalType = finalType.toLowerCase(); // e.g. "social run"
-    }
-
-    final fullDateTime = DateTime(
-      _selectedDate!.year,
-      _selectedDate!.month,
-      _selectedDate!.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
-    );
-
-    final hostDir = _leadHostDirectorController.text.trim();
-    final venue = _venueController.text.trim();
-    final venueAddress = _venueAddressController.text.trim();
-    final description = _descriptionController.text.trim();
-
-    // ----- TITLE GENERATION -----
-    String title;
-    String? raceName;
-    String? handicapDistance;
-    int? trainingNumber;
-    String? relayTeam;
-
-    switch (finalType) {
-      case 'training':
-        trainingNumber = _trainingNumber;
-        final custom = _titleController.text.trim();
-        title = custom.isEmpty
-            ? 'Training $trainingNumber'
-            : 'Training $trainingNumber — $custom';
-        break;
-      case 'race':
-        raceName = _selectedRaceName;
-        title = 'Race: $raceName';
-        break;
-      case 'handicap':
-        handicapDistance = _selectedHandicapDistance;
-        title = 'Handicap ($handicapDistance)';
-        break;
-      case 'relay':
-        relayTeam = _relayTeam;
-        title = 'RNR Relay – Team $relayTeam';
-        break;
-      default:
-        title = _titleController.text.trim().isEmpty
-            ? finalType[0].toUpperCase() + finalType.substring(1)
-            : _titleController.text.trim();
-    }
-
-    // ---------------------------
-    // Create event in Supabase
-    // ---------------------------
-
-    try {
-      final eventId = await EventService.createEvent(
-        eventType: finalType,
-        trainingNumber: trainingNumber,
-        raceName: raceName,
-        handicapDistance: handicapDistance,
-        title: title,
-        dateTime: fullDateTime,
-        hostOrDirector: hostDir,
-        venue: venue,
-        venueAddress: venueAddress.isEmpty ? null : venueAddress,
-        description: description,
-        marshalCallDate: _marshalCallDate,
-        relayTeam: relayTeam,
-      );
-
-      final friendlyDate =
-          '${fullDateTime.day.toString().padLeft(2, '0')}/${fullDateTime.month.toString().padLeft(2, '0')}';
-      final friendlyTime =
-          '${fullDateTime.hour.toString().padLeft(2, '0')}:${fullDateTime.minute.toString().padLeft(2, '0')}';
-
-      final message =
-          '$title on $friendlyDate at $friendlyTime'
-          '${venue.isNotEmpty ? ' · $venue' : ''}';
-
-      await NotificationService.notifyAllUsers(
-        title: 'New $finalType created',
-        body: message,
-        eventId: eventId,
-      );
-
-      if (!mounted) return;
-
+    if (selectedDate == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Saved $finalType: $title')));
+      ).showSnackBar(const SnackBar(content: Text("Please select a date")));
+      return;
+    }
 
+    if (selectedTime == null && selectedEventType != "Relay") {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please select a time")));
+      return;
+    }
+
+    final timeString = selectedEventType == "Relay"
+        ? "00:00"
+        : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
+
+    final map = {
+      "event_type": selectedEventType.toLowerCase().replaceAll(" ", "_"),
+      "training_number": selectedEventType == "Training 1"
+          ? 1
+          : selectedEventType == "Training 2"
+          ? 2
+          : null,
+      "race_name": selectedEventType == "Race" ? selectedRace : null,
+      "handicap_distance": selectedEventType == "Handicap Series"
+          ? selectedHandicapDistance
+          : null,
+      "relay_team": selectedEventType == "Relay" ? selectedRelayTeam : null,
+      "title": buildTitle(),
+      "date": selectedDate!.toIso8601String().split("T").first,
+      "time": timeString,
+      "host_or_director": hostCtrl.text.trim(),
+      "venue": venueCtrl.text.trim(),
+      "venue_address": venueAddressCtrl.text.trim(),
+      "description": descriptionCtrl.text.trim(),
+      "marshal_call_date":
+          (selectedEventType == "Race" ||
+              selectedEventType == "Handicap Series")
+          ? marshalCallDate?.toIso8601String().split("T").first
+          : null,
+      "expected_time_required":
+          selectedEventType == "Handicap Series" || selectedEventType == "Relay"
+          ? true
+          : false,
+    };
+
+    try {
+      await supabase.from("club_events").insert(map);
+
+      if (!mounted) return;
       Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Event created successfully!")),
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to save event: $e')));
+      ).showSnackBar(SnackBar(content: Text("Failed: $e")));
     }
   }
 
-  // -------------------------------
-  // UI
-  // -------------------------------
+  Widget _section(String title, Widget child) {
+    return Card(
+      elevation: 1,
+      color: const Color.fromARGB(226, 101, 105, 101),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = widget.userRole == 'admin';
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Club Activity')),
+      appBar: AppBar(title: const Text("Create Event")),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Form(
           key: _formKey,
-
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ⭐ ADMIN DROPDOWN (disabled for readers)
-              Opacity(
-                opacity: isAdmin ? 1.0 : 0.4,
-                child: IgnorePointer(
-                  ignoring: !isAdmin,
-                  child: DropdownButtonFormField<String>(
-                    value: _adminEventType,
-                    decoration: const InputDecoration(
-                      labelText: 'Admin-only activities',
-                    ),
-                    items: _adminTypes
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(
-                              type[0].toUpperCase() + type.substring(1),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      setState(() {
-                        _adminEventType = v;
-                        _socialEventType = null;
-                      });
-                    },
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ⭐ SOCIAL DROPDOWN
-              DropdownButtonFormField<String>(
-                value: _socialEventType,
-                decoration: const InputDecoration(
-                  labelText: 'Social activities (all members)',
-                ),
-                items: _socialTypes
-                    .map(
-                      (type) =>
-                          DropdownMenuItem(value: type, child: Text(type)),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  setState(() {
-                    _socialEventType = v;
-                    _adminEventType = null;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // ⭐ DYNAMIC FIELDS, based on admin type
-              if (_adminEventType == 'training') ...[
-                Row(
-                  children: [
-                    const Text('Training number:'),
-                    const SizedBox(width: 12),
-                    DropdownButton<int>(
-                      value: _trainingNumber,
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('Training 1')),
-                        DropdownMenuItem(value: 2, child: Text('Training 2')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) {
-                          setState(() => _trainingNumber = v);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Optional label (e.g. Intervals on the hill)',
-                  ),
-                ),
-              ],
-
-              if (_adminEventType == 'event') ...[
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(labelText: 'Event name'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-              ],
-
-              if (_adminEventType == 'race') ...[
-                DropdownButtonFormField<String>(
-                  value: _selectedRaceName,
-                  items: _raceNames
-                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _selectedRaceName = v);
-                    }
-                  },
-                  decoration: const InputDecoration(labelText: 'Race name'),
-                ),
-              ],
-
-              if (_adminEventType == 'handicap') ...[
-                DropdownButtonFormField<String>(
-                  value: _selectedHandicapDistance,
-                  items: _handicapDistances
-                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _selectedHandicapDistance = v);
-                    }
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Handicap distance',
-                  ),
-                ),
-              ],
-
-              if (_adminEventType == 'relay') ...[
-                DropdownButtonFormField<String>(
-                  value: _relayTeam,
-                  items: const [
-                    DropdownMenuItem(value: 'A', child: Text('Team A')),
-                    DropdownMenuItem(value: 'B', child: Text('Team B')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _relayTeam = v);
-                    }
-                  },
-                  decoration: const InputDecoration(labelText: 'Relay Team'),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // -------------------------------
-              // DATE + TIME
-              // -------------------------------
               Row(
                 children: [
                   Expanded(
-                    child: InkWell(
-                      onTap: _pickDate,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Date',
-                          border: OutlineInputBorder(),
-                        ),
-                        child: Text(_formatDate(_selectedDate)),
-                      ),
+                    child: ElevatedButton(
+                      onPressed: widget.userRole == "admin"
+                          ? () => setState(() {
+                              selectedCategory = "admin";
+                              selectedEventType = adminTypes.first;
+                            })
+                          : null,
+                      child: const Text("Admin Events"),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: InkWell(
-                      onTap: _pickTime,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Time',
-                          border: OutlineInputBorder(),
-                        ),
-                        child: Text(_formatTime(_selectedTime)),
-                      ),
+                    child: ElevatedButton(
+                      onPressed: () => setState(() {
+                        selectedCategory = "social";
+                        selectedEventType = socialTypes.first;
+                      }),
+                      child: const Text("Social Events"),
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // -------------------------------
-              // HOST / DIRECTOR
-              // -------------------------------
-              TextFormField(
-                controller: _leadHostDirectorController,
-                decoration: InputDecoration(
-                  labelText:
-                      (_adminEventType == 'race' ||
-                          _adminEventType == 'handicap')
-                      ? 'Run Director(s)'
-                      : _adminEventType == 'training'
-                      ? 'Training lead name'
-                      : 'Host',
+              /// EVENT TYPE
+              _section(
+                "Event Type",
+                DropdownButtonFormField<String>(
+                  value: selectedEventType,
+                  items: selectedCategory == "admin"
+                      ? adminTypes
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList()
+                      : socialTypes
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                  onChanged: (v) => setState(() => selectedEventType = v!),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // Venue
-              TextFormField(
-                controller: _venueController,
-                decoration: const InputDecoration(labelText: 'Venue'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
+              // RACE UI
+              if (selectedEventType == "Race")
+                _section(
+                  "Race Name",
+                  DropdownButtonFormField<String>(
+                    value: selectedRace,
+                    items: raceNames
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedRace = v),
+                    decoration: const InputDecoration(labelText: "Select Race"),
+                  ),
+                ),
 
-              const SizedBox(height: 8),
+              // HANDICAP UI
+              if (selectedEventType == "Handicap Series")
+                _section(
+                  "Handicap Event",
+                  DropdownButtonFormField<String>(
+                    value: selectedHandicapDistance,
+                    items: handicapDistances
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => selectedHandicapDistance = v),
+                  ),
+                ),
 
-              TextFormField(
-                controller: _venueAddressController,
-                decoration: const InputDecoration(labelText: 'Venue address'),
-              ),
+              // RELAY UI
+              if (selectedEventType == "Relay")
+                _section(
+                  "Relay Team",
+                  DropdownButtonFormField<String>(
+                    value: selectedRelayTeam,
+                    items: const [
+                      DropdownMenuItem(value: "A", child: Text("Team A")),
+                      DropdownMenuItem(value: "B", child: Text("Team B")),
+                    ],
+                    onChanged: (v) => setState(() => selectedRelayTeam = v!),
+                  ),
+                ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              if (_adminEventType == 'race' || _adminEventType == 'handicap')
-                InkWell(
-                  onTap: _pickMarshalCallDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Marshal call date',
-                      border: OutlineInputBorder(),
+              // HOST / VENUE / DESCRIPTION
+              _section(
+                "Event Details",
+                Column(
+                  children: [
+                    TextFormField(
+                      controller: hostCtrl,
+                      decoration: const InputDecoration(labelText: "Host"),
+                      validator: (v) => v!.trim().isEmpty ? "Required" : null,
                     ),
+                    TextFormField(
+                      controller: venueCtrl,
+                      decoration: const InputDecoration(labelText: "Venue"),
+                      validator: (v) => v!.trim().isEmpty ? "Required" : null,
+                    ),
+                    TextFormField(
+                      controller: venueAddressCtrl,
+                      decoration: const InputDecoration(
+                        labelText: "Venue Address",
+                      ),
+                    ),
+                    TextFormField(
+                      controller: descriptionCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: "Description",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              /// DATE & TIME
+              Card(
+                elevation: 1,
+                color: const Color.fromARGB(255, 74, 75, 76),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Date & Time",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.yellow[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: pickDate,
+                              child: Text(
+                                selectedDate == null
+                                    ? "Pick Date"
+                                    : "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
+                              ),
+                            ),
+                          ),
+                          if (selectedEventType != "Relay") ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final t = await showTimePicker(
+                                    context: context,
+                                    initialTime:
+                                        selectedTime ?? TimeOfDay.now(),
+                                  );
+                                  if (t != null)
+                                    setState(() => selectedTime = t);
+                                },
+                                child: Text(
+                                  selectedTime == null
+                                      ? "Pick Time"
+                                      : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}",
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // MARSHAL CALL DATE
+              if (selectedEventType == "Race" ||
+                  selectedEventType == "Handicap Series")
+                _section(
+                  "Marshal Call Date",
+                  OutlinedButton(
+                    onPressed: pickMarshalDate,
                     child: Text(
-                      _marshalCallDate == null
-                          ? 'Pick date'
-                          : _formatDate(_marshalCallDate),
+                      marshalCallDate == null
+                          ? "Pick Marshal Call Date"
+                          : "${marshalCallDate!.day}/${marshalCallDate!.month}/${marshalCallDate!.year}",
                     ),
                   ),
                 ),
 
-              const SizedBox(height: 16),
-
-              // Description
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _onSave,
+                  onPressed: saveEvent,
                   icon: const Icon(Icons.save),
-                  label: const Text('Save activity'),
+                  label: const Text("Save Event"),
                 ),
               ),
             ],

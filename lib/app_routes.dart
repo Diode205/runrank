@@ -9,7 +9,7 @@ import 'package:runrank/root_navigation.dart';
 import 'package:runrank/history_screen.dart';
 
 // Club hub / events
-import 'package:runrank/widgets/training_events_calendar.dart';
+import 'package:runrank/widgets/club_events_calendar.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
 
 // Menu pages
@@ -47,7 +47,7 @@ class AppRoutes {
     login: (_) => const LoginScreen(),
     root: (_) => const RootNavigation(),
     history: (_) => const HistoryScreen(),
-    clubHub: (_) => const TrainingEventsCalendar(),
+    clubHub: (_) => const ClubEventsCalendar(),
     userProfile: (_) => const UserProfilePage(),
     membership: (_) => const MembershipPage(),
     charity: (_) => const CharityPage(),

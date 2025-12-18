@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:runrank/services/event_response_service.dart';
+import 'package:runrank/widgets/event_details_page.dart';
 
 class AttendeeListPage extends StatefulWidget {
   final String eventId;
@@ -32,7 +32,7 @@ class _AttendeeListPageState extends State<AttendeeListPage> {
 
   Future<void> _loadAttendees() async {
     setState(() => _loading = true);
-    final attendees = await EventResponseService.getRespondersWithNames(
+    final attendees = await getRespondersWithNames(
       eventId: widget.eventId,
       responseType: widget.responseType,
     );
