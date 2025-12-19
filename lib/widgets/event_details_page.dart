@@ -135,6 +135,40 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     setState(() {});
   }
 
+  Map<String, int> _supportRoleBreakdown() {
+    final counts = <String, int>{
+      "timekeeping": 0,
+      "cycling": 0,
+      "driving": 0,
+      "team_lead": 0,
+    };
+
+    for (final supporter in supporters) {
+      final raw = supporter["relay_roles_json"];
+      List<dynamic>? roles;
+      if (raw is String) {
+        try {
+          roles = jsonDecode(raw) as List<dynamic>?;
+        } catch (_) {
+          roles = null;
+        }
+      } else if (raw is List) {
+        roles = raw;
+      }
+
+      if (roles == null) continue;
+
+      for (final r in roles) {
+        final role = r as String?;
+        if (role != null && counts.containsKey(role)) {
+          counts[role] = (counts[role] ?? 0) + 1;
+        }
+      }
+    }
+
+    return counts;
+  }
+
   String _weekday(DateTime dt) {
     const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     return names[dt.weekday - 1];
@@ -686,7 +720,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         ),
                       ),
                     ),
-              child: const Icon(Icons.security),
+              child: const Text("🦺", style: TextStyle(fontSize: 20)),
             ),
             FilledButton(
               onPressed: () async {
@@ -1216,6 +1250,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     List<Map<String, dynamic>> participants, {
     String? responseType,
     bool showExpectedTime = false,
+    String? subtitle,
   }) {
     return InkWell(
       onTap: count > 0
@@ -1236,18 +1271,37 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
           border: Border.all(color: Colors.grey.shade300),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  count.toString(),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              count.toString(),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            if (subtitle != null && subtitle.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+            ],
           ],
         ),
       ),
@@ -1314,6 +1368,10 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         ),
       );
     } else if (type == "relay") {
+      final roleCounts = _supportRoleBreakdown();
+      final supportSubtitle =
+          "🧭 ${roleCounts['timekeeping'] ?? 0} · 🚴 ${roleCounts['cycling'] ?? 0} · 🚐 ${roleCounts['driving'] ?? 0} · 📋 ${roleCounts['team_lead'] ?? 0}";
+
       lines.add(
         _buildParticipantLine(
           "🏃‍♀️ Running",
@@ -1324,22 +1382,21 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       );
       lines.add(
         _buildParticipantLine(
-          "🦺 Marshals",
+          "🦺 Stage 6 Marshals",
           volunteers.length,
           volunteers,
           responseType: 'marshalling',
         ),
       );
-      if (supporters.isNotEmpty) {
-        lines.add(
-          _buildParticipantLine(
-            "🤝 Support Crew",
-            supporters.length,
-            supporters,
-            responseType: 'supporting',
-          ),
-        );
-      }
+      lines.add(
+        _buildParticipantLine(
+          "🤝 Support Crew",
+          supporters.length,
+          supporters,
+          responseType: 'supporting',
+          subtitle: supportSubtitle,
+        ),
+      );
     }
 
     return lines;
