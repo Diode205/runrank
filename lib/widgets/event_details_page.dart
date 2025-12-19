@@ -708,122 +708,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   Widget _relayRunningDialog() {
-    List<int> selectedStages = List.from(myRelayStages);
-    String? pace;
-
-    return StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Text("Select Relay Stages & Pace"),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  children: relayStages.map((stage) {
-                    return CheckboxListTile(
-                      title: Text(
-                        "Stage ${stage['stage']}: ${stage['distance']} - ${stage['details']}",
-                      ),
-                      value: selectedStages.contains(stage['stage']),
-                      onChanged: (v) {
-                        setState(() {
-                          if (v == true) {
-                            selectedStages.add(stage['stage'] as int);
-                          } else {
-                            selectedStages.remove(stage['stage'] as int);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: "Predicted Pace (min/mile)",
-                ),
-                onChanged: (value) => pace = value.trim(),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, {
-              'stages': selectedStages,
-              'pace': pace,
-            }),
-            child: const Text("OK"),
-          ),
-        ],
-      ),
+    return _RelayRunningDialog(
+      relayStages: relayStages,
+      initialSelectedStages: List<int>.from(myRelayStages),
+      initialPace: myPredictedPace,
     );
   }
 
   Widget _relaySupportingDialog() {
-    List<String> selectedRoles = List.from(myRelayRoles);
-
-    return StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Text("Select Support Roles"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CheckboxListTile(
-              title: const Text("🧭 Timekeeping"),
-              value: selectedRoles.contains("timekeeping"),
-              onChanged: (v) => setState(
-                () => v == true
-                    ? selectedRoles.add("timekeeping")
-                    : selectedRoles.remove("timekeeping"),
-              ),
-            ),
-            CheckboxListTile(
-              title: const Text("🚴 Cycling"),
-              value: selectedRoles.contains("cycling"),
-              onChanged: (v) => setState(
-                () => v == true
-                    ? selectedRoles.add("cycling")
-                    : selectedRoles.remove("cycling"),
-              ),
-            ),
-            CheckboxListTile(
-              title: const Text("🚐 Driving"),
-              value: selectedRoles.contains("driving"),
-              onChanged: (v) => setState(
-                () => v == true
-                    ? selectedRoles.add("driving")
-                    : selectedRoles.remove("driving"),
-              ),
-            ),
-            CheckboxListTile(
-              title: const Text("📋 Team Lead"),
-              value: selectedRoles.contains("team_lead"),
-              onChanged: (v) => setState(
-                () => v == true
-                    ? selectedRoles.add("team_lead")
-                    : selectedRoles.remove("team_lead"),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, selectedRoles),
-            child: const Text("OK"),
-          ),
-        ],
-      ),
+    return _RelaySupportingDialog(
+      initialSelectedRoles: List<String>.from(myRelayRoles),
     );
   }
 
@@ -1549,6 +1443,160 @@ class _CommentsSheet extends StatefulWidget {
 
   @override
   State<_CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _RelayRunningDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> relayStages;
+  final List<int> initialSelectedStages;
+  final String? initialPace;
+
+  const _RelayRunningDialog({
+    required this.relayStages,
+    required this.initialSelectedStages,
+    required this.initialPace,
+  });
+
+  @override
+  State<_RelayRunningDialog> createState() => _RelayRunningDialogState();
+}
+
+class _RelayRunningDialogState extends State<_RelayRunningDialog> {
+  late List<int> selectedStages;
+  String? pace;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedStages = List<int>.from(widget.initialSelectedStages);
+    pace = widget.initialPace;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text("Select Relay Stages & Pace"),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 400,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                children: widget.relayStages.map((stage) {
+                  final stageNum = stage['stage'] as int;
+                  return CheckboxListTile(
+                    title: Text(
+                      "Stage $stageNum: ${stage['distance']} - ${stage['details']}",
+                    ),
+                    value: selectedStages.contains(stageNum),
+                    onChanged: (v) {
+                      if (!mounted) return;
+                      setState(() {
+                        if (v == true) {
+                          selectedStages.add(stageNum);
+                        } else {
+                          selectedStages.remove(stageNum);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: "Predicted Pace (min/mile)",
+              ),
+              onChanged: (value) => pace = value.trim(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.pop(context, {'stages': selectedStages, 'pace': pace}),
+          child: const Text("OK"),
+        ),
+      ],
+    );
+  }
+}
+
+class _RelaySupportingDialog extends StatefulWidget {
+  final List<String> initialSelectedRoles;
+
+  const _RelaySupportingDialog({required this.initialSelectedRoles});
+
+  @override
+  State<_RelaySupportingDialog> createState() => _RelaySupportingDialogState();
+}
+
+class _RelaySupportingDialogState extends State<_RelaySupportingDialog> {
+  late List<String> selectedRoles;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedRoles = List<String>.from(widget.initialSelectedRoles);
+  }
+
+  void _toggleRole(String role, bool? v) {
+    if (!mounted) return;
+    setState(() {
+      if (v == true) {
+        if (!selectedRoles.contains(role)) selectedRoles.add(role);
+      } else {
+        selectedRoles.remove(role);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text("Select Support Roles"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CheckboxListTile(
+            title: const Text("🧭 Timekeeping"),
+            value: selectedRoles.contains("timekeeping"),
+            onChanged: (v) => _toggleRole("timekeeping", v),
+          ),
+          CheckboxListTile(
+            title: const Text("🚴 Cycling"),
+            value: selectedRoles.contains("cycling"),
+            onChanged: (v) => _toggleRole("cycling", v),
+          ),
+          CheckboxListTile(
+            title: const Text("🚐 Driving"),
+            value: selectedRoles.contains("driving"),
+            onChanged: (v) => _toggleRole("driving", v),
+          ),
+          CheckboxListTile(
+            title: const Text("📋 Team Lead"),
+            value: selectedRoles.contains("team_lead"),
+            onChanged: (v) => _toggleRole("team_lead", v),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, selectedRoles),
+          child: const Text("OK"),
+        ),
+      ],
+    );
+  }
 }
 
 class _HostChatSheet extends StatefulWidget {
