@@ -885,10 +885,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                const Color(0xFFFFD300).withOpacity(0.3),
-                const Color(0xFF0057B7).withOpacity(0.3),
-              ],
+              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -913,13 +910,13 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                Colors.red.withOpacity(0.3),
-                                Colors.red.withOpacity(0.1),
+                                const Color(0x4DFF0000),
+                                const Color(0x1AFF0000),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.red.withOpacity(0.5),
+                              color: const Color(0x80FF0000),
                               width: 2,
                             ),
                           ),
@@ -952,8 +949,12 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.grey.shade800.withOpacity(0.5),
-                        Colors.grey.shade900.withOpacity(0.5),
+                        Colors.grey.shade800.withValues(
+                          alpha: Colors.grey.shade800.opacity * 0.5,
+                        ),
+                        Colors.grey.shade900.withValues(
+                          alpha: Colors.grey.shade900.opacity * 0.5,
+                        ),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -969,7 +970,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFD300).withOpacity(0.2),
+                              color: const Color(0x33FFD300),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -997,7 +998,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0057B7).withOpacity(0.2),
+                              color: const Color(0x330057B7),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -1119,7 +1120,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                 const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade900.withOpacity(0.5),
+                    color: Colors.grey.shade900.withValues(
+                      alpha: Colors.grey.shade900.opacity * 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -1150,7 +1153,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF0057B7).withOpacity(0.3),
+                        color: const Color(0x4D0057B7),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -1182,12 +1185,12 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.25),
+                      color: const Color(0x40000000),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: Colors.white12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
+                          color: const Color(0x40000000),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -1680,7 +1683,7 @@ class _HostChatSheet extends StatefulWidget {
 
 class _HostChatSheetState extends State<_HostChatSheet> {
   final _headerShadow = BoxShadow(
-    color: Colors.black.withOpacity(0.35),
+    color: const Color(0x59000000),
     blurRadius: 16,
     offset: const Offset(0, 10),
   );
@@ -1805,10 +1808,7 @@ class _HostChatSheetState extends State<_HostChatSheet> {
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFFFD300).withOpacity(0.22),
-                      const Color(0xFF0057B7).withOpacity(0.18),
-                    ],
+                    colors: [const Color(0x38FFD300), const Color(0x2E0057B7)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1934,9 +1934,7 @@ class _HostChatSheetState extends State<_HostChatSheet> {
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: isMine
-                                        ? const Color(
-                                            0xFF0057B7,
-                                          ).withOpacity(0.85)
+                                        ? const Color(0xD90057B7)
                                         : Colors.grey.shade800,
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
@@ -1979,9 +1977,7 @@ class _HostChatSheetState extends State<_HostChatSheet> {
                                             child: Text(
                                               ts,
                                               style: TextStyle(
-                                                color: Colors.white.withOpacity(
-                                                  0.55,
-                                                ),
+                                                color: const Color(0x8CFFFFFF),
                                                 fontSize: 12,
                                               ),
                                             ),
@@ -2021,10 +2017,10 @@ class _HostChatSheetState extends State<_HostChatSheet> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.white12),
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.35),
+                            const BoxShadow(
+                              color: Color(0x59000000),
                               blurRadius: 12,
-                              offset: const Offset(0, 6),
+                              offset: Offset(0, 6),
                             ),
                           ],
                         ),
@@ -2290,7 +2286,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
+                        color: const Color(0x59000000),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white24, width: 1),
                       ),
