@@ -280,282 +280,32 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   Future<void> _contactHost() async {
+    // Treat the event creator as the host; fall back to the current user if missing.
+    final hostUserId = widget.event.createdBy ?? supabase.auth.currentUser?.id;
+    if (hostUserId == null || hostUserId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "No creator id found for this event. Please re-save the event.",
+          ),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade600,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFFFD300).withOpacity(0.2),
-                      const Color(0xFF0057B7).withOpacity(0.2),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white24, width: 1.5),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.message,
-                                color: Color(0xFFFFD300),
-                                size: 24,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  widget.event.title ?? "Event",
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today,
-                                size: 14,
-                                color: Color(0xFF0057B7),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "${_weekday(widget.event.dateTime)}, ${widget.event.dateTime.day} ${_month(widget.event.dateTime.month)} ${widget.event.dateTime.year}",
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Color(0xFF0057B7),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  widget.event.venue,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: const [
-                    Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: Colors.white24,
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              "No messages yet",
-                              style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              "Start a conversation with the host",
-                              style: TextStyle(
-                                color: Colors.white24,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade800,
-                  border: const Border(
-                    top: BorderSide(color: Colors.white12, width: 1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        constraints: const BoxConstraints(
-                          minHeight: 56,
-                          maxHeight: 140,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade900,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.35),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
-                              ),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      "Photo attachment coming soon",
-                                    ),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.photo_library),
-                              color: const Color(0xFF0057B7),
-                              tooltip: "Attach photo",
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
-                              ),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Camera feature coming soon"),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.camera_alt),
-                              color: const Color(0xFF0057B7),
-                              tooltip: "Take photo",
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: TextField(
-                                controller: messageController,
-                                maxLines: null,
-                                textInputAction: TextInputAction.newline,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                  hintText: "Type a message...",
-                                  hintStyle: TextStyle(color: Colors.white38),
-                                  border: InputBorder.none,
-                                  isCollapsed: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        onPressed: () {
-                          if (messageController.text.trim().isNotEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Message sent!"),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                            messageController.clear();
-                          }
-                        },
-                        icon: const Icon(Icons.send, color: Colors.white),
-                        tooltip: "Send message",
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      builder: (_) => _HostChatSheet(
+        event: widget.event,
+        hostUserId: hostUserId,
+        hostDisplayName: widget.event.hostOrDirector.isNotEmpty
+            ? widget.event.hostOrDirector
+            : "Host / Coach",
+        messageController: messageController,
+        loadMessages: getHostMessagesWithNames,
+        sendMessage: _sendHostMessage,
       ),
     );
   }
@@ -585,6 +335,60 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         onCommentSubmitted: _submitComment,
       ),
     );
+  }
+
+  Future<Map<String, String>> _fetchNamesForIds(Set<String> userIds) async {
+    if (userIds.isEmpty) return {};
+
+    final res = await supabase
+        .from("user_profiles")
+        .select("id, full_name")
+        .inFilter("id", userIds.toList());
+
+    final map = <String, String>{};
+    for (final row in res) {
+      final id = row["id"] as String?;
+      final name = row["full_name"] as String?;
+      if (id != null) {
+        map[id] = name ?? "Unknown";
+      }
+    }
+    return map;
+  }
+
+  Future<List<Map<String, dynamic>>> getHostMessagesWithNames(
+    String eventId,
+  ) async {
+    final rows = await supabase
+        .from("event_host_messages")
+        .select("id, event_id, sender_id, receiver_id, message, created_at")
+        .eq("event_id", eventId)
+        .order("created_at");
+
+    final messages = rows.map((e) => Map<String, dynamic>.from(e)).toList();
+    final ids = <String>{};
+    for (final m in messages) {
+      final sender = m["sender_id"] as String?;
+      if (sender != null) ids.add(sender);
+    }
+
+    final names = await _fetchNamesForIds(ids);
+
+    return messages
+        .map((m) => {...m, "senderName": names[m["sender_id"]] ?? "Member"})
+        .toList();
+  }
+
+  Future<void> _sendHostMessage(String hostUserId, String message) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    await supabase.from("event_host_messages").insert({
+      "event_id": widget.event.id,
+      "sender_id": user.id,
+      "receiver_id": hostUserId,
+      "message": message,
+    });
   }
 
   Future<void> _cancelMyPlan() async {
@@ -1745,6 +1549,476 @@ class _CommentsSheet extends StatefulWidget {
 
   @override
   State<_CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _HostChatSheet extends StatefulWidget {
+  final ClubEvent event;
+  final String hostUserId;
+  final String hostDisplayName;
+  final TextEditingController messageController;
+  final Future<List<Map<String, dynamic>>> Function(String eventId)
+  loadMessages;
+  final Future<void> Function(String hostUserId, String message) sendMessage;
+
+  const _HostChatSheet({
+    required this.event,
+    required this.hostUserId,
+    required this.hostDisplayName,
+    required this.messageController,
+    required this.loadMessages,
+    required this.sendMessage,
+  });
+
+  @override
+  State<_HostChatSheet> createState() => _HostChatSheetState();
+}
+
+class _HostChatSheetState extends State<_HostChatSheet> {
+  final _headerShadow = BoxShadow(
+    color: Colors.black.withOpacity(0.35),
+    blurRadius: 16,
+    offset: const Offset(0, 10),
+  );
+
+  bool _loading = true;
+  bool _sending = false;
+  List<Map<String, dynamic>> _messages = [];
+  ScrollController? _listController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    _listController = null;
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    try {
+      final data = await widget.loadMessages(widget.event.id);
+      if (!mounted) return;
+      _messages = data;
+      _loading = false;
+      setState(() {});
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      _loading = false;
+      setState(() {});
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to load messages: $e')));
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = _listController;
+      if (controller == null || !controller.hasClients) return;
+      controller.animateTo(
+        controller.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  String _formatTime(String? isoString) {
+    if (isoString == null) return "";
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return "$h:$m";
+    } catch (_) {
+      return isoString;
+    }
+  }
+
+  Future<void> _handleSend() async {
+    final text = widget.messageController.text.trim();
+    if (text.isEmpty || _sending) return;
+
+    setState(() => _sending = true);
+    try {
+      await widget.sendMessage(widget.hostUserId, text);
+      widget.messageController.clear();
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message sent'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not send message: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
+      minChildSize: 0.55,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        _listController = scrollController;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade600,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFFFD300).withOpacity(0.22),
+                      const Color(0xFF0057B7).withOpacity(0.18),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white24, width: 1.2),
+                  boxShadow: [_headerShadow],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.forum,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.event.title ?? "Event",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Chat with ${widget.hostDisplayName}",
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _messages.isEmpty
+                    ? ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(32),
+                        children: const [
+                          Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: Colors.white24,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No messages yet",
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  "Start a conversation with the host",
+                                  style: TextStyle(
+                                    color: Colors.white24,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: _messages.length,
+                        itemBuilder: (_, i) {
+                          final msg = _messages[i];
+                          final isMine = msg['sender_id'] == currentUserId;
+                          final sender =
+                              (msg['senderName'] as String?) ??
+                              (isMine ? 'You' : widget.hostDisplayName);
+                          final ts = _formatTime(msg['created_at'] as String?);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Align(
+                              alignment: isMine
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.75,
+                                ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: isMine
+                                        ? const Color(
+                                            0xFF0057B7,
+                                          ).withOpacity(0.85)
+                                        : Colors.grey.shade800,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white12,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment: isMine
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isMine)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 4,
+                                            ),
+                                            child: Text(
+                                              sender,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        Text(
+                                          (msg['message'] as String?) ?? '',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        if (ts.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Text(
+                                              ts,
+                                              style: TextStyle(
+                                                color: Colors.white.withOpacity(
+                                                  0.55,
+                                                ),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  border: const Border(
+                    top: BorderSide(color: Colors.white12, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minHeight: 56,
+                          maxHeight: 140,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade900,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Photo attachment coming soon',
+                                    ),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.photo_library),
+                              color: const Color(0xFF0057B7),
+                              tooltip: 'Attach photo',
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Camera feature coming soon'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.camera_alt),
+                              color: const Color(0xFF0057B7),
+                              tooltip: 'Take photo',
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: TextField(
+                                controller: widget.messageController,
+                                maxLines: null,
+                                textInputAction: TextInputAction.newline,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: const InputDecoration(
+                                  hintText: 'Type a message...',
+                                  hintStyle: TextStyle(color: Colors.white38),
+                                  border: InputBorder.none,
+                                  isCollapsed: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        onPressed: _sending ? null : _handleSend,
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send, color: Colors.white),
+                        tooltip: 'Send message',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _CommentsSheetState extends State<_CommentsSheet> {
