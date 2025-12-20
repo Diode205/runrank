@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
+import 'package:runrank/services/notification_service.dart';
 
 // Prevent repeated Supabase error spam if the comments table is absent.
 bool _baseCommentsTableMissing = false;
@@ -339,6 +340,41 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         "expected_time_seconds": predictedTimeSeconds,
       }, onConflict: 'event_id,user_id');
 
+      // Notify event creator about new response
+      if (event.createdBy != null && event.createdBy!.isNotEmpty) {
+        final userProfile = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+
+        final userName = userProfile['full_name'] ?? 'A member';
+        String action;
+        switch (dbType) {
+          case "running":
+            action = "joined";
+            break;
+          case "marshalling":
+            action = "volunteered to marshal";
+            break;
+          case "supporting":
+            action = "offered support for";
+            break;
+          case "unavailable":
+            action = "marked unavailable for";
+            break;
+          default:
+            action = "responded to";
+        }
+
+        await NotificationService.notifyEventCreator(
+          eventId: event.id,
+          creatorId: event.createdBy!,
+          title: 'Event Response',
+          body: '$userName has $action ${event.title}',
+        );
+      }
+
       loadResponses();
     } catch (e) {
       ScaffoldMessenger.of(
@@ -362,7 +398,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       if (id != null) {
         map[id] = name ?? "Unknown";
       }
-    }
+    } 
     return map;
   }
 

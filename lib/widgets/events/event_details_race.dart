@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
+import 'package:runrank/services/notification_service.dart';
 
 /// Event details page for race events (Race, Handicap_Series)
 /// Group 2: Race and Handicap_Series with marshal call dates and predicted finish times
@@ -707,6 +708,13 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         })
         .eq("id", widget.event.id);
 
+    // Notify all participants about cancellation
+    await NotificationService.notifyEventParticipants(
+      eventId: widget.event.id,
+      title: 'Event Cancelled',
+      body: '${widget.event.title} has been cancelled',
+    );
+
     setState(() {});
   }
 
@@ -730,6 +738,14 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     );
 
     if (ok != true) return;
+
+    // Notify all participants about deletion
+    await NotificationService.notifyEventParticipants(
+      eventId: widget.event.id,
+      title: 'Event Deleted',
+      body: '${widget.event.title} has been removed from the calendar',
+    );
+
     await supabase.from("club_events").delete().eq("id", widget.event.id);
     Navigator.pop(context);
   }

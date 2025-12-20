@@ -625,6 +625,13 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
         })
         .eq("id", widget.event.id);
 
+    // Notify all participants about cancellation
+    await NotificationService.notifyEventParticipants(
+      eventId: widget.event.id,
+      title: 'Event Cancelled',
+      body: '${widget.event.title} has been cancelled',
+    );
+
     setState(() {});
   }
 
@@ -648,6 +655,14 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     );
 
     if (ok != true) return;
+
+    // Notify all participants about deletion
+    await NotificationService.notifyEventParticipants(
+      eventId: widget.event.id,
+      title: 'Event Deleted',
+      body: '${widget.event.title} has been removed from the calendar',
+    );
+
     await supabase.from("club_events").delete().eq("id", widget.event.id);
     Navigator.pop(context);
   }

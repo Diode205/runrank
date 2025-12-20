@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class AdminCreateEventPage extends StatefulWidget {
   final String userRole;
@@ -168,9 +169,24 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     };
 
     try {
-      await supabase.from("club_events").insert(map);
+      final result = await supabase.from("club_events").insert(map).select();
 
       if (!mounted) return;
+
+      // Send notification to all users about new event
+      if (result.isNotEmpty) {
+        final eventId = result.first['id']?.toString();
+        if (eventId != null) {
+          final eventTitle = buildTitle();
+          await NotificationService.notifyAllUsers(
+            title: 'New Event Created',
+            body: '$eventTitle has been added to the calendar',
+            eventId: eventId,
+            targetScreen: 'calendar',
+          );
+        }
+      }
+
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Event created successfully!")),

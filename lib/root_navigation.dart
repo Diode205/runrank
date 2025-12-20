@@ -25,6 +25,7 @@ class _RootNavigationState extends State<RootNavigation>
   ];
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
+  late Stream<int> _unreadStream;
 
   @override
   void initState() {
@@ -38,17 +39,18 @@ class _RootNavigationState extends State<RootNavigation>
     _glowAnimation = Tween<double>(begin: 0.0, end: 15.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+
+    // Set up real-time unread count stream
+    _unreadStream = NotificationService.watchUnreadCountStream();
+    _unreadStream.listen((count) {
+      setState(() => _unread = count);
+    });
   }
 
   @override
   void dispose() {
     _glowController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadUnread() async {
-    final count = await NotificationService.unreadCount();
-    setState(() => _unread = count);
   }
 
   void _onItemTapped(int index) {
