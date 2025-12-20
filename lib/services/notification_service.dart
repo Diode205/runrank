@@ -110,10 +110,7 @@ class NotificationService {
 
     print("DEBUG fetchNotifications: $response");
 
-    if (response is List) {
-      return response.cast<Map<String, dynamic>>();
-    }
-    return [];
+    return response.cast<Map<String, dynamic>>();
   }
 
   // ---------------------------------------------------------------

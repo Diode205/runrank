@@ -398,7 +398,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       if (id != null) {
         map[id] = name ?? "Unknown";
       }
-    } 
+    }
     return map;
   }
 
