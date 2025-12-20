@@ -13,7 +13,6 @@ class NotificationService {
     required String title,
     required String body,
     String? eventId,
-    String? targetScreen,
   }) async {
     final users = await _supabase.from('user_profiles').select('id');
 
@@ -23,7 +22,6 @@ class NotificationService {
         'title': title,
         'body': body,
         'event_id': eventId,
-        'target_screen': targetScreen,
         'is_read': false,
       });
     }
@@ -37,14 +35,12 @@ class NotificationService {
     required String title,
     required String body,
     String? eventId,
-    String? targetScreen,
   }) async {
     await _supabase.from('notifications').insert({
       'user_id': userId,
       'title': title,
       'body': body,
       'event_id': eventId,
-      'target_screen': targetScreen,
       'is_read': false,
     });
   }
@@ -63,7 +59,6 @@ class NotificationService {
       title: title,
       body: body,
       eventId: eventId,
-      targetScreen: 'event_details',
     );
   }
 
@@ -90,7 +85,6 @@ class NotificationService {
         title: title,
         body: body,
         eventId: eventId,
-        targetScreen: 'event_details',
       );
     }
   }

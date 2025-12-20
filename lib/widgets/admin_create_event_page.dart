@@ -182,7 +182,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
             title: 'New Event Created',
             body: '$eventTitle has been added to the calendar',
             eventId: eventId,
-            targetScreen: 'calendar',
           );
         }
       }
