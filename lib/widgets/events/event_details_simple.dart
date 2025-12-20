@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
+import 'package:runrank/services/notification_service.dart';
 
 /// Event details page for simple events (Training, Special Event, Social Run, etc.)
 /// Group 1: Training_1/2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
