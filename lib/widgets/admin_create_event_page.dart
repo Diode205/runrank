@@ -164,6 +164,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           selectedEventType == "Handicap Series" || selectedEventType == "Relay"
           ? true
           : false,
+      "created_by": supabase.auth.currentUser?.id,
     };
 
     try {

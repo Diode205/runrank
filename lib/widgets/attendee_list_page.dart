@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:runrank/widgets/event_details_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AttendeeListPage extends StatefulWidget {
   final String eventId;
@@ -98,5 +98,47 @@ class _AttendeeListPageState extends State<AttendeeListPage> {
               itemCount: _attendees.length,
             ),
     );
+  }
+}
+
+Future<List<Map<String, dynamic>>> getRespondersWithNames({
+  required String eventId,
+  required String responseType,
+}) async {
+  final supabase = Supabase.instance.client;
+  try {
+    final responseRows = await supabase
+        .from('club_event_responses')
+        .select('user_id, expected_time_seconds')
+        .eq('event_id', eventId)
+        .eq('response_type', responseType);
+
+    if (responseRows.isEmpty) return [];
+
+    final userIds = <String>{
+      for (final row in responseRows) row['user_id'] as String,
+    }.toList();
+    final orFilter = userIds.map((id) => 'id.eq.$id').join(',');
+    final profileRows = await supabase
+        .from('user_profiles')
+        .select('id, full_name')
+        .or(orFilter);
+
+    final Map<String, String> idToName = {
+      for (final p in profileRows)
+        p['id'] as String: (p['full_name'] as String?) ?? 'Unknown runner',
+    };
+
+    return [
+      for (final row in responseRows)
+        {
+          'userId': row['user_id'] as String,
+          'fullName': idToName[row['user_id'] as String] ?? 'Unknown runner',
+          'expectedTimeSeconds': row['expected_time_seconds'] as int?,
+        },
+    ];
+  } catch (e) {
+    print('❌ Error fetching responders with names: $e');
+    return [];
   }
 }
