@@ -59,9 +59,11 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
-  image_path: "assets/images/rank_logo.png"
+  image_path: "assets/images/app_icon_round.png"
   ios: true
   android: true
+  adaptive_icon_background: "#282828"  # Dark grey background
+  adaptive_icon_foreground: "assets/images/app_icon_round.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
