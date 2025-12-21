@@ -34,6 +34,7 @@ dependencies:
   package_info_plus: ^9.0.0
   supabase_flutter: ^2.8.4
   image_picker: ^1.0.7
+  file_picker: ^8.0.7
   google_maps_flutter: ^2.6.1
   url_launcher: ^6.2.6
 
@@ -59,11 +60,11 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
-  image_path: "assets/images/app_icon_round.png"
+  image_path: "assets/images/screenrank_logo.png"
   ios: true
   android: true
-  adaptive_icon_background: "#282828"  # Dark grey background
-  adaptive_icon_foreground: "assets/images/app_icon_round.png"
+  adaptive_icon_background: "#ffffff"  # White background
+  adaptive_icon_foreground: "assets/images/screenrank_logo.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
