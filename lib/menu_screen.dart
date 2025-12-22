@@ -516,28 +516,22 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
             ),
-            // Admin badge
+            // Admin badge (emoji, no background)
             if (_isAdmin)
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF0F111A).withOpacity(0.9),
-                    border: Border.all(
-                      color: const Color(0xFFF5C542),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.shield,
-                      color: Color(0xFFF5C542),
-                      size: 20,
-                    ),
+              const Positioned(
+                top: 2,
+                right: 2,
+                child: Text(
+                  '🛡️',
+                  style: TextStyle(
+                    fontSize: 22,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
