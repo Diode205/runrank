@@ -480,39 +480,68 @@ class _MenuScreenState extends State<MenuScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        GestureDetector(
-          onTap: _changeAvatar,
-          child: Container(
-            width: 110,
-            height: 120,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1F3A93), Color(0xFF0F111A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: membershipColor, width: 1.2),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  color: Colors.white10,
-                  child: _avatarUrl != null
-                      ? Image.network(_avatarUrl!, fit: BoxFit.cover)
-                      : const Center(
-                          child: Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Colors.white70,
-                          ),
-                        ),
+        Stack(
+          children: [
+            GestureDetector(
+              onTap: _changeAvatar,
+              child: Container(
+                width: 110,
+                height: 120,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1F3A93), Color(0xFF0F111A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: membershipColor, width: 1.2),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      color: Colors.white10,
+                      child: _avatarUrl != null
+                          ? Image.network(_avatarUrl!, fit: BoxFit.cover)
+                          : const Center(
+                              child: Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white70,
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+            // Admin badge
+            if (_isAdmin)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF0F111A).withOpacity(0.9),
+                    border: Border.all(
+                      color: const Color(0xFFF5C542),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.shield,
+                      color: Color(0xFFF5C542),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         const Text(
