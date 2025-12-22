@@ -54,155 +54,170 @@ class _MenuScreenState extends State<MenuScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Quick edit',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Name / nickname'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ukaController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('UKA number'),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Membership type',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: selectedMembershipType,
-                items: const [
-                  DropdownMenuItem(
-                    value: '1st Claim',
-                    child: Text('1st Claim'),
-                  ),
-                  DropdownMenuItem(
-                    value: '2nd Claim',
-                    child: Text('2nd Claim'),
-                  ),
-                  DropdownMenuItem(value: 'Social', child: Text('Social')),
-                  DropdownMenuItem(
-                    value: 'Full-Time Education',
-                    child: Text('Full-Time Education'),
-                  ),
-                ],
-                onChanged: (val) => selectedMembershipType = val,
-                decoration: _inputDecoration('Select membership'),
-                dropdownColor: const Color(0xFF0F111A),
-                style: const TextStyle(color: Colors.white),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF5C542),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  onPressed: () async {
-                    final user = _supabase.auth.currentUser;
-                    if (user == null) return;
-
-                    final newName = nameController.text.trim();
-                    final newEmail = emailController.text.trim();
-                    final newUka = ukaController.text.trim();
-
-                    try {
-                      await _supabase
-                          .from('user_profiles')
-                          .update({
-                            'full_name': newName.isEmpty ? null : newName,
-                            'email': newEmail.isEmpty ? null : newEmail,
-                            'uka_number': newUka.isEmpty ? null : newUka,
-                            'membership_type': selectedMembershipType,
-                          })
-                          .eq('id', user.id);
-
-                      setState(() {
-                        _fullName = newName.isEmpty ? null : newName;
-                        _email = newEmail.isEmpty ? null : newEmail;
-                        _ukaNumber = newUka.isEmpty ? null : newUka;
-                        _membershipType = selectedMembershipType;
-                      });
-
-                      if (!mounted) return;
-                      Navigator.pop(sheetContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          backgroundColor: Color(0xFF1F3A93),
-                          content: Text(
-                            'Profile updated',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      );
-                    } catch (e) {
-                      debugPrint('Error updating quick profile: $e');
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: Colors.redAccent,
-                          content: const Text(
-                            'Update failed',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text(
-                    'Save',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Quick edit',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('Name / nickname'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: emailController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('Email'),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ukaController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('UKA number'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Membership type',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedMembershipType,
+                    items: const [
+                      DropdownMenuItem(
+                        value: '1st Claim',
+                        child: Text('1st Claim'),
+                      ),
+                      DropdownMenuItem(
+                        value: '2nd Claim',
+                        child: Text('2nd Claim'),
+                      ),
+                      DropdownMenuItem(value: 'Social', child: Text('Social')),
+                      DropdownMenuItem(
+                        value: 'Full-Time Education',
+                        child: Text('Full-Time Education'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      setModalState(() {
+                        selectedMembershipType = val;
+                      });
+                    },
+                    decoration: _inputDecoration('Select membership'),
+                    dropdownColor: const Color(0xFF0F111A),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF5C542),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final user = _supabase.auth.currentUser;
+                        if (user == null) return;
+
+                        final newName = nameController.text.trim();
+                        final newEmail = emailController.text.trim();
+                        final newUka = ukaController.text.trim();
+
+                        try {
+                          final updated = await _supabase
+                              .from('user_profiles')
+                              .update({
+                                'full_name': newName.isEmpty ? null : newName,
+                                'email': newEmail.isEmpty ? null : newEmail,
+                                'uka_number': newUka.isEmpty ? null : newUka,
+                                'membership_type': selectedMembershipType,
+                              })
+                              .eq('id', user.id)
+                              .select()
+                              .maybeSingle();
+
+                          debugPrint('Quick edit saved row: $updated');
+
+                          setState(() {
+                            _fullName = newName.isEmpty ? null : newName;
+                            _email = newEmail.isEmpty ? null : newEmail;
+                            _ukaNumber = newUka.isEmpty ? null : newUka;
+                            _membershipType = selectedMembershipType;
+                          });
+
+                          if (!mounted) return;
+                          Navigator.pop(sheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: Color(0xFF1F3A93),
+                              content: Text(
+                                'Profile updated',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          debugPrint('Error updating quick profile: $e');
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.redAccent,
+                              content: const Text(
+                                'Update failed',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

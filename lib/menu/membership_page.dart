@@ -409,7 +409,14 @@ class _MembershipPageState extends State<MembershipPage> {
             'member_since': DateTime.now().toIso8601String(),
         };
 
-        await _client.from('user_profiles').update(updates).eq('id', user.id);
+        final updated = await _client
+          .from('user_profiles')
+          .update(updates)
+          .eq('id', user.id)
+          .select()
+          .maybeSingle();
+
+        debugPrint('Membership update saved row: $updated');
 
         setState(() {
           _membershipType = tierName;
