@@ -373,6 +373,16 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           title: 'Event Response',
           body: '$userName has $action ${event.title}',
         );
+
+        // Scope alerts: creator + actor only (no broadcast to all participants)
+
+        // Also notify the responding user so their Alerts badge updates
+        await NotificationService.notifyUser(
+          userId: user.id,
+          title: 'Response Saved',
+          body: 'You have $action ${event.title}',
+          eventId: event.id,
+        );
       }
 
       loadResponses();

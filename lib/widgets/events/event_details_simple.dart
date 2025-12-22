@@ -439,18 +439,9 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: () => setState(() => myResponse = null),
-                    child: const Text("Edit"),
-                  ),
-                  const SizedBox(width: 12),
-                  TextButton(
-                    onPressed: cancelMyPlan,
-                    child: const Text("Cancel"),
-                  ),
-                ],
+              OutlinedButton(
+                onPressed: () => setState(() => myResponse = null),
+                child: const Text("Edit Participation"),
               ),
             ],
           ),
@@ -626,12 +617,37 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
         })
         .eq("id", widget.event.id);
 
-    // Notify all participants about cancellation
-    await NotificationService.notifyEventParticipants(
-      eventId: widget.event.id,
-      title: 'Event Cancelled',
-      body: '${widget.event.title} has been cancelled',
-    );
+    // Scoped alerts: notify creator (if different from actor) and actor
+    final me = supabase.auth.currentUser;
+    final creatorId = widget.event.createdBy;
+
+    if (me != null) {
+      if (creatorId == me.id) {
+        // If actor is creator, send one alert
+        await NotificationService.notifyUser(
+          userId: me.id,
+          title: 'Event Cancelled',
+          body: 'You cancelled ${widget.event.title}',
+          eventId: widget.event.id,
+        );
+      } else {
+        // If different, notify both
+        if (creatorId != null) {
+          await NotificationService.notifyEventCreator(
+            eventId: widget.event.id,
+            creatorId: creatorId,
+            title: 'Event Cancelled',
+            body: '${widget.event.title} was cancelled',
+          );
+        }
+        await NotificationService.notifyUser(
+          userId: me.id,
+          title: 'Event Cancelled',
+          body: 'You cancelled ${widget.event.title}',
+          eventId: widget.event.id,
+        );
+      }
+    }
 
     setState(() {});
   }
@@ -657,12 +673,37 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
 
     if (ok != true) return;
 
-    // Notify all participants about deletion
-    await NotificationService.notifyEventParticipants(
-      eventId: widget.event.id,
-      title: 'Event Deleted',
-      body: '${widget.event.title} has been removed from the calendar',
-    );
+    // Scoped alerts: unified message
+    final me = supabase.auth.currentUser;
+    final creatorId = widget.event.createdBy;
+
+    if (me != null) {
+      if (creatorId == me.id) {
+        // If actor is creator, send one alert
+        await NotificationService.notifyUser(
+          userId: me.id,
+          title: 'Event Deleted',
+          body: 'You deleted ${widget.event.title}',
+          eventId: widget.event.id,
+        );
+      } else {
+        // If different, notify both
+        if (creatorId != null) {
+          await NotificationService.notifyEventCreator(
+            eventId: widget.event.id,
+            creatorId: creatorId,
+            title: 'Event Deleted',
+            body: '${widget.event.title} was deleted',
+          );
+        }
+        await NotificationService.notifyUser(
+          userId: me.id,
+          title: 'Event Deleted',
+          body: 'You deleted ${widget.event.title}',
+          eventId: widget.event.id,
+        );
+      }
+    }
 
     await supabase.from("club_events").delete().eq("id", widget.event.id);
     Navigator.pop(context);

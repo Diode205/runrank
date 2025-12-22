@@ -180,6 +180,15 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
           "Club Activity Hub",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
 
       body: _loading
@@ -197,7 +206,19 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                   SliverAppBar(
                     pinned: true,
                     floating: false,
-                    backgroundColor: Colors.black.withOpacity(0.75),
+                    backgroundColor: Colors.transparent,
+                    flexibleSpace: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0x4DFFD300),
+                            const Color(0x4D0057B7),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
                     title: Text(
                       _currentMonthLabel,
                       style: const TextStyle(

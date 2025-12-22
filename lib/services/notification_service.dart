@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationService {
   static final _supabase = Supabase.instance.client;
+  static final _unreadCountController = StreamController<int>.broadcast();
 
   // ---------------------------------------------------------------
   // SEND NOTIFICATION TO ALL USERS
@@ -14,6 +15,9 @@ class NotificationService {
     required String body,
     String? eventId,
   }) async {
+    print(
+      "DEBUG: notifyAllUsers called - title: $title, body: $body, eventId: $eventId",
+    );
     final users = await _supabase.from('user_profiles').select('id');
 
     for (final u in users) {
@@ -24,6 +28,7 @@ class NotificationService {
         'event_id': eventId,
         'is_read': false,
       });
+      print("DEBUG: Notification sent to user: ${u['id']}");
     }
   }
 
@@ -36,6 +41,9 @@ class NotificationService {
     required String body,
     String? eventId,
   }) async {
+    print(
+      "DEBUG: notifyUser called - userId: $userId, title: $title, body: $body, eventId: $eventId",
+    );
     await _supabase.from('notifications').insert({
       'user_id': userId,
       'title': title,
@@ -43,6 +51,7 @@ class NotificationService {
       'event_id': eventId,
       'is_read': false,
     });
+    print("DEBUG: Notification inserted for user: $userId");
   }
 
   // ---------------------------------------------------------------
@@ -54,6 +63,9 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
+    print(
+      "DEBUG: notifyEventCreator called - creatorId: $creatorId, title: $title, body: $body",
+    );
     await notifyUser(
       userId: creatorId,
       title: title,
@@ -71,14 +83,21 @@ class NotificationService {
     required String body,
     String? excludeUserId,
   }) async {
+    print(
+      "DEBUG: notifyEventParticipants called - eventId: $eventId, title: $title",
+    );
     final responses = await _supabase
         .from('club_event_responses')
         .select('user_id')
         .eq('event_id', eventId);
 
+    print("DEBUG: Found ${responses.length} participants for event $eventId");
     for (final response in responses) {
       final userId = response['user_id'] as String;
-      if (excludeUserId != null && userId == excludeUserId) continue;
+      if (excludeUserId != null && userId == excludeUserId) {
+        print("DEBUG: Skipping user $userId (excluded)");
+        continue;
+      }
 
       await notifyUser(
         userId: userId,
@@ -142,13 +161,34 @@ class NotificationService {
   // ---------------------------------------------------------------
   static Stream<int> watchUnreadCountStream() {
     final user = _supabase.auth.currentUser;
-    if (user == null) return Stream.value(0);
+    if (user == null) {
+      print("DEBUG: User is null, returning Stream.value(0)");
+      return Stream.value(0);
+    }
 
+    print("DEBUG: Creating watchUnreadCountStream for user: ${user.id}");
     final controller = StreamController<int>();
+
+    // Listen to broadcast controller for manual refreshes
+    final broadcastSubscription = _unreadCountController.stream.listen(
+      (count) {
+        print("DEBUG: Broadcast controller update: $count");
+        if (!controller.isClosed) {
+          controller.add(count);
+        }
+      },
+      onError: (error) {
+        print("DEBUG: Broadcast error: $error");
+      },
+    );
 
     // Initial push
     () async {
-      controller.add(await unreadCount());
+      final count = await unreadCount();
+      print("DEBUG: Initial unread count: $count");
+      if (!controller.isClosed) {
+        controller.add(count);
+      }
     }();
 
     final channel = _supabase
@@ -163,12 +203,20 @@ class NotificationService {
             value: user.id,
           ),
           callback: (payload) async {
-            controller.add(await unreadCount());
+            final count = await unreadCount();
+            print(
+              "DEBUG: Postgres change detected! New unread count: $count, Payload: $payload",
+            );
+            if (!controller.isClosed) {
+              controller.add(count);
+            }
           },
         )
         .subscribe();
 
     controller.onCancel = () async {
+      print("DEBUG: Stream cancelled, removing channel");
+      await broadcastSubscription.cancel();
       await _supabase.removeChannel(channel);
       await controller.close();
     };
@@ -177,6 +225,23 @@ class NotificationService {
   }
 
   static void watchUnreadCount(void Function(int) handler) {
-    watchUnreadCountStream().listen(handler);
+    watchUnreadCountStream().listen(
+      handler,
+      onError: (error) {
+        print("DEBUG: Stream error: $error");
+      },
+      onDone: () {
+        print("DEBUG: Stream done");
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // REFRESH UNREAD COUNT (call this after marking as read)
+  // ---------------------------------------------------------------
+  static Future<void> refreshUnreadCount() async {
+    final count = await unreadCount();
+    print("DEBUG: Refreshing unread count: $count");
+    _unreadCountController.add(count);
   }
 }

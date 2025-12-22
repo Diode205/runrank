@@ -44,6 +44,7 @@ class AuthService {
     required String dob,
     required String ukaNumber,
     required String club,
+    required String membershipType,
   }) async {
     try {
       // 1) Create user in Supabase Auth
@@ -73,6 +74,7 @@ class AuthService {
         "date_of_birth": dob,
         "uka_number": ukaNumber,
         "club": club,
+        "membership_type": membershipType,
         // NEW ▶ store member_since (ISO string from today)
         "member_since": DateTime.now().toIso8601String(),
       });

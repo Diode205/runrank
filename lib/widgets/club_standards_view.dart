@@ -365,7 +365,19 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           'in four of six distances over a calendar year to earn an award.\n'
           'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n'
           'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n'
-          'Awards will be presented at the Annual Awards evening.',
+          'Awards will be presented at the Annual Awards evening.\n'
+          'For more information, visit the NNBR website.\n\n'
+          'Age-graded percentages are provided for guidance only and do not form part of the Club Standards assessment.\n'
+          'Age record tables used are from ARRS, the Association of Road Racing Statisticians, which they maintained and updates as necessary.\n'
+          'The distance record updates are as follows:\n'
+          '5km last update on 06 Deecember 2017\n'
+          '10km last update on 28 November 2017\n'
+          '5miles last update on 10 December 2017\n'
+          '10miles last update on 16 March 2020\n'
+          'Half Marathon last update on 20 November 2017\n'
+          'Marathon last update on 01 November 2019\n'
+          'ARRS is actively looking for people to help maintain their records, as well as sponsorships.\n'
+          'For full details, visit https://arrs.run/.',
           style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
           textAlign: TextAlign.center,
         ),
@@ -438,7 +450,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       body: SafeArea(
         child: Column(
           children: [
-            // HEADER (unchanged except spacing)
+            // HEADER (glassy effect with opacity)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Container(
@@ -447,24 +459,37 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   vertical: 22,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.yellowAccent,
+                  color: Colors.yellowAccent.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white30, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.yellowAccent.withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     Image.asset('assets/images/rank_logo.png', height: 70),
-                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'CLUB STANDARDS',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w900,
-                              color: Color.fromARGB(255, 77, 3, 224),
-                              letterSpacing: 1.0,
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'CLUB STANDARDS',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 23,
+                                fontWeight: FontWeight.w900,
+                                color: Color.fromARGB(255, 77, 3, 224),
+                                letterSpacing: 1.0,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 1),
@@ -472,14 +497,17 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                             opacity: _fadeAnimation,
                             child: SlideTransition(
                               position: _slideAnimation,
-                              child: const Text(
-                                'Race & Team Admin On The Go',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontStyle: FontStyle.italic,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color.fromARGB(221, 235, 81, 5),
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Race & Team Admin On The Go',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color.fromARGB(221, 235, 81, 5),
+                                  ),
                                 ),
                               ),
                             ),
@@ -507,28 +535,21 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: SizedBox(
-                          height: 170, // visible height
+                          height: 170,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               final parallax = (_scrollOffset * 0.25).clamp(
                                 0.0,
                                 60.0,
                               );
-
                               return Transform.translate(
-                                offset: Offset(
-                                  0,
-                                  parallax,
-                                ), // <<< REAL PARALLAX
+                                offset: Offset(0, parallax),
                                 child: Image.asset(
                                   'assets/images/nnbr_cover.png',
-                                  height: 230, // larger than container
+                                  height: 230,
                                   width: constraints.maxWidth,
                                   fit: BoxFit.cover,
-                                  alignment: Alignment(
-                                    1.0,
-                                    0,
-                                  ), // keeps NNBR logo visible
+                                  alignment: Alignment(1.0, 0),
                                 ),
                               );
                             },
@@ -536,6 +557,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
 
                     // INPUT FORM
                     Padding(
@@ -580,49 +602,79 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               child: Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _onCalculate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.yellow.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white30, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellow.withOpacity(0.3),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Check\nAchievement',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                      child: ElevatedButton(
+                        onPressed: _onCalculate,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.black,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Check\nAchievement',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => HistoryScreen()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white30, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blueAccent.withOpacity(0.3),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Check\nRace Records',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => HistoryScreen()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Check\nRace Records',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -630,9 +682,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ], // Close Column children
+        ), // Close Column
+      ), // Close SafeArea
+    ); // Close Scaffold
   }
 }

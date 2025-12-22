@@ -439,7 +439,7 @@ class _RootNavigationState extends State<RootNavigation>
           const NavigationDestination(
             icon: Icon(Icons.menu, color: Color.fromARGB(255, 236, 234, 234)),
             selectedIcon: Icon(
-              Icons.directions_run,
+              Icons.menu,
               color: Color.fromARGB(255, 239, 236, 236),
             ),
             label: 'Menu',

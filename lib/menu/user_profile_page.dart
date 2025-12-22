@@ -22,6 +22,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
   String? _email;
   String? _ukaNumber;
   String? _club;
+  String? _membershipType;
+  DateTime? _memberSince;
   DateTime? _dob;
   DateTime? _createdAt;
   String? _avatarUrl;
@@ -57,6 +59,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
             email,
             uka_number,
             club,
+            membership_type,
+            member_since,
             date_of_birth,
             avatar_url,
             created_at
@@ -79,6 +83,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _email = row['email'] as String?;
         _ukaNumber = row['uka_number'] as String?;
         _club = row['club'] as String?;
+        _membershipType = row['membership_type'] as String?;
         _avatarUrl = row['avatar_url'] as String?;
 
         final dobStr = row['date_of_birth'] as String?;
@@ -89,6 +94,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
         final createdStr = row['created_at']?.toString();
         if (createdStr != null && createdStr.isNotEmpty) {
           _createdAt = DateTime.tryParse(createdStr);
+        }
+
+        final memberStr = row['member_since']?.toString();
+        if (memberStr != null && memberStr.isNotEmpty) {
+          _memberSince = DateTime.tryParse(memberStr);
         }
 
         _loading = false;
@@ -115,7 +125,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   String _memberSinceText() {
-    if (_createdAt == null) return 'Member';
+    final referenceDate = _memberSince ?? _createdAt;
+    if (referenceDate == null) return 'Member';
     const months = [
       'Jan',
       'Feb',
@@ -130,8 +141,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
       'Nov',
       'Dec',
     ];
-    final m = months[_createdAt!.month - 1];
-    final y = _createdAt!.year;
+    final m = months[referenceDate.month - 1];
+    final y = referenceDate.year;
     return 'Member since $m $y';
   }
 
@@ -208,6 +219,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _showEditProfileSheet() async {
     final nameController = TextEditingController(text: _fullName ?? '');
     final ukaController = TextEditingController(text: _ukaNumber ?? '');
+    String? selectedMembershipType = _membershipType;
+    DateTime? selectedMemberSince = _memberSince;
+
+    const membershipOptions = [
+      '1st Claim',
+      '2nd Claim',
+      'Social',
+      'Full-Time Education',
+    ];
 
     await showModalBottomSheet(
       context: context,
@@ -253,6 +273,63 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 controller: ukaController,
                 decoration: const InputDecoration(labelText: 'UKA number'),
               ),
+              const SizedBox(height: 12),
+              const Text(
+                'Membership type',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedMembershipType,
+                items: membershipOptions
+                    .map(
+                      (type) => DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(type),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedMembershipType = value;
+                  });
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Select membership',
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Member since',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedMemberSince ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      selectedMemberSince = picked;
+                    });
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Member since date',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Text(
+                    selectedMemberSince != null
+                        ? '${selectedMemberSince!.day}/${selectedMemberSince!.month}/${selectedMemberSince!.year}'
+                        : 'Select date',
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -267,12 +344,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     try {
                       await _supabase
                           .from('user_profiles')
-                          .update({'full_name': newName, 'uka_number': newUka})
+                          .update({
+                            'full_name': newName,
+                            'uka_number': newUka,
+                            'membership_type': selectedMembershipType,
+                            'member_since': selectedMemberSince
+                                ?.toIso8601String(),
+                          })
                           .eq('id', user.id);
 
                       setState(() {
                         _fullName = newName;
                         _ukaNumber = newUka;
+                        _membershipType = selectedMembershipType;
+                        _memberSince = selectedMemberSince;
                       });
 
                       if (!mounted) return;
@@ -477,6 +562,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     child: Column(
                       children: [
+                        _buildInfoRow(
+                          'Membership type',
+                          _membershipType ?? 'Not set',
+                        ),
+                        const Divider(color: Colors.white24),
+                        _buildInfoRow(
+                          'Member since',
+                          _memberSince != null ? _memberSinceText() : 'Not set',
+                        ),
+                        const Divider(color: Colors.white24),
                         _buildInfoRow('UKA number', _ukaNumber ?? 'Not set'),
                         const Divider(color: Colors.white24),
                         _buildInfoRow('Club', _club ?? 'NNBR'),

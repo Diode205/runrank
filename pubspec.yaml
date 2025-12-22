@@ -81,6 +81,10 @@ flutter:
     - assets/images/nnbr_logo.png
     - assets/images/rank_logo.png
     - assets/images/nnbr_cover.png
+    - assets/images/firstclaim.png
+    - assets/images/secondclaim.png
+    - assets/images/socialclaim.png
+    - assets/images/fulleduc.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -44,61 +44,49 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     _setupRealtime();
   }
 
-  @override
-  void dispose() {
-    if (_postChannel != null) {
-      supabase.removeChannel(_postChannel!);
-    }
-    if (_reactionChannel != null) {
-      supabase.removeChannel(_reactionChannel!);
-    }
-    if (_commentChannel != null) {
-      supabase.removeChannel(_commentChannel!);
-    }
-    for (final controller in _commentControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
   void _setupRealtime() {
-    // Posts changes
     _postChannel = supabase
-        .channel('realtime-posts')
+        .channel('club_posts_changes')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'club_posts',
-          callback: (payload) {
-            _loadPosts();
-          },
+          callback: (_) => _loadPosts(),
         )
         .subscribe();
 
-    // Reactions changes
     _reactionChannel = supabase
-        .channel('realtime-reactions')
+        .channel('club_post_reactions_changes')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'club_post_reactions',
           callback: (payload) {
-            final postId = payload.newRecord['post_id'] as String?;
-            if (postId != null) _loadReactions(postId);
+            final postId =
+                payload.newRecord['post_id'] ?? payload.oldRecord['post_id'];
+            if (postId is String) {
+              _loadReactions(postId);
+            } else {
+              _loadPosts();
+            }
           },
         )
         .subscribe();
 
-    // Comments changes
     _commentChannel = supabase
-        .channel('realtime-comments')
+        .channel('club_post_comments_changes')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'club_post_comments',
           callback: (payload) {
-            final postId = payload.newRecord['post_id'] as String?;
-            if (postId != null) _loadComments(postId);
+            final postId =
+                payload.newRecord['post_id'] ?? payload.oldRecord['post_id'];
+            if (postId is String) {
+              _loadComments(postId);
+            } else {
+              _loadPosts();
+            }
           },
         )
         .subscribe();
@@ -113,9 +101,11 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           .select('is_admin')
           .eq('id', user.id)
           .single();
-      if (mounted) setState(() => isAdmin = profile['is_admin'] ?? false);
+      if (mounted) {
+        setState(() => isAdmin = profile['is_admin'] ?? false);
+      }
     } catch (e) {
-      print('Error checking admin status: $e');
+      debugPrint('Error checking admin status: $e');
     }
   }
 
@@ -128,26 +118,32 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       if (isAdmin) {
         data = await supabase
             .from('club_posts')
-            .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name), club_post_attachments(*)',
-            )
+            .select('''
+              *,
+              user_profiles!club_posts_author_id_fkey(full_name),
+              club_post_attachments(*)
+            ''')
             .gte('expiry_date', now)
             .order('created_at', ascending: false);
       } else if (user != null) {
         final approved = await supabase
             .from('club_posts')
-            .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name), club_post_attachments(*)',
-            )
+            .select('''
+              *,
+              user_profiles!club_posts_author_id_fkey(full_name),
+              club_post_attachments(*)
+            ''')
             .gte('expiry_date', now)
             .eq('is_approved', true)
             .order('created_at', ascending: false);
 
         final mine = await supabase
             .from('club_posts')
-            .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name), club_post_attachments(*)',
-            )
+            .select('''
+              *,
+              user_profiles!club_posts_author_id_fkey(full_name),
+              club_post_attachments(*)
+            ''')
             .gte('expiry_date', now)
             .eq('author_id', user.id)
             .order('created_at', ascending: false);
@@ -175,8 +171,17 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         });
       }
     } catch (e) {
-      print('Error loading posts: $e');
+      debugPrint('Error loading posts: $e');
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _rejectPost(String postId) async {
+    try {
+      await supabase.from('club_posts').delete().eq('id', postId);
+      await _loadPosts();
+    } catch (e) {
+      print('Reject error: $e');
     }
   }
 
@@ -195,16 +200,12 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     }
   }
 
-  Future<void> _rejectPost(String postId) async {
-    try {
-      await supabase.from('club_posts').delete().eq('id', postId);
-      await _loadPosts();
-    } catch (e) {
-      print('Reject error: $e');
-    }
-  }
-
   void _openImageFullscreen(String imageUrl) {
+    // Guard against invalid/empty URLs to prevent runtime exceptions
+    final uri = Uri.tryParse(imageUrl);
+    if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -456,7 +457,10 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                 radius: 20,
                                 backgroundColor: Colors.blue,
                                 child: Text(
-                                  authorName[0].toUpperCase(),
+                                  (authorName is String &&
+                                          authorName.isNotEmpty)
+                                      ? authorName[0].toUpperCase()
+                                      : '?',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -593,6 +597,57 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                             width: double.infinity,
                                             height: 200,
                                             fit: BoxFit.cover,
+                                            loadingBuilder:
+                                                (
+                                                  context,
+                                                  child,
+                                                  loadingProgress,
+                                                ) {
+                                                  if (loadingProgress == null) {
+                                                    return child;
+                                                  }
+                                                  return Container(
+                                                    color: Colors.grey[800],
+                                                    alignment: Alignment.center,
+                                                    child: const SizedBox(
+                                                      width: 24,
+                                                      height: 24,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Container(
+                                                    color: Colors.grey[800],
+                                                    height: 200,
+                                                    alignment: Alignment.center,
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.broken_image,
+                                                          color:
+                                                              Colors.redAccent,
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                        Text(
+                                                          'Failed to load image',
+                                                          style: TextStyle(
+                                                            color: Colors
+                                                                .grey[400],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
                                           ),
                                         ),
                                       ),

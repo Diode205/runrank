@@ -19,6 +19,14 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   final password = TextEditingController();
 
   bool loading = false;
+  String? selectedMembershipType;
+
+  final membershipOptions = [
+    "1st Claim",
+    "2nd Claim",
+    "Social",
+    "Full-Time Education",
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +60,40 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
               obscureText: true,
               decoration: const InputDecoration(labelText: "Password"),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            const Text(
+              "Select Your Membership Type",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            DropdownButton<String>(
+              isExpanded: true,
+              value: selectedMembershipType,
+              hint: const Text("Choose your membership type"),
+              items: membershipOptions.map((String type) {
+                return DropdownMenuItem<String>(value: type, child: Text(type));
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  selectedMembershipType = newValue;
+                });
+              },
+            ),
 
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: loading
                   ? null
                   : () async {
+                      if (selectedMembershipType == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Please select a membership type"),
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() => loading = true);
 
                       final success = await AuthService.register(
@@ -67,6 +103,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         dob: dob.text.trim(),
                         ukaNumber: uka.text.trim(),
                         club: widget.selectedClub,
+                        membershipType: selectedMembershipType!,
                       );
 
                       setState(() => loading = false);
@@ -85,7 +122,6 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         );
                       }
                     },
-
               child: loading
                   ? const CircularProgressIndicator()
                   : const Text("Create Account"),
