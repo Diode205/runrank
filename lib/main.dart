@@ -7,6 +7,9 @@ import 'auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
 
+// Global RouteObserver to support auto-refresh on page resume
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -106,6 +109,7 @@ class RunRankApp extends StatelessWidget {
       ),
 
       routes: AppRoutes.routes,
+      navigatorObservers: [routeObserver],
       home: const SplashScreen(nextPage: AuthGate()),
     );
   }

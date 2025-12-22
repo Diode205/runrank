@@ -519,8 +519,13 @@ class _MenuScreenState extends State<MenuScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1F3A93), Color(0xFFF5C542), Color(0xFF0F111A)],
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1F3A93),
+            const Color(0xFFF5C542).withOpacity(0.35), // toned-down yellow
+            const Color(0xFF0F111A),
+          ],
+          stops: const [0.0, 0.45, 1.0],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

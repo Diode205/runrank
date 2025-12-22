@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/main.dart' show routeObserver;
 
 class MembershipPage extends StatefulWidget {
   const MembershipPage({super.key});
@@ -8,7 +9,7 @@ class MembershipPage extends StatefulWidget {
   State<MembershipPage> createState() => _MembershipPageState();
 }
 
-class _MembershipPageState extends State<MembershipPage> {
+class _MembershipPageState extends State<MembershipPage> with RouteAware {
   final _client = Supabase.instance.client;
 
   bool _loading = true;
@@ -19,6 +20,27 @@ class _MembershipPageState extends State<MembershipPage> {
   @override
   void initState() {
     super.initState();
+    _loadMembershipData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  // Called when returning to this page (e.g., after closing quick-edit)
+  @override
+  void didPopNext() {
     _loadMembershipData();
   }
 
@@ -410,11 +432,11 @@ class _MembershipPageState extends State<MembershipPage> {
         };
 
         final updated = await _client
-          .from('user_profiles')
-          .update(updates)
-          .eq('id', user.id)
-          .select()
-          .maybeSingle();
+            .from('user_profiles')
+            .update(updates)
+            .eq('id', user.id)
+            .select()
+            .maybeSingle();
 
         debugPrint('Membership update saved row: $updated');
 
