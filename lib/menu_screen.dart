@@ -32,6 +32,7 @@ class _MenuScreenState extends State<MenuScreen> {
   String? _avatarUrl;
   DateTime? _memberSince;
   DateTime? _adminSince;
+  String? _membershipType;
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final nameController = TextEditingController(text: _fullName ?? '');
     final emailController = TextEditingController(text: _email ?? '');
     final ukaController = TextEditingController(text: _ukaNumber ?? '');
+    String? selectedMembershipType = _membershipType;
 
     await showModalBottomSheet(
       context: context,
@@ -102,6 +104,34 @@ class _MenuScreenState extends State<MenuScreen> {
                 decoration: _inputDecoration('UKA number'),
                 keyboardType: TextInputType.number,
               ),
+              const SizedBox(height: 12),
+              const Text(
+                'Membership type',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedMembershipType,
+                items: const [
+                  DropdownMenuItem(
+                    value: '1st Claim',
+                    child: Text('1st Claim'),
+                  ),
+                  DropdownMenuItem(
+                    value: '2nd Claim',
+                    child: Text('2nd Claim'),
+                  ),
+                  DropdownMenuItem(value: 'Social', child: Text('Social')),
+                  DropdownMenuItem(
+                    value: 'Full-Time Education',
+                    child: Text('Full-Time Education'),
+                  ),
+                ],
+                onChanged: (val) => selectedMembershipType = val,
+                decoration: _inputDecoration('Select membership'),
+                dropdownColor: const Color(0xFF0F111A),
+                style: const TextStyle(color: Colors.white),
+              ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -129,6 +159,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             'full_name': newName.isEmpty ? null : newName,
                             'email': newEmail.isEmpty ? null : newEmail,
                             'uka_number': newUka.isEmpty ? null : newUka,
+                            'membership_type': selectedMembershipType,
                           })
                           .eq('id', user.id);
 
@@ -136,14 +167,18 @@ class _MenuScreenState extends State<MenuScreen> {
                         _fullName = newName.isEmpty ? null : newName;
                         _email = newEmail.isEmpty ? null : newEmail;
                         _ukaNumber = newUka.isEmpty ? null : newUka;
+                        _membershipType = selectedMembershipType;
                       });
 
                       if (!mounted) return;
                       Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Profile updated'),
                           backgroundColor: Color(0xFF1F3A93),
+                          content: Text(
+                            'Profile updated',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       );
                     } catch (e) {
@@ -151,8 +186,11 @@ class _MenuScreenState extends State<MenuScreen> {
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Update failed: $e'),
-                          backgroundColor: Colors.red,
+                          backgroundColor: Colors.redAccent,
+                          content: const Text(
+                            'Update failed',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       );
                     }
@@ -204,7 +242,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final profile = await _supabase
           .from('user_profiles')
           .select(
-            'full_name, email, uka_number, club, avatar_url, member_since, is_admin, admin_since, created_at',
+            'full_name, email, uka_number, club, avatar_url, member_since, membership_type, is_admin, admin_since, created_at',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -268,6 +306,7 @@ class _MenuScreenState extends State<MenuScreen> {
         _avatarUrl = profile?['avatar_url'] as String?;
         _memberSince = parsedMemberSince;
         _adminSince = parsedAdminSince;
+        _membershipType = profile?['membership_type'] as String?;
         _isAdmin = isAdmin;
         _loading = false;
       });
@@ -383,10 +422,10 @@ class _MenuScreenState extends State<MenuScreen> {
     final name = _fullName?.isNotEmpty == true ? _fullName! : 'Set your name';
     final email = _email?.isNotEmpty == true ? _email! : 'Add an email';
     final memberSince = _memberSince != null
-        ? 'Member since ${_formatMonthYear(_memberSince!)}'
+        ? 'Member Since ${_formatMonthYear(_memberSince!)}'
         : 'Member since not set';
     final adminSince = _adminSince != null
-        ? 'Admin since ${_formatMonthYear(_adminSince!)}'
+        ? 'Admin Since ${_formatMonthYear(_adminSince!)}'
         : 'Admin since not set';
     final sinceLabel = _isAdmin ? adminSince : memberSince;
 

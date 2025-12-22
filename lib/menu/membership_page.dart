@@ -393,11 +393,38 @@ class _MembershipPageState extends State<MembershipPage> {
   }
 
   void _handleBuy(String tierName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$tierName membership purchase — code to be integrated"),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to continue')),
+      );
+      return;
+    }
+
+    () async {
+      try {
+        final updates = {
+          'membership_type': tierName,
+          if (_memberSince == null)
+            'member_since': DateTime.now().toIso8601String(),
+        };
+
+        await _client.from('user_profiles').update(updates).eq('id', user.id);
+
+        setState(() {
+          _membershipType = tierName;
+          _memberSince ??= _formatMonthYear(DateTime.now().toIso8601String());
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Membership updated: $tierName')),
+        );
+      } catch (e) {
+        debugPrint('Error updating membership_type: $e');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+      }
+    }();
   }
 }
