@@ -433,6 +433,21 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
+  Color _getMembershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700); // Gold/Yellow
+      case '2nd Claim':
+        return const Color(0xFF0055FF); // Blue
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57); // Green
+      default:
+        return const Color(0xFFF5C542); // Default yellow
+    }
+  }
+
   Widget _profileHeader() {
     final name = _fullName?.isNotEmpty == true ? _fullName! : 'Set your name';
     final email = _email?.isNotEmpty == true ? _email! : 'Add an email';
@@ -461,6 +476,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _photoCard() {
+    final membershipColor = _getMembershipColor(_membershipType);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -476,7 +492,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFF5C542), width: 1.2),
+              border: Border.all(color: membershipColor, width: 1.2),
             ),
             child: Padding(
               padding: const EdgeInsets.all(12),
