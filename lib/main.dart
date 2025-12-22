@@ -1,14 +1,18 @@
 // main.dart
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'splash_screen.dart';
 import 'auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 // Global RouteObserver to support auto-refresh on page resume
-final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +26,20 @@ void main() async {
     anonKey: 'sb_publishable_PxUqRg99ug7dqYnWG82M9A_pRukqS1k',
   );
 
-  runApp(const RunRankApp());
+  // 3️⃣ Crashlytics: capture Dart & platform errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+  };
+  ui.PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true; // handled
+  };
+
+  runZonedGuarded(() {
+    runApp(const RunRankApp());
+  }, (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  });
 }
 
 class RunRankApp extends StatelessWidget {

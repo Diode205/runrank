@@ -503,7 +503,14 @@ class _MenuScreenState extends State<MenuScreen> {
                     child: Container(
                       color: Colors.white10,
                       child: _avatarUrl != null
-                          ? Image.network(_avatarUrl!, fit: BoxFit.cover)
+                          ? Image.network(
+                              _avatarUrl!,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.low,
+                              errorBuilder: (context, error, stack) => const Center(
+                                child: Icon(Icons.broken_image, color: Colors.white54),
+                              ),
+                            )
                           : const Center(
                               child: Icon(
                                 Icons.person,
