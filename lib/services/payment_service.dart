@@ -87,7 +87,8 @@ class PaymentService {
           paymentIntentClientSecret: clientSecret,
           merchantDisplayName: 'RunRank',
           style: ThemeMode.dark,
-          applePay: const PaymentSheetApplePay(merchantCountryCode: 'GB'),
+          // Disable Apple Pay until merchant ID is configured
+          // applePay: const PaymentSheetApplePay(merchantCountryCode: 'GB'),
           googlePay: const PaymentSheetGooglePay(
             merchantCountryCode: 'GB',
             testEnv: true,
