@@ -119,8 +119,14 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         data = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id,
+              title,
+              content,
+              author_id,
+              author_name,
+              created_at,
+              is_approved,
+              expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -129,8 +135,14 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         final approved = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id,
+              title,
+              content,
+              author_id,
+              author_name,
+              created_at,
+              is_approved,
+              expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -140,8 +152,14 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         final mine = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id,
+              title,
+              content,
+              author_id,
+              author_name,
+              created_at,
+              is_approved,
+              expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -404,7 +422,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                   final post = posts[index];
                   final postId = post['id'] as String;
                   final authorName =
-                      post['user_profiles']?['full_name'] ?? 'Unknown';
+                      post['author_name'] as String? ?? 'Unknown';
                   final attachments =
                       (post['club_post_attachments'] as List?)
                           ?.map((e) => e as Map<String, dynamic>)
@@ -438,7 +456,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                       .take(3)
                       .toList();
 
-                  return Card(
+                  final postCard = Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -457,8 +475,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                 radius: 20,
                                 backgroundColor: Colors.blue,
                                 child: Text(
-                                  (authorName is String &&
-                                          authorName.isNotEmpty)
+                                  authorName.isNotEmpty
                                       ? authorName[0].toUpperCase()
                                       : '?',
                                   style: const TextStyle(
@@ -964,6 +981,71 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                       ],
                     ),
                   );
+
+                  // Admin delete via swipe-to-delete
+                  if (isAdmin) {
+                    return Dismissible(
+                      key: ValueKey('post-$postId'),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) async {
+                        return await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Post'),
+                                content: const Text(
+                                  'Are you sure you want to delete this post?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ) ??
+                            false;
+                      },
+                      onDismissed: (_) async {
+                        try {
+                          await supabase
+                              .from('club_posts')
+                              .delete()
+                              .eq('id', postId);
+                          await _loadPosts();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Post deleted')),
+                            );
+                          }
+                        } catch (e) {
+                          debugPrint('Error deleting post: $e');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 16),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      child: postCard,
+                    );
+                  }
+
+                  return postCard;
                 },
               ),
             ),
