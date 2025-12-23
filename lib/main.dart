@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/painting.dart' as painting;
+import 'package:runrank/services/payment_service.dart';
 
 // Global RouteObserver to support auto-refresh on page resume
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -26,6 +27,9 @@ void main() async {
     url: 'https://yzccwmhgqlgguighfhsk.supabase.co',
     anonKey: 'sb_publishable_PxUqRg99ug7dqYnWG82M9A_pRukqS1k',
   );
+
+  // 2b️⃣ Stripe setup (safe if keys not provided)
+  await PaymentService.init();
 
   // 3️⃣ Crashlytics: capture Dart & platform errors
   FlutterError.onError = (FlutterErrorDetails details) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/payment_service.dart';
 import 'package:runrank/main.dart' show routeObserver;
 
 class MembershipPage extends StatefulWidget {
@@ -15,6 +16,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   bool _loading = true;
   String? _memberSince;
   String? _membershipType;
+  String? _fullName;
+  String? _email;
+  String? _ukaNumber;
+  String? _dob;
   final String _membershipStatus = "Active";
 
   @override
@@ -54,7 +59,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     try {
       final row = await _client
           .from('user_profiles')
-          .select('member_since, membership_type')
+          .select(
+              'member_since, membership_type, full_name, email, uka_number, date_of_birth')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -65,6 +71,11 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       if (row != null && row['membership_type'] != null) {
         _membershipType = row['membership_type'] as String?;
       }
+
+      _fullName = row?['full_name'] as String?;
+      _email = row?['email'] as String?;
+      _ukaNumber = row?['uka_number'] as String?;
+      _dob = row?['date_of_birth'] as String?;
     } catch (e) {
       debugPrint("Error loading membership data: $e");
     }
@@ -423,8 +434,42 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       return;
     }
 
+    final amountMap = <String, int>{
+      '1st Claim': 3000, // £30.00
+      '2nd Claim': 1500, // £15.00
+      'Social': 500, // £5.00
+      'Full-Time Education': 1500, // £15.00
+    };
+
+    final amountCents = amountMap[tierName];
+    if (amountCents == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unknown membership tier.')),
+      );
+      return;
+    }
+
     () async {
       try {
+        final metadata = {
+          'user_id': user.id,
+          'full_name': _fullName,
+          'email': _email,
+          'uka_number': _ukaNumber,
+          'date_of_birth': _dob,
+          'membership_type_requested': tierName,
+        };
+
+        final paid = await PaymentService.startMembershipPayment(
+          context: context,
+          tierName: tierName,
+          amountCents: amountCents,
+          metadata: metadata,
+        );
+
+        if (!paid) return;
+
+        // Optimistic update; in production prefer webhook confirmation
         final updates = {
           'membership_type': tierName,
           if (_memberSince == null)
@@ -446,7 +491,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Membership updated: $tierName')),
+          SnackBar(content: Text('Membership purchased: $tierName')),
         );
       } catch (e) {
         debugPrint('Error updating membership_type: $e');
