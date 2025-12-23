@@ -309,10 +309,17 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                   final post = posts[index];
                   final postId = post['id'] as String;
                   if (index == 0) {
-                    print('PostsFeed: Building posts, isAdmin=$isAdmin, count=${posts.length}');
+                    print(
+                      'PostsFeed: Building posts, isAdmin=$isAdmin, count=${posts.length}',
+                    );
                   }
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
+                  
+                  if (index == 0) {
+                    print('PostsFeed: First post data: id=$postId, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}');
+                  }
+                  
                   final displayAuthor =
                       (fallbackAuthorName != null &&
                           fallbackAuthorName.isNotEmpty)
@@ -335,8 +342,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     color: Colors.grey[850],
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
+                    child: GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
