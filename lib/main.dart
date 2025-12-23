@@ -9,6 +9,7 @@ import 'auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/painting.dart' as painting;
 
 // Global RouteObserver to support auto-refresh on page resume
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -35,11 +36,53 @@ void main() async {
     return true; // handled
   };
 
-  runZonedGuarded(() {
-    runApp(const RunRankApp());
-  }, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-  });
+  // Trim image cache to reduce memory pressure on iOS
+  try {
+    painting.PaintingBinding.instance.imageCache
+      ..maximumSize = 200
+      ..maximumSizeBytes = 60 * 1024 * 1024; // 60MB
+  } catch (_) {}
+
+  runZonedGuarded(
+    () {
+      runApp(const LifecycleProbe(child: RunRankApp()));
+    },
+    (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    },
+  );
+}
+
+// Logs lifecycle transitions to Crashlytics to help diagnose untethered crashes
+class LifecycleProbe extends StatefulWidget {
+  const LifecycleProbe({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<LifecycleProbe> createState() => _LifecycleProbeState();
+}
+
+class _LifecycleProbeState extends State<LifecycleProbe>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    FirebaseCrashlytics.instance.log('AppLifecycleState: $state');
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class RunRankApp extends StatelessWidget {
