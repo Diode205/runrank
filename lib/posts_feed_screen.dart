@@ -57,8 +57,11 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
           .eq('id', user.id)
           .single();
 
+      final adminStatus = profile['is_admin'] ?? false;
+      print('PostsFeed: Admin status for ${user.id}: $adminStatus');
+
       if (mounted) {
-        setState(() => isAdmin = profile['is_admin'] ?? false);
+        setState(() => isAdmin = adminStatus);
       }
     } catch (e) {
       print('Error checking admin status: $e');
@@ -73,23 +76,21 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
       List data;
       if (isAdmin) {
-        // Admins see ALL posts
+        // Admins see ALL posts (approved + pending + their own)
         data = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
             .order('created_at', ascending: false);
       } else if (user != null) {
-        // Non-admins see approved posts OR own posts
+        // Non-admins see approved posts OR own posts (no join to avoid RLS issues)
         final approved = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -99,8 +100,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
         final mine = await supabase
             .from('club_posts')
             .select('''
-              *,
-              user_profiles!club_posts_author_id_fkey(full_name),
+              id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -227,6 +227,12 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
     }
   }
 
+  String _shortId(String? id) {
+    if (id == null || id.isEmpty) return 'Member';
+    if (id.length <= 6) return id;
+    return 'Member ${id.substring(0, 6)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -292,8 +298,13 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
                   final post = posts[index];
-                  final authorName =
-                      post['user_profiles']?['full_name'] ?? 'Unknown';
+                  final fallbackAuthorName = (post['author_name'] as String?)
+                      ?.trim();
+                  final displayAuthor =
+                      (fallbackAuthorName != null &&
+                          fallbackAuthorName.isNotEmpty)
+                      ? fallbackAuthorName
+                      : _shortId(post['author_id'] as String?);
                   final commentsCount = 0;
                   final attachments =
                       (post['club_post_attachments'] as List?)
@@ -334,7 +345,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                   radius: 20,
                                   backgroundColor: Colors.blue,
                                   child: Text(
-                                    authorName[0].toUpperCase(),
+                                    displayAuthor[0].toUpperCase(),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -348,7 +359,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        authorName,
+                                        displayAuthor,
                                         style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -563,8 +574,11 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
                   // Wrap card in Dismissible for admin swipe-to-delete
                   if (isAdmin) {
+                    print(
+                      'PostsFeed: Wrapping post $postId in Dismissible (admin=$isAdmin)',
+                    );
                     return Dismissible(
-                      key: Key(postId),
+                      key: ValueKey('post-$postId'),
                       direction: DismissDirection.endToStart,
                       background: Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -572,14 +586,52 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: const Icon(
                           Icons.delete_outline,
                           color: Colors.white,
                           size: 28,
                         ),
                       ),
+                      secondaryBackground: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      confirmDismiss: (_) async {
+                        return await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text('Delete post?'),
+                                content: const Text(
+                                  'This will permanently delete the post.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            ) ??
+                            false;
+                      },
                       onDismissed: (_) async {
                         try {
                           await supabase

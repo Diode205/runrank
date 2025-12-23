@@ -8,6 +8,7 @@ import 'package:runrank/menu/membership_page.dart';
 import 'package:runrank/menu/merchandise_page.dart';
 import 'package:runrank/menu/races_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
+import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -437,6 +438,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 context,
                 MaterialPageRoute(
                   builder: (_) => const AdministrativeTeamPage(),
+                ),
+              );
+            },
+          ),
+          _menuTile(
+            icon: Icons.description,
+            title: 'Policies, Forms, and Notices',
+            subtitle: 'Club policies, waivers, and key updates',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PoliciesFormsNoticesPage(),
                 ),
               );
             },

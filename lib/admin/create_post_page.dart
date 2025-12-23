@@ -184,6 +184,20 @@ class _CreatePostPageState extends State<CreatePostPage> {
       if (user == null) {
         throw Exception('User not logged in');
       }
+      // Fetch author display name for denormalized storage (avoids RLS on user_profiles)
+      String authorName = 'Unknown';
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+        final name = profile?['full_name'] as String?;
+        if (name != null && name.trim().isNotEmpty) {
+          authorName = name.trim();
+        }
+      } catch (_) {}
+
       // Determine approval
       final isApproved = _isAdmin;
 
@@ -199,6 +213,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
             'title': titleText,
             'content': _contentController.text.trim(),
             'author_id': user.id,
+            'author_name': authorName,
             'expiry_date': _expiryDate.toIso8601String(),
             'created_at': DateTime.now().toIso8601String(),
             'is_approved': isApproved,

@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "std/": "https://deno.land/std@0.224.0/",
+    "stripe": "https://deno.land/x/stripe@v12.2.0/mod.ts"
+  }
+}
