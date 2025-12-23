@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -267,6 +268,62 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Approval policy notice
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[700]!),
+                      ),
+                      child: Center(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(
+                                text:
+                                    'All posts are subject to Admin approval. Any post that is deemed irrelevant and or unnecessary may not be published. Please refer to Club Policies on Privacy, Health & Safety, and Data Protection. ',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                  height: 1.5,
+                                ),
+                              ),
+                              TextSpan(
+                                text: 'Contact',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFFFFD300),
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                  height: 1.5,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.of(
+                                      context,
+                                    ).popUntil((route) => route.isFirst);
+                                    // Navigate to admin in menu
+                                    Navigator.of(context).pushNamed('/menu');
+                                  },
+                              ),
+                              const TextSpan(
+                                text:
+                                    ' your Admin for clarification and guidance.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     // Title category + optional custom title (responsive)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

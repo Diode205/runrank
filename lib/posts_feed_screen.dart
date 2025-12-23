@@ -301,8 +301,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       [];
                   final timeAgo = _getTimeAgo(post['created_at']);
                   final isApproved = post['is_approved'] ?? true;
+                  final postId = post['id'] as String;
 
-                  return Card(
+                  // Build the card widget
+                  final card = Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -557,6 +559,49 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       ),
                     ),
                   );
+
+                  // Wrap card in Dismissible for admin swipe-to-delete
+                  if (isAdmin) {
+                    return Dismissible(
+                      key: Key(postId),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 16),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      onDismissed: (_) async {
+                        try {
+                          await supabase.from('club_posts').delete().eq('id', postId);
+                          await _loadPosts();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Post deleted')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting post: $e')),
+                            );
+                          }
+                          await _loadPosts();
+                        }
+                      },
+                      child: card,
+                    );
+                  }
+
+                  return card;
                 },
               ),
             ),
