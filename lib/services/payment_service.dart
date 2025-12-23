@@ -51,35 +51,36 @@ class PaymentService {
           'amount': amountCents,
           'currency': 'gbp',
           'tier': tierName,
-          final response = await http.post(
+          'metadata': metadata,
         }),
       );
 
       if (response.statusCode != 200) {
-        debugPrint(
-          'Payment intent error: ${response.statusCode} ${response.body}',
+        final body = response.body;
+        debugPrint('Payment intent error: ${response.statusCode} $body');
+        final snippet = body.length > 140 ? body.substring(0, 140) + '…' : body;
+        _showSnack(
+          context,
+          'Payment config error (${response.statusCode}). ${snippet.isEmpty ? '' : snippet}',
         );
-        _showSnack(context, 'Unable to start payment.');
         return false;
       }
-          if (response.statusCode != 200) {
-            final body = response.body;
-            debugPrint('Payment intent error: ${response.statusCode} $body');
-            final snippet = body.length > 140 ? body.substring(0, 140) + '…' : body;
-            _showSnack(
-              context,
-              'Payment config error (${response.statusCode}). ${snippet.isEmpty ? '' : snippet}',
-            );
-          data['paymentIntentClientSecret'] ??
-          data['clientSecret'] ??
-          data['paymentIntent'];
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final String? clientSecret =
+          (data['paymentIntentClientSecret'] ??
+                  data['clientSecret'] ??
+                  data['paymentIntent'])
+              as String?;
+
       if (clientSecret == null) {
         _showSnack(context, 'Payment config missing client secret.');
         return false;
-            _showSnack(context, 'Payment config missing client secret.');
+      }
 
-      final customerId = data['customerId'] ?? data['customer'];
-      final ephemeralKey = data['ephemeralKey'];
+      final String? customerId =
+          data['customerId'] as String? ?? data['customer'] as String?;
+      final String? ephemeralKey = data['ephemeralKey'] as String?;
 
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
@@ -97,19 +98,21 @@ class PaymentService {
         ),
       );
 
-      await Stripe.instance.presentPaymentSheet();
-      return true;
-          try {
-            await Stripe.instance.presentPaymentSheet();
-            return true;
-          } on StripeException catch (se) {
-            debugPrint('Stripe exception: ${se.error.localizedMessage ?? se.error.message}');
-            _showSnack(context, 'Payment failed: ${se.error.localizedMessage ?? se.error.message ?? se.toString()}');
-            return false;
-          }
-        } catch (e) {
-          debugPrint('Payment error: $e');
-          _showSnack(context, 'Payment cancelled or failed: $e');
+      try {
+        await Stripe.instance.presentPaymentSheet();
+        return true;
+      } on StripeException catch (se) {
+        final msg =
+            se.error.localizedMessage ?? se.error.message ?? 'Stripe error';
+        debugPrint('Stripe exception: $msg');
+        _showSnack(context, 'Payment failed: $msg');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Payment error: $e');
+      _showSnack(context, 'Payment cancelled or failed: $e');
+      return false;
+    }
   }
 
   static void _showSnack(BuildContext context, String message) {
