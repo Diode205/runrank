@@ -11,6 +11,7 @@ import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/main.dart' show routeObserver;
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -19,7 +20,7 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen> with RouteAware {
   final _supabase = Supabase.instance.client;
   bool _loading = true;
   bool _isAdmin = false;
@@ -37,6 +38,27 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  // Called when returning to this page (e.g., after closing membership page)
+  @override
+  void didPopNext() {
     _loadProfile();
   }
 
@@ -507,9 +529,13 @@ class _MenuScreenState extends State<MenuScreen> {
                               _avatarUrl!,
                               fit: BoxFit.cover,
                               filterQuality: FilterQuality.low,
-                              errorBuilder: (context, error, stack) => const Center(
-                                child: Icon(Icons.broken_image, color: Colors.white54),
-                              ),
+                              errorBuilder: (context, error, stack) =>
+                                  const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
                             )
                           : const Center(
                               child: Icon(
