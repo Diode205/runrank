@@ -51,7 +51,7 @@ class PaymentService {
           'amount': amountCents,
           'currency': 'gbp',
           'tier': tierName,
-          'metadata': metadata,
+          final response = await http.post(
         }),
       );
 
@@ -62,16 +62,21 @@ class PaymentService {
         _showSnack(context, 'Unable to start payment.');
         return false;
       }
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final clientSecret =
+          if (response.statusCode != 200) {
+            final body = response.body;
+            debugPrint('Payment intent error: ${response.statusCode} $body');
+            final snippet = body.length > 140 ? body.substring(0, 140) + '…' : body;
+            _showSnack(
+              context,
+              'Payment config error (${response.statusCode}). ${snippet.isEmpty ? '' : snippet}',
+            );
           data['paymentIntentClientSecret'] ??
           data['clientSecret'] ??
           data['paymentIntent'];
       if (clientSecret == null) {
         _showSnack(context, 'Payment config missing client secret.');
         return false;
-      }
+            _showSnack(context, 'Payment config missing client secret.');
 
       final customerId = data['customerId'] ?? data['customer'];
       final ephemeralKey = data['ephemeralKey'];
@@ -94,11 +99,17 @@ class PaymentService {
 
       await Stripe.instance.presentPaymentSheet();
       return true;
-    } catch (e) {
-      debugPrint('Payment error: $e');
-      _showSnack(context, 'Payment cancelled or failed.');
-      return false;
-    }
+          try {
+            await Stripe.instance.presentPaymentSheet();
+            return true;
+          } on StripeException catch (se) {
+            debugPrint('Stripe exception: ${se.error.localizedMessage ?? se.error.message}');
+            _showSnack(context, 'Payment failed: ${se.error.localizedMessage ?? se.error.message ?? se.toString()}');
+            return false;
+          }
+        } catch (e) {
+          debugPrint('Payment error: $e');
+          _showSnack(context, 'Payment cancelled or failed: $e');
   }
 
   static void _showSnack(BuildContext context, String message) {
