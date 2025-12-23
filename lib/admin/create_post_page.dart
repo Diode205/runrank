@@ -494,15 +494,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       ),
                     ],
                     const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    Center(
                       child: Text(
-                        'Posts expire one year from date of publication.',
+                        'Unless removed by Admin, post expires one year from date of publication.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],
                           fontStyle: FontStyle.italic,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                     const SizedBox(height: 32),

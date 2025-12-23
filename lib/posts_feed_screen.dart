@@ -33,8 +33,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
-    _loadPosts();
+    _checkAdminStatus().then((_) {
+      _loadPosts();
+    });
   }
 
   @override
@@ -581,7 +582,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       ),
                       onDismissed: (_) async {
                         try {
-                          await supabase.from('club_posts').delete().eq('id', postId);
+                          await supabase
+                              .from('club_posts')
+                              .delete()
+                              .eq('id', postId);
                           await _loadPosts();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -591,7 +595,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                         } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error deleting post: $e')),
+                              SnackBar(
+                                content: Text('Error deleting post: $e'),
+                              ),
                             );
                           }
                           await _loadPosts();
