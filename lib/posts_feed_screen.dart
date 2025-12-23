@@ -33,7 +33,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   @override
   void initState() {
     super.initState();
+    print('PostsFeed: initState called');
     _checkAdminStatus().then((_) {
+      print('PostsFeed: Admin check complete, loading posts...');
       _loadPosts();
     });
   }
@@ -48,7 +50,11 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
   Future<void> _checkAdminStatus() async {
     final user = supabase.auth.currentUser;
-    if (user == null) return;
+    print('PostsFeed: _checkAdminStatus called, user: ${user?.id}');
+    if (user == null) {
+      print('PostsFeed: No user found, cannot check admin');
+      return;
+    }
 
     try {
       final profile = await supabase
@@ -69,6 +75,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   }
 
   Future<void> _loadPosts() async {
+    print('PostsFeed: _loadPosts called, isAdmin=$isAdmin');
     try {
       // Load posts that haven't expired
       final now = DateTime.now().toIso8601String();
@@ -76,6 +83,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
       List data;
       if (isAdmin) {
+        print('PostsFeed: Loading ALL posts (admin mode)');
         // Admins see ALL posts (approved + pending + their own)
         data = await supabase
             .from('club_posts')
@@ -126,6 +134,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
       }
 
       if (mounted) {
+        print('PostsFeed: Loaded ${data.length} posts');
         setState(() {
           posts = List<Map<String, dynamic>>.from(data);
           loading = false;
@@ -298,6 +307,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
                   final post = posts[index];
+                  final postId = post['id'] as String;
+                  if (index == 0) {
+                    print('PostsFeed: Building posts, isAdmin=$isAdmin, count=${posts.length}');
+                  }
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
                   final displayAuthor =
@@ -313,7 +326,6 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       [];
                   final timeAgo = _getTimeAgo(post['created_at']);
                   final isApproved = post['is_approved'] ?? true;
-                  final postId = post['id'] as String;
 
                   // Build the card widget
                   final card = Card(
