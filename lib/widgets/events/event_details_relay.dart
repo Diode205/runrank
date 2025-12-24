@@ -473,53 +473,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                   ),
                 ),
 
-                // Admin controls
-                ...(_isAdmin
-                    ? [
-                        const Divider(height: 40),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0057B7),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                                onPressed: _editEvent,
-                                icon: const Icon(Icons.edit),
-                                label: const Text("Edit Event"),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                                onPressed: _cancelEvent,
-                                icon: const Icon(Icons.cancel),
-                                label: const Text("Cancel Event"),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red.shade900,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: _deleteEvent,
-                          icon: const Icon(Icons.delete_forever),
-                          label: const Text("Delete Event Permanently"),
-                        ),
-                      ]
-                    : []),
+                // Admin controls moved to swipe on calendar
+                // Edit (left-to-right) and Cancel (right-to-left)
               ],
             ),
     );

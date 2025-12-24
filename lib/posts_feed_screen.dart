@@ -315,11 +315,13 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                   }
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
-                  
+
                   if (index == 0) {
-                    print('PostsFeed: First post data: id=$postId, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}');
+                    print(
+                      'PostsFeed: First post data: id=$postId, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}',
+                    );
                   }
-                  
+
                   final displayAuthor =
                       (fallbackAuthorName != null &&
                           fallbackAuthorName.isNotEmpty)

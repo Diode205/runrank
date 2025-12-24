@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
+import 'package:runrank/widgets/admin_edit_event_page.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
 import 'package:runrank/services/notification_service.dart';
 
@@ -391,27 +392,8 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                   ),
                 ),
 
-                // Admin controls
-                ...(isAdmin
-                    ? [
-                        const Divider(height: 40),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          onPressed: _cancelEvent,
-                          child: const Text("Cancel Event"),
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.black,
-                          ),
-                          onPressed: _deleteEvent,
-                          child: const Text("Delete Event"),
-                        ),
-                      ]
-                    : []),
+                // Admin controls moved to swipe on calendar
+                // Edit (left-to-right) and Cancel (right-to-left)
               ],
             ),
     );

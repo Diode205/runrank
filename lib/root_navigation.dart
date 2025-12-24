@@ -77,6 +77,8 @@ class _RootNavigationState extends State<RootNavigation>
     if (user == null) return;
 
     try {
+      debugPrint('RootNav: Setting up post activity listener...');
+
       // Listen for new posts
       supabase
           .channel('public:club_posts')
@@ -85,12 +87,17 @@ class _RootNavigationState extends State<RootNavigation>
             schema: 'public',
             table: 'club_posts',
             callback: (payload) {
+              debugPrint(
+                'RootNav: New post detected! _selectedIndex=$_selectedIndex',
+              );
               if (mounted && _selectedIndex != 2) {
                 setState(() => _postActivityCount++);
               }
             },
           )
           .subscribe();
+
+      debugPrint('RootNav: club_posts subscription active');
 
       // Listen for new reactions
       supabase
@@ -122,7 +129,7 @@ class _RootNavigationState extends State<RootNavigation>
           )
           .subscribe();
     } catch (e) {
-      print('Error setting up post activity listener: $e');
+      debugPrint('RootNav: Error setting up post activity listener: $e');
     }
   }
 

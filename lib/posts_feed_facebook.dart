@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/admin/create_post_page.dart';
+import 'package:runrank/admin/edit_post_page.dart';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
   const PostsFeedFacebookScreen({super.key});
@@ -982,70 +983,124 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                     ),
                   );
 
-                  // Admin delete via swipe-to-delete
-                  if (isAdmin) {
-                    return Dismissible(
-                      key: ValueKey('post-$postId'),
-                      direction: DismissDirection.endToStart,
-                      confirmDismiss: (_) async {
-                        return await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Delete Post'),
-                                content: const Text(
-                                  'Are you sure you want to delete this post?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
+                  final currentUser = supabase.auth.currentUser;
+                  final postAuthorId = post['author_id'] as String?;
+                  final isCreator =
+                      currentUser != null &&
+                      postAuthorId != null &&
+                      postAuthorId == currentUser.id;
+
+                  // Add swipe gestures based on permissions
+                  Widget result = postCard;
+
+                  if (isCreator || isAdmin) {
+                    // Determine swipe direction(s)
+                    DismissDirection swipeDirection;
+                    if (isCreator && isAdmin) {
+                      swipeDirection = DismissDirection.horizontal; // both
+                    } else if (isCreator) {
+                      swipeDirection = DismissDirection.startToEnd; // edit only
+                    } else {
+                      swipeDirection =
+                          DismissDirection.endToStart; // delete only
+                    }
+
+                    result = Dismissible(
+                      key: ValueKey('post-swipe-$postId'),
+                      direction: swipeDirection,
+                      confirmDismiss: (direction) async {
+                        if (direction == DismissDirection.startToEnd) {
+                          // Edit action (left-to-right)
+                          if (!context.mounted) return false;
+                          try {
+                            final updated = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditPostPage(post: post),
                               ),
-                            ) ??
-                            false;
-                      },
-                      onDismissed: (_) async {
-                        try {
-                          await supabase
-                              .from('club_posts')
-                              .delete()
-                              .eq('id', postId);
-                          await _loadPosts();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post deleted')),
                             );
+                            if (updated == true && context.mounted) {
+                              await _loadPosts();
+                            }
+                          } catch (e) {
+                            debugPrint('Error navigating to EditPostPage: $e');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
                           }
-                        } catch (e) {
-                          debugPrint('Error deleting post: $e');
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
+                          return false;
+                        } else {
+                          // Delete action (right-to-left)
+                          return await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Delete Post'),
+                                  content: const Text(
+                                    'Are you sure you want to delete this post?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+                        }
+                      },
+                      onDismissed: (direction) async {
+                        if (direction == DismissDirection.endToStart) {
+                          // Only delete executes onDismissed
+                          try {
+                            await supabase
+                                .from('club_posts')
+                                .delete()
+                                .eq('id', postId);
+                            await _loadPosts();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Post deleted')),
+                              );
+                            }
+                          } catch (e) {
+                            debugPrint('Error deleting post: $e');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
                           }
                         }
                       },
                       background: Container(
+                        color: Colors.blue,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 16),
+                        child: const Icon(Icons.edit, color: Colors.white),
+                      ),
+                      secondaryBackground: Container(
                         color: Colors.red,
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.only(right: 16),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
-                      child: postCard,
+                      child: result,
                     );
                   }
 
-                  return postCard;
+                  return result;
                 },
               ),
             ),

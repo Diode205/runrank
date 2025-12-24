@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
+import 'package:runrank/widgets/admin_edit_event_page.dart';
+import 'package:runrank/services/notification_service.dart';
 
 /// =============================================================
 /// CLUB EVENTS CALENDAR — unified for all event types
@@ -56,6 +58,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
           .order("date")
           .order("time");
 
+      debugPrint('ClubEventsCalendar: Fetched ${rows.length} total events');
+
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
@@ -65,6 +69,13 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
           return d.isAtSameMomentAs(today) || d.isAfter(today);
         },
       ).toList();
+
+      debugPrint(
+        'ClubEventsCalendar: After date filter, have ${parsed.length} events',
+      );
+      for (var e in parsed) {
+        debugPrint('  - ${e.title} (cancelled: ${e.isCancelled})');
+      }
 
       parsed.sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
@@ -235,7 +246,22 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                     SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final e = group.events[index];
-                        return GestureDetector(
+                        final currentUserId = supabase.auth.currentUser?.id;
+                        final isCreator =
+                            currentUserId != null &&
+                            e.createdBy == currentUserId;
+
+                        if (isCreator) {
+                          debugPrint(
+                            'ClubEventsCalendar: Event ${e.id} is creator-owned. currentUserId=$currentUserId, createdBy=${e.createdBy}',
+                          );
+                        } else {
+                          debugPrint(
+                            'ClubEventsCalendar: Event ${e.id} NOT creator. currentUserId=$currentUserId, createdBy=${e.createdBy}',
+                          );
+                        }
+
+                        Widget card = GestureDetector(
                           onTap: () => _openEvent(e),
                           child: _EventCard(
                             weekday: _weekday(e.dateTime),
@@ -247,6 +273,144 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                             isCancelled: e.isCancelled,
                           ),
                         );
+
+                        if (isCreator) {
+                          // Single Dismissible handles both edit (L→R) and cancel (R→L)
+                          card = Dismissible(
+                            key: ValueKey('event-swipe-${e.id}'),
+                            direction: DismissDirection.horizontal,
+                            background: Container(
+                              color: Colors.blue,
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                              ),
+                            ),
+                            secondaryBackground: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: const Icon(
+                                Icons.cancel,
+                                color: Colors.white,
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                // Edit
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AdminEditEventPage(event: e),
+                                  ),
+                                );
+                                if (result == true) {
+                                  await _loadEvents();
+                                }
+                                return false; // keep card
+                              } else {
+                                // Cancel
+                                final reasonController =
+                                    TextEditingController();
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text('Cancel Event?'),
+                                    content: TextField(
+                                      controller: reasonController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Reason (optional)',
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('No'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        child: const Text('Cancel Event'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (ok == true) {
+                                  try {
+                                    await supabase
+                                        .from('club_events')
+                                        .update({
+                                          'is_cancelled': true,
+                                          'cancel_reason': reasonController.text
+                                              .trim(),
+                                        })
+                                        .eq('id', e.id);
+
+                                    // Notify all members about cancellation
+                                    try {
+                                      await NotificationService.notifyAllUsers(
+                                        title: '${e.title} Cancelled',
+                                        body: reasonController.text.isNotEmpty
+                                            ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
+                                            : 'Event has been cancelled.',
+                                        eventId: e.id,
+                                      );
+                                    } catch (notifErr) {
+                                      debugPrint(
+                                        'Error notifying users: $notifErr',
+                                      );
+                                    }
+
+                                    await _loadEvents();
+                                    // Refresh unread badge for current user (creator)
+                                    try {
+                                      await NotificationService.refreshUnreadCount();
+                                    } catch (e) {
+                                      debugPrint(
+                                        'Error refreshing unread count: $e',
+                                      );
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Event cancelled & members notified',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (err) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('Error: $err')),
+                                      );
+                                    }
+                                  }
+                                }
+                                return false; // keep card
+                              }
+                            },
+                            child: card,
+                          );
+                        }
+
+                        return card;
                       }, childCount: group.events.length),
                     ),
                   ],

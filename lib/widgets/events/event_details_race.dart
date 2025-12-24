@@ -4,6 +4,7 @@ import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/weather_service.dart';
+import 'package:runrank/widgets/admin_edit_event_page.dart';
 
 /// Event details page for race events (Race, Handicap_Series)
 /// Group 2: Race and Handicap_Series with marshal call dates and predicted finish times
@@ -37,7 +38,6 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final dt = e.dateTime;
     final user = supabase.auth.currentUser;
     final isAdmin = user?.id == e.createdBy;
-    final isHandicap = e.eventType == "handicap_series";
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -293,9 +293,10 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                     color: const Color(0xFFFFD300),
                   ),
                 ),
-                const SizedBox(height: 8),
-                _buildParticipationSection(),
                 const SizedBox(height: 20),
+
+                // Admin controls moved to swipe on calendar
+                // Edit (left-to-right) and Cancel (right-to-left)
 
                 // Participant counts
                 Container(
@@ -407,27 +408,8 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                   ),
                 ),
 
-                // Admin controls
-                ...(isAdmin
-                    ? [
-                        const Divider(height: 40),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          onPressed: _cancelEvent,
-                          child: const Text("Cancel Event"),
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.black,
-                          ),
-                          onPressed: _deleteEvent,
-                          child: const Text("Delete Event"),
-                        ),
-                      ]
-                    : []),
+                // Admin controls moved to swipe on calendar
+                // Edit (left-to-right) and Cancel (right-to-left)
               ],
             ),
     );

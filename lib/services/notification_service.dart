@@ -18,17 +18,25 @@ class NotificationService {
     print(
       "DEBUG: notifyAllUsers called - title: $title, body: $body, eventId: $eventId",
     );
-    final users = await _supabase.from('user_profiles').select('id');
+    try {
+      final users = await _supabase.from('user_profiles').select('id');
 
-    for (final u in users) {
-      await _supabase.from('notifications').insert({
-        'user_id': u['id'],
-        'title': title,
-        'body': body,
-        'event_id': eventId,
-        'is_read': false,
-      });
-      print("DEBUG: Notification sent to user: ${u['id']}");
+      for (final u in users) {
+        try {
+          await _supabase.from('notifications').insert({
+            'user_id': u['id'],
+            'title': title,
+            'body': body,
+            'event_id': eventId,
+            'is_read': false,
+          });
+          print("DEBUG: Notification sent to user: ${u['id']}");
+        } catch (e) {
+          print("DEBUG: Error sending notification to user ${u['id']}: $e");
+        }
+      }
+    } catch (e) {
+      print("DEBUG: Error in notifyAllUsers: $e");
     }
   }
 

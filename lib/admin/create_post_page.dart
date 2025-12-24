@@ -195,8 +195,21 @@ class _CreatePostPageState extends State<CreatePostPage> {
         final name = profile?['full_name'] as String?;
         if (name != null && name.trim().isNotEmpty) {
           authorName = name.trim();
+        } else {
+          // Fallback to user metadata if available
+          final displayName = user.userMetadata?['full_name'] as String?;
+          if (displayName != null && displayName.trim().isNotEmpty) {
+            authorName = displayName.trim();
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error fetching author name: $e');
+        // Fallback to user metadata
+        final displayName = user.userMetadata?['full_name'] as String?;
+        if (displayName != null && displayName.trim().isNotEmpty) {
+          authorName = displayName.trim();
+        }
+      }
 
       // Determine approval
       final isApproved = _isAdmin;
