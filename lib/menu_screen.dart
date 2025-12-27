@@ -385,7 +385,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           _menuTile(
             icon: Icons.history_edu,
             title: 'Club History',
-            subtitle: "Milestones & Achievements",
+            subtitle: "Records & Milestones",
             onTap: () {
               Navigator.push(
                 context,

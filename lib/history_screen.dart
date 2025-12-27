@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/club_records_service.dart';
 
 class RaceRecord {
   final String raceName;
@@ -30,11 +31,13 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   final _distances = const ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
+  final _clubRecordsService = ClubRecordsService();
 
   bool _loading = true;
   bool _error = false;
 
   Map<String, List<RaceRecord>> _byDistance = {};
+  Map<String, ClubRecord?> _clubRecords = {};
 
   @override
   void initState() {
@@ -133,11 +136,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _byDistance = grouped;
         _loading = false;
       });
+
+      // Fetch club records for all distances
+      _fetchClubRecords();
     } catch (e) {
       setState(() {
         _error = true;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _fetchClubRecords() async {
+    try {
+      for (final distance in _distances) {
+        final record = await _clubRecordsService.getClubRecordHolder(distance);
+        if (mounted) {
+          setState(() {
+            _clubRecords[distance] = record;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching club records: $e');
     }
   }
 
@@ -234,6 +255,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .map((e) => '${e.key} × ${e.value}')
         .join('   •   ');
 
+    final clubRecord = _clubRecords[distance];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -246,13 +269,71 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           Text(
             '$distance Summary',
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 18,
             ),
           ),
           const SizedBox(height: 10),
+
+          // Club Record Holder - prominently displayed
+          if (clubRecord != null) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.emoji_events,
+                    color: Color(0xFFFFD700),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'CLUB RECORD',
+                          style: TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          clubRecord.runnerName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    clubRecord.formattedTime,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white24, height: 1),
+            const SizedBox(height: 12),
+          ],
 
           _summaryRow(
             Icons.timer,

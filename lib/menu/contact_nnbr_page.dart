@@ -9,32 +9,39 @@ class ContactNNBRPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Contact NNBR'), centerTitle: true),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          _ContactCard(
+        children: [
+          // Header photo
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              'assets/images/runners_group.JPG',
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _ContactCard(
             label: 'General enquiries',
             detail: 'hello@nnbr.run',
             icon: Icons.email_outlined,
           ),
-          _ContactCard(
+          const _ContactCard(
             label: 'Membership',
             detail: 'membership@nnbr.run',
             icon: Icons.badge_outlined,
           ),
-          _ContactCard(
+          const _ContactCard(
             label: 'Club kit',
             detail: 'kit@nnbr.run',
             icon: Icons.shopping_bag_outlined,
           ),
-          _ContactCard(
+          const _ContactCard(
             label: 'Press',
             detail: 'press@nnbr.run',
             icon: Icons.campaign_outlined,
           ),
-          SizedBox(height: 12),
-          Text(
-            'Replace these placeholders with live data when available.',
-            style: TextStyle(color: Colors.black54),
-          ),
+          const SizedBox(height: 12),
         ],
       ),
     );

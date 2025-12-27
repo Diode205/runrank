@@ -81,6 +81,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/runners_group.JPG
+    - assets/images/club_history_runner.jpg
     - assets/images/nnbr_logo.png
     - assets/images/rank_logo.png
     - assets/images/nnbr_cover.png
