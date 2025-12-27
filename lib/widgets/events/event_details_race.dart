@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
-import 'package:runrank/services/notification_service.dart';
+// import removed: notification_service (not used here)
 import 'package:runrank/services/weather_service.dart';
-import 'package:runrank/widgets/admin_edit_event_page.dart';
+// import removed: admin_edit_event_page.dart (controls moved to calendar)
 
 /// Event details page for race events (Race, Handicap_Series)
 /// Group 2: Race and Handicap_Series with marshal call dates and predicted finish times
@@ -36,8 +36,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
-    final user = supabase.auth.currentUser;
-    final isAdmin = user?.id == e.createdBy;
+    // current user not used directly in this page
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -293,6 +292,8 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                     color: const Color(0xFFFFD300),
                   ),
                 ),
+                const SizedBox(height: 8),
+                _buildParticipationSection(),
                 const SizedBox(height: 20),
 
                 // Admin controls moved to swipe on calendar
@@ -854,130 +855,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     );
   }
 
-  Future<void> _cancelEvent() async {
-    final reasonController = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Cancel Event?"),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(labelText: "Reason"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    await supabase
-        .from("club_events")
-        .update({
-          "is_cancelled": true,
-          "cancel_reason": reasonController.text.trim(),
-        })
-        .eq("id", widget.event.id);
-
-    // Scoped alerts: unified message
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Cancelled',
-            body: '${widget.event.title} was cancelled',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    setState(() {});
-  }
-
-  Future<void> _deleteEvent() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Event Permanently?"),
-        content: const Text("This cannot be undone."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("DELETE"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    // Scoped alerts: unified message
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Deleted',
-            body: '${widget.event.title} was deleted',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    await supabase.from("club_events").delete().eq("id", widget.event.id);
-    Navigator.pop(context);
-  }
+  // Legacy cancel/delete methods removed (controls are now via calendar swipes)
 
   Future<void> _showParticipantsByType(
     String title,
