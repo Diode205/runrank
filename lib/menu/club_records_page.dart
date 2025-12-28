@@ -31,7 +31,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
 
     _isAdmin = await UserService.isAdmin();
     _recordsByDistance = await _recordsService.getAllTopRecords(
-      limitPerDistance: 3,
+      limitPerDistance: 10,
     );
 
     setState(() => _loading = false);
@@ -81,18 +81,21 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                       onPageChanged: (i) => setState(() => _currentIndex = i),
                       itemBuilder: (context, i) {
                         final distance = _distances[i];
-                        final records =
+                        final allRecords =
                             _recordsByDistance[distance] ?? const [];
+                        final topThree = allRecords.take(3).toList();
+                        final nextSeven = allRecords.skip(3).take(7).toList();
                         return SingleChildScrollView(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildDistanceHeader(distance),
                               const SizedBox(height: 16),
-                              if (records.isEmpty)
+                              if (allRecords.isEmpty)
                                 _buildEmptyState()
-                              else
-                                ...records
+                              else ...[
+                                // Top 3 prominent
+                                ...topThree
                                     .asMap()
                                     .entries
                                     .map(
@@ -100,6 +103,12 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                                           _buildRecordCard(e.value, e.key + 1),
                                     )
                                     .toList(),
+                                // Next 7 smaller list
+                                if (nextSeven.isNotEmpty) ...[
+                                  const SizedBox(height: 20),
+                                  _buildNextSevenSection(nextSeven),
+                                ],
+                              ],
                               const SizedBox(height: 24),
                               _buildPagerControls(),
                             ],
@@ -934,6 +943,91 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
       'Dec',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Widget _buildNextSevenSection(List<ClubRecord> records) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'More Top Times',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0055FF),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...records.asMap().entries.map((entry) {
+            final position = entry.key + 4; // 4th position onwards
+            final record = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$position',
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          record.runnerName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${record.raceName} • ${_formatDate(record.raceDate)}',
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    record.formattedTime,
+                    style: const TextStyle(
+                      color: Color(0xFF0055FF),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
   }
 }
 

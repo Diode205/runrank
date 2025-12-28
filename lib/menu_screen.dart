@@ -4,8 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:runrank/admin/admin_charity_page.dart';
 import 'package:runrank/auth/login_screen.dart';
 import 'package:runrank/menu/club_history_page.dart';
+import 'package:runrank/menu/kit_merchandise_page.dart';
 import 'package:runrank/menu/membership_page.dart';
-import 'package:runrank/menu/merchandise_page.dart';
 import 'package:runrank/menu/races_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
@@ -411,7 +411,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const MerchandisePage()),
+                MaterialPageRoute(builder: (_) => const KitMerchandisePage()),
               );
             },
           ),

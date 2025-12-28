@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
+import 'package:runrank/menu/team_achievements_page.dart';
 
 class ClubHistoryPage extends StatelessWidget {
   const ClubHistoryPage({super.key});
@@ -26,7 +27,7 @@ class ClubHistoryPage extends StatelessWidget {
             elevation: 0,
             floating: false,
             pinned: true,
-            toolbarHeight: 390,
+            toolbarHeight: 472,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.all(20),
@@ -47,7 +48,7 @@ class ClubHistoryPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                         child: Image.asset(
                           'assets/images/club_history_runner.jpg',
-                          height: 280,
+                          height: 320,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           alignment: Alignment.topCenter,
@@ -57,13 +58,13 @@ class ClubHistoryPage extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // Two slightly glassy buttons: Records & Milestones
+                    // Three glassy buttons in a single row
                     Row(
                       children: [
                         Expanded(
                           child: _GlassyButton(
                             icon: Icons.emoji_events_outlined,
-                            label: 'Records',
+                            label: 'Individual Records',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -75,8 +76,21 @@ class ClubHistoryPage extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _GlassyButton(
+                            icon: Icons.groups_outlined,
+                            label: 'Team Awards',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const TeamAchievementsPage(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _GlassyButton(
                             icon: Icons.timeline_outlined,
-                            label: 'Milestones',
+                            label: 'Historical Milestones',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -87,6 +101,7 @@ class ClubHistoryPage extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -227,7 +242,7 @@ class _GlassyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 50,
+      height: 88,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF0055FF), width: 1.5),
@@ -246,20 +261,25 @@ class _GlassyButton extends StatelessWidget {
                   onTap: onTap,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                      horizontal: 12,
+                      vertical: 10,
                     ),
-                    child: Row(
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Icon(icon, color: const Color(0xFFFFD700)),
-                        const SizedBox(width: 8),
+                        Icon(icon, color: const Color(0xFFFFD700), size: 22),
+                        const SizedBox(height: 8),
                         Text(
                           label,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          softWrap: true,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            height: 1.1,
                           ),
                         ),
                       ],
