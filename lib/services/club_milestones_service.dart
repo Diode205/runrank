@@ -60,10 +60,15 @@ class ClubMilestonesService {
 
   Future<bool> addMilestone(ClubMilestone milestone) async {
     try {
-      await _supabase.from('club_milestones').insert(milestone.toJson());
+      print('Attempting to add milestone: ${milestone.toJson()}');
+      final response = await _supabase
+          .from('club_milestones')
+          .insert(milestone.toJson());
+      print('Milestone added successfully: $response');
       return true;
     } catch (e) {
       print('Error adding milestone: $e');
+      print('Error type: ${e.runtimeType}');
       return false;
     }
   }

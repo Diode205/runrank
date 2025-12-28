@@ -341,6 +341,9 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                 if (dateController.text.trim().isEmpty ||
                     titleController.text.trim().isEmpty ||
                     descController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please fill all fields')),
+                  );
                   return;
                 }
 
@@ -354,9 +357,24 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                 );
 
                 final success = await _service.addMilestone(milestone);
-                if (success && mounted) {
-                  Navigator.pop(context);
-                  _loadData();
+                if (mounted) {
+                  if (success) {
+                    Navigator.pop(context);
+                    _loadData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Milestone added successfully!'),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Error adding milestone - check console logs',
+                        ),
+                      ),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
