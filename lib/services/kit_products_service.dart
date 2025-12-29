@@ -62,8 +62,14 @@ class KitProductsService {
           .eq('category', category)
           .order('product_name', ascending: true);
 
-      return (response as List)
+      final products = (response as List)
           .map((json) => KitProduct.fromJson(json))
+          .toList();
+
+      // Remove duplicates based on product name
+      final seen = <String>{};
+      return products
+          .where((product) => seen.add(product.productName))
           .toList();
     } catch (e) {
       print('Error fetching products: $e');

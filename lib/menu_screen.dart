@@ -582,6 +582,34 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   ),
                 ),
               ),
+            // Remove avatar button (bottom-right), shown only if avatar exists
+            if (_avatarUrl != null)
+              Positioned(
+                bottom: 6,
+                right: 6,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _removeAvatar,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.redAccent.withOpacity(0.6),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.redAccent,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -645,41 +673,159 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
 
   Future<void> _changeAvatar() async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('User not logged in')));
+      return;
+    }
+
+    debugPrint('Avatar change started');
 
     try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening gallery...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
       final picked = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 800,
         imageQuality: 80,
       );
-      if (picked == null) return;
+
+      if (picked == null) {
+        debugPrint('No image selected (user cancelled or permission denied)');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No image selected'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      debugPrint('Image picked: ${picked.path}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Uploading photo...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
       final file = File(picked.path);
-      final path = 'avatars/${user.id}.jpg';
+
+      if (!await file.exists()) {
+        throw Exception('Selected file does not exist');
+      }
+
+      final fileSize = await file.length();
+      debugPrint('File size: ${fileSize ~/ 1024} KB');
+
+      // Store each user's avatar under their own folder for simple RLS rules
+      final path = '${user.id}/avatar.jpg';
+      debugPrint('Uploading to: $path');
 
       await _supabase.storage
           .from('avatars')
-          .upload(path, file, fileOptions: const FileOptions(upsert: true));
+          .upload(
+            path,
+            file,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+
+      debugPrint('Upload successful');
 
       final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      debugPrint('Public URL: $publicUrl');
 
+      // Store the base URL in DB; use a cache-busted URL locally to refresh immediately
       await _supabase
           .from('user_profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
 
+      final publicUrlWithTs =
+          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('Profile updated with cache-bust: $publicUrlWithTs');
+
       if (!mounted) return;
-      setState(() => _avatarUrl = publicUrl);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
-    } catch (e) {
+      setState(() => _avatarUrl = publicUrlWithTs);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated successfully!')),
+      );
+    } catch (e, stackTrace) {
       debugPrint('Error updating avatar: $e');
+      debugPrint('Stack trace: $stackTrace');
+
       if (!mounted) return;
+
+      String errorMessage = 'Failed to update photo';
+      if (e.toString().contains('storage')) {
+        errorMessage = 'Storage error. Please check your connection.';
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'Permission denied. Please allow photo access.';
+      } else if (e.toString().contains('404')) {
+        errorMessage = 'Storage bucket not found. Please contact admin.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$errorMessage\n$e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to update photo')));
+      ).showSnackBar(const SnackBar(content: Text('User not logged in')));
+      return;
+    }
+
+    try {
+      // Delete from storage
+      final path = '${user.id}/avatar.jpg';
+      await _supabase.storage.from('avatars').remove([path]);
+
+      // Clear DB avatar url
+      await _supabase
+          .from('user_profiles')
+          .update({'avatar_url': null})
+          .eq('id', user.id);
+
+      if (!mounted) return;
+      setState(() => _avatarUrl = null);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile photo removed')));
+    } catch (e) {
+      debugPrint('Error removing avatar: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to remove photo\n$e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

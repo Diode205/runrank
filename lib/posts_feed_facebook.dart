@@ -128,6 +128,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -144,6 +145,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -161,6 +163,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -307,7 +310,10 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     try {
       final data = await supabase
           .from('club_post_comments')
-          .select('id, user_id, comment, created_at')
+          .select('''
+            id, user_id, comment, created_at,
+            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url)
+          ''')
           .eq('post_id', postId)
           .order('created_at', ascending: true);
       setState(() {
@@ -424,6 +430,8 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                   final postId = post['id'] as String;
                   final authorName =
                       post['author_name'] as String? ?? 'Unknown';
+                  final authorAvatarUrl =
+                      post['user_profiles']?['avatar_url'] as String?;
                   final attachments =
                       (post['club_post_attachments'] as List?)
                           ?.map((e) => e as Map<String, dynamic>)
@@ -475,15 +483,22 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                               CircleAvatar(
                                 radius: 20,
                                 backgroundColor: Colors.blue,
-                                child: Text(
-                                  authorName.isNotEmpty
-                                      ? authorName[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                backgroundImage: authorAvatarUrl != null
+                                    ? NetworkImage(
+                                        '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                      )
+                                    : null,
+                                child: authorAvatarUrl == null
+                                    ? Text(
+                                        authorName.isNotEmpty
+                                            ? authorName[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -855,63 +870,86 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: (_commentsByPost[postId] ?? const [])
-                                  .map(
-                                    (c) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 16,
-                                            backgroundColor: Colors.blue,
-                                            child: const Icon(
-                                              Icons.person,
-                                              size: 16,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey[800],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    c['comment'] ?? '',
-                                                    style: const TextStyle(
-                                                      fontSize: 13,
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    _getTimeAgo(
-                                                      c['created_at']
-                                                          ?.toString(),
-                                                    ),
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                              children: (_commentsByPost[postId] ?? const []).map((
+                                c,
+                              ) {
+                                final commentAuthor =
+                                    c['user_profiles']?['full_name'] ??
+                                    'Unknown';
+                                final commentAvatarUrl =
+                                    c['user_profiles']?['avatar_url']
+                                        as String?;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: Colors.blue,
+                                        backgroundImage:
+                                            commentAvatarUrl != null
+                                            ? NetworkImage(
+                                                '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                              )
+                                            : null,
+                                        child: commentAvatarUrl == null
+                                            ? const Icon(
+                                                Icons.person,
+                                                size: 16,
+                                                color: Colors.white,
+                                              )
+                                            : null,
                                       ),
-                                    ),
-                                  )
-                                  .toList(),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[800],
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                commentAuthor,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                c['comment'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _getTimeAgo(
+                                                  c['created_at']?.toString(),
+                                                ),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ),
                         ],

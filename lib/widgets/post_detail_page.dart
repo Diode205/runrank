@@ -49,7 +49,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .from('club_posts')
           .select('''
             *,
-            user_profiles!club_posts_author_id_fkey(full_name)
+            user_profiles!club_posts_author_id_fkey(full_name, avatar_url)
           ''')
           .eq('id', widget.postId)
           .maybeSingle();
@@ -70,12 +70,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .select()
           .eq('post_id', widget.postId);
 
-      // Load comments with author names
+      // Load comments with author names and avatars
       final commentsData = await supabase
           .from('club_post_comments')
           .select('''
             *,
-            user_profiles!club_post_comments_user_id_fkey(full_name)
+            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url)
           ''')
           .eq('post_id', widget.postId)
           .order('created_at', ascending: true);
@@ -427,6 +427,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     }
 
     final authorName = post!['user_profiles']?['full_name'] ?? 'Unknown';
+    final authorAvatarUrl = post!['user_profiles']?['avatar_url'] as String?;
     final imageUrl = post!['image_url'] as String?;
 
     return Scaffold(
@@ -481,14 +482,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     child: Row(
                       children: [
                         CircleAvatar(
+                          radius: 20,
                           backgroundColor: Colors.blue,
-                          child: Text(
-                            authorName[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          backgroundImage: authorAvatarUrl != null
+                              ? NetworkImage(
+                                  '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                )
+                              : null,
+                          child: authorAvatarUrl == null
+                              ? Text(
+                                  authorName[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -753,6 +762,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   ...comments.map((comment) {
                     final commentAuthor =
                         comment['user_profiles']?['full_name'] ?? 'Unknown';
+                    final avatarUrl =
+                        comment['user_profiles']?['avatar_url'] as String?;
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -764,13 +775,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           CircleAvatar(
                             radius: 16,
                             backgroundColor: Colors.green,
-                            child: Text(
-                              commentAuthor[0].toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                              ),
-                            ),
+                            backgroundImage: avatarUrl != null
+                                ? NetworkImage(
+                                    '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                  )
+                                : null,
+                            child: avatarUrl == null
+                                ? Text(
+                                    commentAuthor[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : null,
                           ),
                           const SizedBox(width: 12),
                           Expanded(

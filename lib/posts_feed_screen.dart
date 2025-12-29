@@ -89,6 +89,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -99,6 +100,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -109,6 +111,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -315,6 +318,8 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                   }
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
+                  final authorAvatarUrl =
+                      post['user_profiles']?['avatar_url'] as String?;
 
                   if (index == 0) {
                     print(
@@ -364,13 +369,20 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                 CircleAvatar(
                                   radius: 20,
                                   backgroundColor: Colors.blue,
-                                  child: Text(
-                                    displayAuthor[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  backgroundImage: authorAvatarUrl != null
+                                      ? NetworkImage(
+                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                        )
+                                      : null,
+                                  child: authorAvatarUrl == null
+                                      ? Text(
+                                          displayAuthor[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
