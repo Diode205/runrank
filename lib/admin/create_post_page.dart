@@ -111,7 +111,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: 'Paste file or image URL',
+            hintText: 'Paste file, image, or video URL',
           ),
         ),
         actions: [
@@ -127,11 +127,24 @@ class _CreatePostPageState extends State<CreatePostPage> {
       ),
     );
     if (ok == true && controller.text.trim().isNotEmpty) {
+      final url = controller.text.trim();
+      final lowerUrl = url.toLowerCase();
+      
+      // Auto-detect type from URL extension
+      String attachmentType = 'link';
+      if (lowerUrl.contains('.png') || lowerUrl.contains('.jpg') || lowerUrl.contains('.jpeg') || lowerUrl.contains('.gif') || lowerUrl.contains('.webp')) {
+        attachmentType = 'image';
+      } else if (lowerUrl.contains('.mp4') || lowerUrl.contains('.mov') || lowerUrl.contains('.avi') || lowerUrl.contains('.mkv') || lowerUrl.contains('.webm') || lowerUrl.contains('.flv')) {
+        attachmentType = 'video';
+      } else if (lowerUrl.contains('.pdf') || lowerUrl.contains('.doc') || lowerUrl.contains('.xls') || lowerUrl.contains('.ppt')) {
+        attachmentType = 'file';
+      }
+      
       setState(() {
         _attachments.add({
-          'type': 'link',
-          'url': controller.text.trim(),
-          'name': 'Link',
+          'type': attachmentType,
+          'url': url,
+          'name': url.split('/').last.split('?').first,
         });
       });
     }
@@ -141,7 +154,16 @@ class _CreatePostPageState extends State<CreatePostPage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+        allowedExtensions: [
+          // Documents
+          'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt',
+          // Images
+          'png', 'jpg', 'jpeg', 'gif', 'webp',
+          // Videos
+          'mp4', 'mov', 'avi', 'mkv', 'webm', 'flv',
+          // Archives
+          'zip', 'rar', '7z',
+        ],
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -162,8 +184,17 @@ class _CreatePostPageState extends State<CreatePostPage> {
           .from('club-media')
           .getPublicUrl(storagePath);
 
+      // Determine attachment type based on file extension
+      String attachmentType = 'file';
+      final lowerName = fileName.toLowerCase();
+      if (lowerName.endsWith('.png') || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.gif') || lowerName.endsWith('.webp')) {
+        attachmentType = 'image';
+      } else if (lowerName.endsWith('.mp4') || lowerName.endsWith('.mov') || lowerName.endsWith('.avi') || lowerName.endsWith('.mkv') || lowerName.endsWith('.webm') || lowerName.endsWith('.flv')) {
+        attachmentType = 'video';
+      }
+
       setState(() {
-        _attachments.add({'type': 'file', 'url': publicUrl, 'name': fileName});
+        _attachments.add({'type': attachmentType, 'url': publicUrl, 'name': fileName});
       });
     } catch (e) {
       if (mounted) {

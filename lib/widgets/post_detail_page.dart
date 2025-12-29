@@ -592,14 +592,28 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             spacing: 8,
                             runSpacing: 8,
                             children: attachments.map((a) {
+                              final attachType = a['type'] as String? ?? 'file';
+                              final fileName = a['name'] as String? ?? 'Attachment';
+                              final isImage = attachType == 'image';
+                              
+                              IconData getIcon() {
+                                if (isImage) return Icons.image;
+                                if (fileName.toLowerCase().endsWith('.pdf')) return Icons.picture_as_pdf;
+                                if (fileName.toLowerCase().endsWith('.doc') || fileName.toLowerCase().endsWith('.docx')) return Icons.description;
+                                if (fileName.toLowerCase().endsWith('.xls') || fileName.toLowerCase().endsWith('.xlsx')) return Icons.table_chart;
+                                if (fileName.toLowerCase().endsWith('.ppt') || fileName.toLowerCase().endsWith('.pptx')) return Icons.slideshow;
+                                if (fileName.toLowerCase().endsWith('.mp4') || fileName.toLowerCase().endsWith('.mov') || fileName.toLowerCase().endsWith('.avi') || fileName.toLowerCase().endsWith('.mkv') || fileName.toLowerCase().endsWith('.webm') || fileName.toLowerCase().endsWith('.flv')) return Icons.videocam;
+                                if (fileName.toLowerCase().endsWith('.gif')) return Icons.animation;
+                                if (fileName.toLowerCase().endsWith('.zip') || fileName.toLowerCase().endsWith('.rar') || fileName.toLowerCase().endsWith('.7z')) return Icons.folder_zip;
+                                return Icons.attachment;
+                              }
+                              
                               return ActionChip(
                                 avatar: Icon(
-                                  a['type'] == 'image'
-                                      ? Icons.image
-                                      : Icons.link,
+                                  getIcon(),
                                   size: 18,
                                 ),
-                                label: Text(a['name'] ?? 'Attachment'),
+                                label: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
                                 onPressed: () async {
                                   final url = a['url'] as String?;
                                   if (url == null || url.isEmpty) return;
@@ -615,7 +629,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                         context,
                                       ).showSnackBar(
                                         SnackBar(
-                                          content: Text('Cannot open: $url'),
+                                          content: Text('Cannot open: $fileName'),
                                         ),
                                       );
                                     }
