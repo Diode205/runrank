@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:runrank/admin/edit_post_page.dart';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
@@ -335,7 +336,11 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 
   Future<void> _addComment(String postId, String text) async {
     final user = supabase.auth.currentUser;
+    final messenger = ScaffoldMessenger.of(context);
     if (user == null) return;
+    if (await UserService.isBlocked(context: context)) {
+      return;
+    }
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     try {

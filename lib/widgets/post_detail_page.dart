@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 class PostDetailPage extends StatefulWidget {
   final String postId;
@@ -319,6 +320,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final user = supabase.auth.currentUser;
     final messenger = ScaffoldMessenger.of(context);
     if (user == null) return;
+    if (await UserService.isBlocked(context: context)) {
+      return;
+    }
 
     try {
       await supabase.from('club_post_comments').insert({

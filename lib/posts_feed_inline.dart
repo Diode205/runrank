@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
+import 'package:runrank/services/user_service.dart';
 
 class PostsFeedInlineScreen extends StatefulWidget {
   const PostsFeedInlineScreen({super.key});
@@ -155,6 +156,9 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Please log in to comment')),
       );
+      return;
+    }
+    if (await UserService.isBlocked(context: context)) {
       return;
     }
     final trimmed = text.trim();

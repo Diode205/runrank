@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:runrank/services/user_service.dart';
 import 'dart:io';
 
 class CreatePostPage extends StatefulWidget {
@@ -191,6 +192,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
       final user = supabase.auth.currentUser;
       if (user == null) {
         throw Exception('User not logged in');
+      }
+      if (await UserService.isBlocked(context: context)) {
+        setState(() => _uploading = false);
+        return;
       }
       // Fetch author display name for denormalized storage (avoids RLS on user_profiles)
       String authorName = 'Unknown';

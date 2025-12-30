@@ -104,11 +104,14 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // Date picker
   // ---------------------------------------------------------
   Future<void> _pickRaceDate() async {
+    final today = DateTime.now();
+    final lastDate = DateTime(today.year, today.month, today.day);
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: lastDate,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: lastDate,
     );
 
     if (picked != null) {
