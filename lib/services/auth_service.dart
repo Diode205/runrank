@@ -75,6 +75,8 @@ class AuthService {
         "uka_number": ukaNumber,
         "club": club,
         "membership_type": membershipType,
+        "is_admin": false,
+        "admin_since": null,
         // NEW ▶ store member_since (ISO string from today)
         "member_since": DateTime.now().toIso8601String(),
       });

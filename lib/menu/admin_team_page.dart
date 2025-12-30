@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
 
 class AdministrativeTeamPage extends StatefulWidget {
@@ -9,7 +11,11 @@ class AdministrativeTeamPage extends StatefulWidget {
 }
 
 class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
+  final _supabase = Supabase.instance.client;
   bool _isAdmin = false;
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _searching = false;
 
   final List<Map<String, String>> _committee = [
     {'role': 'President', 'name': 'Noel Spruce', 'email': ''},
@@ -44,6 +50,12 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   void initState() {
     super.initState();
     _loadAdmin();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAdmin() async {
@@ -114,6 +126,422 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _searchUsers(String term, StateSetter setModalState) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (term.trim().length < 2) {
+      setModalState(() {
+        _searchResults = [];
+        _searching = false;
+      });
+      return;
+    }
+
+    setModalState(() => _searching = true);
+    try {
+      final data = await _supabase
+          .from('user_profiles')
+          .select(
+            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason',
+          )
+          .or('full_name.ilike.%$term%,email.ilike.%$term%')
+          .limit(20);
+
+      setModalState(() {
+        _searchResults = List<Map<String, dynamic>>.from(data);
+      });
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Search failed: $e')));
+    } finally {
+      setModalState(() => _searching = false);
+    }
+  }
+
+  Future<void> _setAdminStatus(
+    Map<String, dynamic> user,
+    bool makeAdmin,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update({
+            'is_admin': makeAdmin,
+            'admin_since': makeAdmin ? DateTime.now().toIso8601String() : null,
+          })
+          .eq('id', user['id'] as String);
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            makeAdmin ? 'User promoted to admin' : 'User demoted to reader',
+          ),
+        ),
+      );
+
+      await _searchUsers(_searchController.text, setModalState);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update admin status: $e')),
+      );
+    }
+  }
+
+  Future<void> _warnUser(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Send warning',
+          style: TextStyle(color: Color(0xFFFFD700)),
+        ),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Message to user',
+            labelStyle: TextStyle(color: Colors.white70),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || controller.text.trim().isEmpty) return;
+
+    try {
+      await NotificationService.notifyUser(
+        userId: user['id'] as String,
+        title: 'Account notice',
+        body: controller.text.trim(),
+      );
+
+      messenger.showSnackBar(const SnackBar(content: Text('Warning sent')));
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not send warning: $e')),
+      );
+    }
+  }
+
+  Future<void> _blockUser(
+    Map<String, dynamic> user,
+    bool block,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    String? reason;
+
+    if (block) {
+      final reasonController = TextEditingController();
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: const Text(
+            'Block user',
+            style: TextStyle(color: Color(0xFFFFD700)),
+          ),
+          content: TextField(
+            controller: reasonController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Reason (optional)',
+              labelStyle: TextStyle(color: Colors.white70),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Block'),
+            ),
+          ],
+        ),
+      );
+
+      if (ok != true) return;
+      reason = reasonController.text.trim();
+    }
+
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update({'is_blocked': block, 'block_reason': block ? reason : null})
+          .eq('id', user['id'] as String);
+
+      messenger.showSnackBar(
+        SnackBar(content: Text(block ? 'User blocked' : 'User unblocked')),
+      );
+
+      await _searchUsers(_searchController.text, setModalState);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Update failed. Ensure is_blocked and block_reason columns exist. ($e)',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _openAdminControls() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.admin_panel_settings,
+                          color: Color(0xFFFFD700),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Admin controls',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _searchController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or email',
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.white70,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFF151828),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.white24),
+                        ),
+                      ),
+                      onChanged: (value) => _searchUsers(value, setModalState),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_searching)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: CircularProgressIndicator(),
+                      )
+                    else if (_searchResults.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text(
+                          'Start typing to search members',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 360,
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: _searchResults.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(color: Colors.white12, height: 16),
+                          itemBuilder: (_, index) {
+                            final user = _searchResults[index];
+                            final isAdmin = user['is_admin'] == true;
+                            final isBlocked = user['is_blocked'] == true;
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.person_outline,
+                                  color: Colors.white70,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        user['full_name'] ?? 'Member',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      Text(
+                                        user['email'] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          Chip(
+                                            label: Text(
+                                              isAdmin ? 'Admin' : 'Reader',
+                                            ),
+                                            backgroundColor: isAdmin
+                                                ? Colors.green.withOpacity(0.2)
+                                                : Colors.blue.withOpacity(0.2),
+                                            labelStyle: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Chip(
+                                            label: Text(
+                                              user['membership_type'] ?? '—',
+                                            ),
+                                            backgroundColor: Colors.white
+                                                .withOpacity(0.08),
+                                            labelStyle: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          if (isBlocked) ...[
+                                            const SizedBox(width: 6),
+                                            Chip(
+                                              label: const Text('Blocked'),
+                                              backgroundColor: Colors.red
+                                                  .withOpacity(0.2),
+                                              labelStyle: const TextStyle(
+                                                color: Colors.redAccent,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      if (user['block_reason'] != null &&
+                                          (user['block_reason'] as String?)
+                                                  ?.isNotEmpty ==
+                                              true)
+                                        Text(
+                                          'Reason: ${user['block_reason']}',
+                                          style: const TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  children: [
+                                    IconButton(
+                                      tooltip: isAdmin
+                                          ? 'Remove admin'
+                                          : 'Make admin',
+                                      onPressed: () => _setAdminStatus(
+                                        user,
+                                        !isAdmin,
+                                        setModalState,
+                                      ),
+                                      icon: Icon(
+                                        isAdmin
+                                            ? Icons.security_update_warning
+                                            : Icons.verified_user,
+                                        color: isAdmin
+                                            ? Colors.orangeAccent
+                                            : Colors.greenAccent,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Warn user',
+                                      onPressed: () =>
+                                          _warnUser(user, setModalState),
+                                      icon: const Icon(
+                                        Icons.warning_amber_rounded,
+                                        color: Colors.amber,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: isBlocked ? 'Unblock' : 'Block',
+                                      onPressed: () => _blockUser(
+                                        user,
+                                        !isBlocked,
+                                        setModalState,
+                                      ),
+                                      icon: Icon(
+                                        isBlocked
+                                            ? Icons.lock_open
+                                            : Icons.block,
+                                        color: isBlocked
+                                            ? Colors.lightGreenAccent
+                                            : Colors.redAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -247,43 +675,70 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0A1A3A), Color(0xFF0D2F5A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(color: const Color(0xFF1E406A), width: 1),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.people, color: Color(0xFFFFD700), size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'The NNBR Team Committee',
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 238, 228, 30),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'For general enquiries, please contact The Chairperson or The Secretary via email.',
-                          style: TextStyle(color: Colors.white70, height: 1.4),
-                        ),
-                      ],
+            child: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0A1A3A), Color(0xFF0D2F5A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFF1E406A),
+                      width: 1,
                     ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.people,
+                        color: Color(0xFFFFD700),
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'The NNBR Team Committee',
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 238, 228, 30),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'For general enquiries, please contact The Chairperson or The Secretary via email.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isAdmin)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: IconButton(
+                      tooltip: 'Admin controls',
+                      onPressed: _openAdminControls,
+                      icon: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           Expanded(
