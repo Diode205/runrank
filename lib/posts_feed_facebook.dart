@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/admin/edit_post_page.dart';
 
@@ -43,6 +44,14 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     _checkAdminStatus();
     _loadPosts();
     _setupRealtime();
+  }
+
+  @override
+  void dispose() {
+    _postChannel?.unsubscribe();
+    _reactionChannel?.unsubscribe();
+    _commentChannel?.unsubscribe();
+    super.dispose();
   }
 
   void _setupRealtime() {
@@ -613,6 +622,12 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                 final links = attachments
                                     .where((a) => a['type'] == 'link')
                                     .toList();
+                                final files = attachments
+                                    .where((a) => a['type'] == 'file')
+                                    .toList();
+                                final videos = attachments
+                                    .where((a) => a['type'] == 'video')
+                                    .toList();
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -685,7 +700,9 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                         ),
                                       ),
                                     if (images.length > 1 ||
-                                        links.isNotEmpty) ...[
+                                        links.isNotEmpty ||
+                                        files.isNotEmpty ||
+                                        videos.isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Wrap(
                                         spacing: 6,
@@ -723,6 +740,58 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                                   fontSize: 12,
                                                 ),
                                               ),
+                                            ),
+                                          ),
+                                          ...videos.map(
+                                            (a) => ActionChip(
+                                              avatar: const Icon(
+                                                Icons.videocam,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                a['name'] ?? 'Video',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                final url = a['url'] as String?;
+                                                if (url == null || url.isEmpty)
+                                                  return;
+                                                try {
+                                                  await launchUrl(
+                                                    Uri.parse(url),
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                } catch (_) {}
+                                              },
+                                            ),
+                                          ),
+                                          ...files.map(
+                                            (a) => ActionChip(
+                                              avatar: const Icon(
+                                                Icons.attachment,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                a['name'] ?? 'File',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                final url = a['url'] as String?;
+                                                if (url == null || url.isEmpty)
+                                                  return;
+                                                try {
+                                                  await launchUrl(
+                                                    Uri.parse(url),
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                } catch (_) {}
+                                              },
                                             ),
                                           ),
                                         ],

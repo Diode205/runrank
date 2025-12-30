@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
-import 'package:runrank/widgets/admin_edit_event_page.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
-import 'package:runrank/services/notification_service.dart';
 
 /// Event details page for simple events (Training, Special Event, Social Run, etc.)
 /// Group 1: Training_1/2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
@@ -24,9 +22,6 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
   @override
   Widget build(BuildContext context) {
     final e = widget.event;
-    final dt = e.dateTime;
-    final user = supabase.auth.currentUser;
-    final isAdmin = user?.id == e.createdBy;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -101,149 +96,17 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.grey.shade800.withValues(
-                          alpha: Colors.grey.shade800.opacity * 0.5,
-                        ),
-                        Colors.grey.shade900.withValues(
-                          alpha: Colors.grey.shade900.opacity * 0.5,
-                        ),
+                        Colors.grey.shade800.withValues(alpha: 0.5),
+                        Colors.grey.shade900.withValues(alpha: 0.5),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white12, width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Date row
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0x33FFD300),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.calendar_month,
-                              color: Color(0xFFFFD300),
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "${weekday(dt)}, ${dt.day} ${month(dt.month)} ${dt.year}",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Time row
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0x330057B7),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.access_time,
-                              color: Color(0xFF0057B7),
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 32, color: Colors.white12),
-
-                      // Hosted By
-                      Text(
-                        "Hosted By",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        e.hostOrDirector.isNotEmpty
-                            ? e.hostOrDirector
-                            : "Not specified",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Divider(height: 32, color: Colors.white12),
-
-                      // Venue
-                      Text(
-                        "Venue",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        e.venue,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      ...(e.venueAddress.isNotEmpty
-                          ? [
-                              const SizedBox(height: 4),
-                              Text(
-                                e.venueAddress,
-                                style: const TextStyle(color: Colors.white60),
-                              ),
-                            ]
-                          : []),
-                      ...(e.latitude != null && e.longitude != null
-                          ? [
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: openMaps,
-                                icon: const Icon(Icons.map),
-                                label: const Text("Open in Maps"),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFD300),
-                                  side: const BorderSide(
-                                    color: Color(0xFFFFD300),
-                                  ),
-                                ),
-                              ),
-                            ]
-                          : []),
-                      const Divider(height: 32, color: Colors.white12),
-
                       // Details
                       Text(
                         "Details",
@@ -285,9 +148,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 // Participant counts
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade900.withValues(
-                      alpha: Colors.grey.shade900.opacity * 0.5,
-                    ),
+                    color: Colors.grey.shade900.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -566,131 +427,6 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     );
   }
 
-  Future<void> _cancelEvent() async {
-    final reasonController = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Cancel Event?"),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(labelText: "Reason"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    await supabase
-        .from("club_events")
-        .update({
-          "is_cancelled": true,
-          "cancel_reason": reasonController.text.trim(),
-        })
-        .eq("id", widget.event.id);
-
-    // Scoped alerts: notify creator (if different from actor) and actor
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Cancelled',
-            body: '${widget.event.title} was cancelled',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    setState(() {});
-  }
-
-  Future<void> _deleteEvent() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Event Permanently?"),
-        content: const Text("This cannot be undone."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("DELETE"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    // Scoped alerts: unified message
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Deleted',
-            body: '${widget.event.title} was deleted',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    await supabase.from("club_events").delete().eq("id", widget.event.id);
-    Navigator.pop(context);
-  }
-
   Future<void> _showParticipantsByType(
     String title,
     String responseType,
@@ -700,6 +436,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
       responseType: responseType,
     );
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
 
 class PostsFeedInlineScreen extends StatefulWidget {
@@ -149,10 +150,11 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
 
   Future<void> _addComment(String postId, String text) async {
     final user = supabase.auth.currentUser;
+    final messenger = ScaffoldMessenger.of(context);
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please log in to comment')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please log in to comment')),
+      );
       return;
     }
     final trimmed = text.trim();
@@ -166,9 +168,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
       _commentControllers[postId]?.clear();
       await _loadComments(postId);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Comment error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Comment error: $e')));
     }
   }
 
@@ -236,6 +236,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   }
 
   Future<void> _approvePost(String postId) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await supabase
           .from('club_posts')
@@ -246,30 +247,23 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           .eq('id', postId);
       await _loadPosts();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Post approved')));
+        messenger.showSnackBar(const SnackBar(content: Text('Post approved')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _rejectPost(String postId) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await supabase.from('club_posts').delete().eq('id', postId);
       await _loadPosts();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Post rejected')));
+        messenger.showSnackBar(const SnackBar(content: Text('Post rejected')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -298,6 +292,18 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openAttachmentUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      // Best effort; ignore failures here
+    }
   }
 
   String _getTimeAgo(String? dateStr) {
@@ -531,6 +537,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                 final links = attachments
                                     .where((a) => a['type'] == 'link')
                                     .toList();
+                                final files = attachments
+                                    .where((a) => a['type'] == 'file')
+                                    .toList();
+                                final videos = attachments
+                                    .where((a) => a['type'] == 'video')
+                                    .toList();
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -562,7 +574,9 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                         ),
                                       ),
                                     if (images.length > 1 ||
-                                        links.isNotEmpty) ...[
+                                        links.isNotEmpty ||
+                                        files.isNotEmpty ||
+                                        videos.isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Wrap(
                                         spacing: 6,
@@ -587,7 +601,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                 ),
                                               ),
                                           ...links.map(
-                                            (a) => Chip(
+                                            (a) => ActionChip(
                                               visualDensity:
                                                   VisualDensity.compact,
                                               avatar: const Icon(
@@ -600,6 +614,50 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                   fontSize: 12,
                                                 ),
                                               ),
+                                              onPressed: () =>
+                                                  _openAttachmentUrl(
+                                                    a['url'] as String?,
+                                                  ),
+                                            ),
+                                          ),
+                                          ...videos.map(
+                                            (a) => ActionChip(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              avatar: const Icon(
+                                                Icons.videocam,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                a['name'] ?? 'Video',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              onPressed: () =>
+                                                  _openAttachmentUrl(
+                                                    a['url'] as String?,
+                                                  ),
+                                            ),
+                                          ),
+                                          ...files.map(
+                                            (a) => ActionChip(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              avatar: const Icon(
+                                                Icons.attachment,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                a['name'] ?? 'File',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              onPressed: () =>
+                                                  _openAttachmentUrl(
+                                                    a['url'] as String?,
+                                                  ),
                                             ),
                                           ),
                                         ],
@@ -720,7 +778,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: selected
-                                          ? Colors.blue.withOpacity(0.3)
+                                          ? Colors.blue.withValues(alpha: 0.3)
                                           : Colors.grey[800],
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(

@@ -57,6 +57,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       setState(() => updating = true);
 
                       // 1. NAME UPDATE
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
                       if (newName.text.isNotEmpty) {
                         await AuthService.updateName(newName.text.trim());
                       }
@@ -66,7 +69,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           confirmPassword.text.isNotEmpty) {
                         if (newPassword.text.trim() !=
                             confirmPassword.text.trim()) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             const SnackBar(
                               content: Text("Passwords do not match."),
                             ),
@@ -84,13 +87,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                       if (!mounted) return;
 
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         const SnackBar(
                           content: Text("Profile updated successfully"),
                         ),
                       );
 
-                      Navigator.pop(context); // return to menu
+                      navigator.pop(); // return to menu
                     },
               child: updating
                   ? const CircularProgressIndicator()

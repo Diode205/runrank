@@ -130,6 +130,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Future<void> _approvePost() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await supabase
           .from('club_posts')
@@ -150,18 +151,15 @@ class _PostDetailPageState extends State<PostDetailPage> {
       }
       await _loadPostDetails();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Post approved')));
+        messenger.showSnackBar(const SnackBar(content: Text('Post approved')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _rejectPost() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       // Keep as not approved, just notify author
       await supabase
@@ -183,19 +181,18 @@ class _PostDetailPageState extends State<PostDetailPage> {
       }
       await _loadPostDetails();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Author notified: not approved')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _editPost() async {
     if (post == null) return;
+    final messenger = ScaffoldMessenger.of(context);
     final titleController = TextEditingController(text: post!['title'] ?? '');
     final contentController = TextEditingController(
       text: post!['content'] ?? '',
@@ -249,19 +246,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
             .eq('id', widget.postId);
         await _loadPostDetails();
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Post updated')));
+          messenger.showSnackBar(const SnackBar(content: Text('Post updated')));
         }
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   Future<void> _deletePost() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -284,11 +279,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
     if (ok == true) {
       try {
         await supabase.from('club_posts').delete().eq('id', widget.postId);
-        if (mounted) Navigator.pop(context);
+        if (mounted) navigator.pop();
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -324,6 +317,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     if (_commentController.text.trim().isEmpty) return;
 
     final user = supabase.auth.currentUser;
+    final messenger = ScaffoldMessenger.of(context);
     if (user == null) return;
 
     try {
@@ -337,9 +331,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
       _commentController.clear();
       _loadPostDetails(); // Refresh comments
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error posting comment: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error posting comment: $e')),
+      );
     }
   }
 
@@ -593,30 +587,59 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             runSpacing: 8,
                             children: attachments.map((a) {
                               final attachType = a['type'] as String? ?? 'file';
-                              final fileName = a['name'] as String? ?? 'Attachment';
+                              final fileName =
+                                  a['name'] as String? ?? 'Attachment';
                               final isImage = attachType == 'image';
-                              
+
                               IconData getIcon() {
                                 if (isImage) return Icons.image;
-                                if (fileName.toLowerCase().endsWith('.pdf')) return Icons.picture_as_pdf;
-                                if (fileName.toLowerCase().endsWith('.doc') || fileName.toLowerCase().endsWith('.docx')) return Icons.description;
-                                if (fileName.toLowerCase().endsWith('.xls') || fileName.toLowerCase().endsWith('.xlsx')) return Icons.table_chart;
-                                if (fileName.toLowerCase().endsWith('.ppt') || fileName.toLowerCase().endsWith('.pptx')) return Icons.slideshow;
-                                if (fileName.toLowerCase().endsWith('.mp4') || fileName.toLowerCase().endsWith('.mov') || fileName.toLowerCase().endsWith('.avi') || fileName.toLowerCase().endsWith('.mkv') || fileName.toLowerCase().endsWith('.webm') || fileName.toLowerCase().endsWith('.flv')) return Icons.videocam;
-                                if (fileName.toLowerCase().endsWith('.gif')) return Icons.animation;
-                                if (fileName.toLowerCase().endsWith('.zip') || fileName.toLowerCase().endsWith('.rar') || fileName.toLowerCase().endsWith('.7z')) return Icons.folder_zip;
+                                if (fileName.toLowerCase().endsWith('.pdf')) {
+                                  return Icons.picture_as_pdf;
+                                }
+                                if (fileName.toLowerCase().endsWith('.doc') ||
+                                    fileName.toLowerCase().endsWith('.docx')) {
+                                  return Icons.description;
+                                }
+                                if (fileName.toLowerCase().endsWith('.xls') ||
+                                    fileName.toLowerCase().endsWith('.xlsx')) {
+                                  return Icons.table_chart;
+                                }
+                                if (fileName.toLowerCase().endsWith('.ppt') ||
+                                    fileName.toLowerCase().endsWith('.pptx')) {
+                                  return Icons.slideshow;
+                                }
+                                if (fileName.toLowerCase().endsWith('.mp4') ||
+                                    fileName.toLowerCase().endsWith('.mov') ||
+                                    fileName.toLowerCase().endsWith('.avi') ||
+                                    fileName.toLowerCase().endsWith('.mkv') ||
+                                    fileName.toLowerCase().endsWith('.webm') ||
+                                    fileName.toLowerCase().endsWith('.flv')) {
+                                  return Icons.videocam;
+                                }
+                                if (fileName.toLowerCase().endsWith('.gif')) {
+                                  return Icons.animation;
+                                }
+                                if (fileName.toLowerCase().endsWith('.zip') ||
+                                    fileName.toLowerCase().endsWith('.rar') ||
+                                    fileName.toLowerCase().endsWith('.7z')) {
+                                  return Icons.folder_zip;
+                                }
                                 return Icons.attachment;
                               }
-                              
+
                               return ActionChip(
-                                avatar: Icon(
-                                  getIcon(),
-                                  size: 18,
+                                avatar: Icon(getIcon(), size: 18),
+                                label: Text(
+                                  fileName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                label: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
                                 onPressed: () async {
                                   final url = a['url'] as String?;
                                   if (url == null || url.isEmpty) return;
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
+                                  );
                                   try {
                                     final uri = Uri.parse(url);
                                     await launchUrl(
@@ -624,15 +647,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                       mode: LaunchMode.externalApplication,
                                     );
                                   } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Cannot open: $fileName'),
-                                        ),
-                                      );
-                                    }
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Cannot open: $fileName'),
+                                      ),
+                                    );
                                   }
                                 },
                               );
@@ -687,7 +706,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? Colors.blue.withOpacity(0.3)
+                                        ? Colors.blue.withValues(alpha: 0.3)
                                         : Colors.grey[800],
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
@@ -720,7 +739,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),
@@ -844,7 +863,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   const SizedBox(height: 80),
                 ],
               ),

@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
-import 'package:runrank/services/user_service.dart';
-import 'package:runrank/services/notification_service.dart';
 
 /// Event details page for relay events (Relay)
 /// Group 3: Relay with multi-stage selection, pacing, and support roles
@@ -20,7 +18,6 @@ class RelayEventDetailsPage extends StatefulWidget {
 
 class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     with EventDetailsBaseMixin<RelayEventDetailsPage> {
-  bool _isAdmin = false;
   // Relay-specific stages
   final List<Map<String, dynamic>> relayStages = [
     {'stage': 1, 'distance': '16.32 miles', 'details': 'Start to Kings Lynn'},
@@ -74,34 +71,9 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   ClubEvent get event => widget.event;
 
   @override
-  void initState() {
-    super.initState();
-    _checkAdmin();
-  }
-
-  Future<void> _checkAdmin() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    // Show admin controls if user is the creator OR has admin flag
-    if (widget.event.createdBy != null && widget.event.createdBy == user.id) {
-      setState(() => _isAdmin = true);
-      return;
-    }
-
-    try {
-      final isAdminProfile = await UserService.isAdmin();
-      if (mounted) setState(() => _isAdmin = isAdminProfile);
-    } catch (_) {
-      // ignore lookup errors
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
-    final user = supabase.auth.currentUser;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -182,12 +154,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.grey.shade800.withValues(
-                          alpha: Colors.grey.shade800.opacity * 0.5,
-                        ),
-                        Colors.grey.shade900.withValues(
-                          alpha: Colors.grey.shade900.opacity * 0.5,
-                        ),
+                        Colors.grey.shade800.withValues(alpha: 0.5),
+                        Colors.grey.shade900.withValues(alpha: 0.5),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -366,9 +334,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 // Participant counts with support role breakdown
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade900.withValues(
-                      alpha: Colors.grey.shade900.opacity * 0.5,
-                    ),
+                    color: Colors.grey.shade900.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -889,6 +855,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> showRelayRunningDialog() async {
+    final messenger = ScaffoldMessenger.of(context);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => RelayRunningDialog(
@@ -905,7 +872,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       final paceSeconds = mmssToSeconds(paceString);
 
       if (paceString != null && paceString.isNotEmpty && paceSeconds == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Enter pace between 02:00 and 20:00 (e.g., 07:30).'),
           ),
@@ -972,6 +939,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         .map((e) => {"fullName": names[e["user_id"]] ?? "Member"})
         .toList();
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -1062,142 +1030,6 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     );
   }
 
-  Future<void> _editEvent() async {
-    // Navigate to edit page (you'll need to create this or reuse create page)
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Edit feature coming soon!")));
-    // TODO: Navigate to AdminCreateEventPage in edit mode
-    // Navigator.pushNamed(context, '/admin-edit-event', arguments: widget.event);
-  }
-
-  Future<void> _cancelEvent() async {
-    final reasonController = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Cancel Event?"),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(labelText: "Reason"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    await supabase
-        .from("club_events")
-        .update({
-          "is_cancelled": true,
-          "cancel_reason": reasonController.text.trim(),
-        })
-        .eq("id", widget.event.id);
-
-    // Scoped alerts: unified message
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Cancelled',
-            body: '${widget.event.title} was cancelled',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Cancelled',
-          body: 'You cancelled ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _deleteEvent() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Event Permanently?"),
-        content: const Text("This cannot be undone."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("No"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("DELETE"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    // Scoped alerts: unified message
-    final me = supabase.auth.currentUser;
-    final creatorId = widget.event.createdBy;
-
-    if (me != null) {
-      if (creatorId == me.id) {
-        // If actor is creator, send one alert
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      } else {
-        // If different, notify both
-        if (creatorId != null) {
-          await NotificationService.notifyEventCreator(
-            eventId: widget.event.id,
-            creatorId: creatorId,
-            title: 'Event Deleted',
-            body: '${widget.event.title} was deleted',
-          );
-        }
-        await NotificationService.notifyUser(
-          userId: me.id,
-          title: 'Event Deleted',
-          body: 'You deleted ${widget.event.title}',
-          eventId: widget.event.id,
-        );
-      }
-    }
-
-    await supabase.from("club_events").delete().eq("id", widget.event.id);
-    Navigator.pop(context);
-  }
-
   Future<void> _showParticipantsByType(
     String title,
     String responseType,
@@ -1207,6 +1039,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       responseType: responseType,
     );
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -1240,6 +1073,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     );
   }
 
+  @override
   Future<Map<String, String>> fetchNamesForIds(Set<String> userIds) async {
     return super.fetchNamesForIds(userIds);
   }

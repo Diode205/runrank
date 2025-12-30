@@ -595,10 +595,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.15),
+                        color: Colors.red.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.redAccent.withOpacity(0.6),
+                          color: Colors.redAccent.withValues(alpha: 0.6),
                         ),
                       ),
                       child: const Icon(
@@ -636,7 +636,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         gradient: LinearGradient(
           colors: [
             const Color(0xFF1F3A93),
-            const Color(0xFFF5C542).withOpacity(0.35), // toned-down yellow
+            const Color(
+              0xFFF5C542,
+            ).withValues(alpha: 0.35), // toned-down yellow
             const Color(0xFF0F111A),
           ],
           stops: const [0.0, 0.45, 1.0],

@@ -27,7 +27,7 @@ class ClubHistoryPage extends StatelessWidget {
             elevation: 0,
             floating: false,
             pinned: true,
-            toolbarHeight: 472,
+            expandedHeight: 520,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.all(20),
@@ -170,10 +170,10 @@ class ClubHistoryPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFFFFD700).withOpacity(0.3),
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -252,7 +252,7 @@ class _GlassyButton extends StatelessWidget {
         child: Stack(
           children: [
             // Glassy background
-            Container(color: Colors.white.withOpacity(0.06)),
+            Container(color: Colors.white.withValues(alpha: 0.06)),
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
               child: Material(

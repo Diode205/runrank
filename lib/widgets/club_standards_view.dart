@@ -303,7 +303,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             Expanded(
               flex: 2,
               child: DropdownButtonFormField<String>(
-                value: _selectedDistance,
+                initialValue: _selectedDistance,
                 items: distances
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
@@ -333,7 +333,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _selectedGender,
+                initialValue: _selectedGender,
                 items: const [
                   DropdownMenuItem(value: 'M', child: Text('Male')),
                   DropdownMenuItem(value: 'F', child: Text('Female')),
@@ -388,58 +388,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // ---------------------------------------------------------
   // Buttons
   // ---------------------------------------------------------
-  Widget _buildButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _onCalculate,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Check\nAchievement',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => HistoryScreen()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Check\nRace Records',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---------------------------------------------------------
   // BUILD UI
   // ---------------------------------------------------------
@@ -459,12 +407,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   vertical: 22,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.yellowAccent.withOpacity(0.55),
+                  color: Colors.yellowAccent.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white30, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.yellowAccent.withOpacity(0.3),
+                      color: Colors.yellowAccent.withValues(alpha: 0.3),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -604,12 +552,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.yellow.withOpacity(0.55),
+                        color: Colors.yellow.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white30, width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.yellow.withOpacity(0.3),
+                            color: Colors.yellow.withValues(alpha: 0.3),
                             blurRadius: 12,
                             spreadRadius: 2,
                           ),
@@ -641,12 +589,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.55),
+                        color: Colors.blueAccent.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white30, width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blueAccent.withOpacity(0.3),
+                            color: Colors.blueAccent.withValues(alpha: 0.3),
                             blurRadius: 12,
                             spreadRadius: 2,
                           ),

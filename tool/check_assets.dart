@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // 📁 File: tool/check_assets.dart
 //
 // Flutter Asset Management Helper — "Bundle Edition"

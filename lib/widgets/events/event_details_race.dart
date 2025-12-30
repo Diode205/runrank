@@ -111,12 +111,8 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.grey.shade800.withValues(
-                          alpha: Colors.grey.shade800.opacity * 0.5,
-                        ),
-                        Colors.grey.shade900.withValues(
-                          alpha: Colors.grey.shade900.opacity * 0.5,
-                        ),
+                        Colors.grey.shade800.withValues(alpha: 0.5),
+                        Colors.grey.shade900.withValues(alpha: 0.5),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -302,9 +298,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 // Participant counts
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade900.withValues(
-                      alpha: Colors.grey.shade900.opacity * 0.5,
-                    ),
+                    color: Colors.grey.shade900.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -554,9 +548,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade900.withValues(
-          alpha: Colors.grey.shade900.opacity * 0.6,
-        ),
+        color: Colors.grey.shade900.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
       ),
@@ -867,6 +859,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
       responseType: responseType,
     );
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(

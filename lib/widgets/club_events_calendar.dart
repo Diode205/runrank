@@ -535,7 +535,7 @@ class _EventCard extends StatelessWidget {
                 border: Border.all(color: Colors.white24, width: 1.4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
+                    color: Colors.black.withValues(alpha: 0.25),
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -563,7 +563,7 @@ class _EventCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red.withOpacity(0.9),
+                            color: Colors.red.withValues(alpha: 0.9),
                           ),
                         ),
                       ),

@@ -144,7 +144,7 @@ class AuthService {
         .order('raceDate', ascending: false)
         .order('created_at', ascending: false);
 
-    return response.map((e) => e as Map<String, dynamic>).toList();
+    return response.cast<Map<String, dynamic>>();
   }
 
   // -------------------------------------------------------

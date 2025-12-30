@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
 import 'package:runrank/admin/create_post_page.dart';
 
@@ -16,43 +17,21 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   bool loading = true;
   bool isAdmin = false;
 
-  // Track expanded states
-  final Map<String, bool> _expandedReactions = {};
-  final Map<String, bool> _expandedComments = {};
-  final Map<String, TextEditingController> _commentControllers = {};
-
-  static const List<String> availableEmojis = [
-    '👍',
-    '❤️',
-    '😂',
-    '😮',
-    '😢',
-    '😡',
-  ];
-
   @override
   void initState() {
     super.initState();
-    print('PostsFeed: initState called');
+    debugPrint('PostsFeed: initState called');
     _checkAdminStatus().then((_) {
-      print('PostsFeed: Admin check complete, loading posts...');
+      debugPrint('PostsFeed: Admin check complete, loading posts...');
       _loadPosts();
     });
   }
 
-  @override
-  void dispose() {
-    for (final controller in _commentControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
   Future<void> _checkAdminStatus() async {
     final user = supabase.auth.currentUser;
-    print('PostsFeed: _checkAdminStatus called, user: ${user?.id}');
+    debugPrint('PostsFeed: _checkAdminStatus called, user: ${user?.id}');
     if (user == null) {
-      print('PostsFeed: No user found, cannot check admin');
+      debugPrint('PostsFeed: No user found, cannot check admin');
       return;
     }
 
@@ -64,18 +43,18 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
           .single();
 
       final adminStatus = profile['is_admin'] ?? false;
-      print('PostsFeed: Admin status for ${user.id}: $adminStatus');
+      debugPrint('PostsFeed: Admin status for ${user.id}: $adminStatus');
 
       if (mounted) {
         setState(() => isAdmin = adminStatus);
       }
     } catch (e) {
-      print('Error checking admin status: $e');
+      debugPrint('Error checking admin status: $e');
     }
   }
 
   Future<void> _loadPosts() async {
-    print('PostsFeed: _loadPosts called, isAdmin=$isAdmin');
+    debugPrint('PostsFeed: _loadPosts called, isAdmin=$isAdmin');
     try {
       // Load posts that haven't expired
       final now = DateTime.now().toIso8601String();
@@ -83,7 +62,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
       List data;
       if (isAdmin) {
-        print('PostsFeed: Loading ALL posts (admin mode)');
+        debugPrint('PostsFeed: Loading ALL posts (admin mode)');
         // Admins see ALL posts (approved + pending + their own)
         data = await supabase
             .from('club_posts')
@@ -137,83 +116,18 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
       }
 
       if (mounted) {
-        print('PostsFeed: Loaded ${data.length} posts');
+        debugPrint('PostsFeed: Loaded ${data.length} posts');
         setState(() {
           posts = List<Map<String, dynamic>>.from(data);
           loading = false;
         });
       }
     } catch (e) {
-      print('Error loading posts: $e');
+      debugPrint('Error loading posts: $e');
       if (mounted) {
         setState(() => loading = false);
       }
     }
-  }
-
-  Future<void> _approvePost(String postId) async {
-    try {
-      await supabase
-          .from('club_posts')
-          .update({
-            'is_approved': true,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', postId);
-      await _loadPosts();
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Post approved')));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  Future<void> _rejectPost(String postId) async {
-    try {
-      await supabase.from('club_posts').delete().eq('id', postId);
-      await _loadPosts();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post rejected and deleted')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  void _openImageFullscreen(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              child: Center(
-                child: Image.network(imageUrl, fit: BoxFit.contain),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   String _getTimeAgo(String? dateStr) {
@@ -468,6 +382,12 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                   final links = attachments
                                       .where((a) => a['type'] == 'link')
                                       .toList();
+                                  final files = attachments
+                                      .where((a) => a['type'] == 'file')
+                                      .toList();
+                                  final videos = attachments
+                                      .where((a) => a['type'] == 'video')
+                                      .toList();
 
                                   return Column(
                                     crossAxisAlignment:
@@ -498,7 +418,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                         ),
                                       // Rest as small chips
                                       if (images.length > 1 ||
-                                          links.isNotEmpty) ...[
+                                          links.isNotEmpty ||
+                                          files.isNotEmpty ||
+                                          videos.isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         Wrap(
                                           spacing: 6,
@@ -536,6 +458,64 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                                     fontSize: 12,
                                                   ),
                                                 ),
+                                              ),
+                                            ),
+                                            ...videos.map(
+                                              (a) => ActionChip(
+                                                avatar: const Icon(
+                                                  Icons.videocam,
+                                                  size: 16,
+                                                ),
+                                                label: Text(
+                                                  a['name'] ?? 'Video',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                onPressed: () async {
+                                                  final url =
+                                                      a['url'] as String?;
+                                                  if (url == null ||
+                                                      url.isEmpty) {
+                                                    return;
+                                                  }
+                                                  try {
+                                                    await launchUrl(
+                                                      Uri.parse(url),
+                                                      mode: LaunchMode
+                                                          .externalApplication,
+                                                    );
+                                                  } catch (_) {}
+                                                },
+                                              ),
+                                            ),
+                                            ...files.map(
+                                              (a) => ActionChip(
+                                                avatar: const Icon(
+                                                  Icons.attachment,
+                                                  size: 16,
+                                                ),
+                                                label: Text(
+                                                  a['name'] ?? 'File',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                onPressed: () async {
+                                                  final url =
+                                                      a['url'] as String?;
+                                                  if (url == null ||
+                                                      url.isEmpty) {
+                                                    return;
+                                                  }
+                                                  try {
+                                                    await launchUrl(
+                                                      Uri.parse(url),
+                                                      mode: LaunchMode
+                                                          .externalApplication,
+                                                    );
+                                                  } catch (_) {}
+                                                },
                                               ),
                                             ),
                                           ],
@@ -665,6 +645,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                             false;
                       },
                       onDismissed: (_) async {
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           await supabase
                               .from('club_posts')
@@ -672,13 +653,13 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                               .eq('id', postId);
                           await _loadPosts();
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               const SnackBar(content: Text('Post deleted')),
                             );
                           }
                         } catch (e) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               SnackBar(
                                 content: Text('Error deleting post: $e'),
                               ),

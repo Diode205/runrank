@@ -118,10 +118,10 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 200 + _pulseAnimation.value,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.yellowAccent.withOpacity(0.12),
+                      color: Colors.yellowAccent.withValues(alpha: 0.12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.yellowAccent.withOpacity(0.45),
+                          color: Colors.yellowAccent.withValues(alpha: 0.45),
                           blurRadius: 32 + _pulseAnimation.value,
                           spreadRadius: 8 + (_pulseAnimation.value / 2),
                         ),
@@ -165,7 +165,7 @@ class _SplashScreenState extends State<SplashScreen>
                   _version,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontStyle: FontStyle.italic,
                   ),
                 ),

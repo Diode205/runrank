@@ -76,7 +76,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         return;
       }
 
-      final row = response.first as Map<String, dynamic>;
+      final row = response.first;
 
       setState(() {
         _fullName = row['full_name'] as String?;
@@ -522,7 +522,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFD300).withOpacity(0.15),
+                      color: const Color(0xFFFFD300).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: const Color(0xFFFFD300),
@@ -554,7 +554,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0057B7).withOpacity(0.25),
+                          color: const Color(
+                            0xFF0057B7,
+                          ).withValues(alpha: 0.25),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -613,7 +615,6 @@ class _HexagonClipper extends CustomClipper<Path> {
     final h = size.height;
     final path = Path();
 
-    final double side = w / 2;
     final double triangleHeight = (h / 2);
 
     path.moveTo(w * 0.25, 0);

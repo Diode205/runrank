@@ -171,7 +171,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             child: Row(
               children: [
                 const Icon(
@@ -195,7 +195,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                     message: 'Admin: Long-press to edit stock',
                     child: Icon(
                       Icons.edit,
-                      color: const Color(0xFFFFD700).withOpacity(0.6),
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.6),
                       size: 18,
                     ),
                   ),
@@ -257,8 +257,8 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.white.withOpacity(0.08),
-              Colors.white.withOpacity(0.02),
+              Colors.white.withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.02),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -266,8 +266,8 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: hasStock
-                ? const Color(0xFF0055FF).withOpacity(0.3)
-                : Colors.red.withOpacity(0.3),
+                ? const Color(0xFF0055FF).withValues(alpha: 0.3)
+                : Colors.red.withValues(alpha: 0.3),
             width: 1.5,
           ),
         ),
@@ -295,7 +295,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFD700).withOpacity(0.2),
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: const Color(0xFFFFD700),
@@ -338,13 +338,13 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                     ),
                     decoration: BoxDecoration(
                       color: inStock
-                          ? const Color(0xFF0055FF).withOpacity(0.2)
-                          : Colors.red.withOpacity(0.1),
+                          ? const Color(0xFF0055FF).withValues(alpha: 0.2)
+                          : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: inStock
-                            ? const Color(0xFF0055FF).withOpacity(0.5)
-                            : Colors.red.withOpacity(0.3),
+                            ? const Color(0xFF0055FF).withValues(alpha: 0.5)
+                            : Colors.red.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Column(

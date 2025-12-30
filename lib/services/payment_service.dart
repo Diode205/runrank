@@ -35,10 +35,15 @@ class PaymentService {
     required int amountCents,
     required Map<String, dynamic> metadata,
   }) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     if (!isConfigured) {
-      _showSnack(
-        context,
-        'Payments not configured. Set STRIPE_PUBLISHABLE_KEY and PAYMENT_INTENT_ENDPOINT.',
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Payments not configured. Set STRIPE_PUBLISHABLE_KEY and PAYMENT_INTENT_ENDPOINT.',
+          ),
+        ),
       );
       return false;
     }
@@ -58,10 +63,13 @@ class PaymentService {
       if (response.statusCode != 200) {
         final body = response.body;
         debugPrint('Payment intent error: ${response.statusCode} $body');
-        final snippet = body.length > 140 ? body.substring(0, 140) + '…' : body;
-        _showSnack(
-          context,
-          'Payment config error (${response.statusCode}). ${snippet.isEmpty ? '' : snippet}',
+        final snippet = body.length > 140 ? '${body.substring(0, 140)}…' : body;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Payment config error (${response.statusCode}). ${snippet.isEmpty ? '' : snippet}',
+            ),
+          ),
         );
         return false;
       }
@@ -74,7 +82,11 @@ class PaymentService {
               as String?;
 
       if (clientSecret == null) {
-        _showSnack(context, 'Payment config missing client secret.');
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Payment config missing client secret.'),
+          ),
+        );
         return false;
       }
 
@@ -106,19 +118,15 @@ class PaymentService {
         final msg =
             se.error.localizedMessage ?? se.error.message ?? 'Stripe error';
         debugPrint('Stripe exception: $msg');
-        _showSnack(context, 'Payment failed: $msg');
+        messenger.showSnackBar(SnackBar(content: Text('Payment failed: $msg')));
         return false;
       }
     } catch (e) {
       debugPrint('Payment error: $e');
-      _showSnack(context, 'Payment cancelled or failed: $e');
+      messenger.showSnackBar(
+        SnackBar(content: Text('Payment cancelled or failed: $e')),
+      );
       return false;
     }
-  }
-
-  static void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/auth_service.dart';
-import 'package:runrank/auth/register_club_screen.dart'; // if still used anywhere
-import 'package:runrank/root_navigation.dart'; // if still used anywhere
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
 
@@ -47,25 +45,26 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () async {
                 final entered = email.text.trim();
                 if (entered.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(
                     const SnackBar(content: Text("Enter your email first")),
                   );
                   return;
                 }
 
                 try {
+                  final messenger = ScaffoldMessenger.of(context);
                   await Supabase.instance.client.auth.resetPasswordForEmail(
                     entered,
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text("Password reset link sent to $entered"),
                     ),
                   );
                 } catch (e) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text("Error: $e")));
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
                 }
               },
               child: const Text("Forgot password?"),
@@ -76,17 +75,20 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: loading
                   ? null
                   : () async {
+                      final navigator = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
                       setState(() => loading = true);
                       final success = await AuthService.login(
                         email.text.trim(),
                         password.text.trim(),
                       );
+                      if (!mounted) return;
                       setState(() => loading = false);
 
-                      if (success && mounted) {
-                        Navigator.pushReplacementNamed(context, AppRoutes.root);
+                      if (success) {
+                        navigator.pushReplacementNamed(AppRoutes.root);
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Login failed, check credentials'),
                           ),

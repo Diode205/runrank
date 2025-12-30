@@ -285,163 +285,266 @@ class _RaceCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFF1F2A3A), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 12,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: info.keyId == 'eaccl'
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: info.keyId == 'eaccl'
-                      ? CrossAxisAlignment.center
-                      : CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      info.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      textAlign: info.keyId == 'eaccl'
-                          ? TextAlign.center
-                          : null,
-                    ),
-                    if (info.keyId == 'eaccl') ...[
-                      const SizedBox(height: 6),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: info.keyId == 'eaccl'
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: info.keyId == 'eaccl'
+                        ? CrossAxisAlignment.center
+                        : CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        info.location,
+                        info.title,
                         style: const TextStyle(
-                          color: Color(0xFF56D3FF),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: info.keyId == 'eaccl'
+                            ? TextAlign.center
+                            : null,
+                      ),
+                      if (info.keyId == 'eaccl') ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          info.location,
+                          style: const TextStyle(
+                            color: Color(0xFF56D3FF),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        info.overview,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.5,
+                          fontSize: 14,
+                        ),
+                        textAlign: info.keyId == 'eaccl'
+                            ? TextAlign.center
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+                if (isAdmin && info.keyId != 'eaccl')
+                  IconButton(
+                    onPressed: onEditDate,
+                    icon: const Icon(
+                      Icons.edit_calendar,
+                      color: Color(0xFFFFD700),
+                    ),
+                    tooltip: 'Edit race date',
+                  ),
+              ],
+            ),
+            if (info.keyId != 'eaccl') ...[
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    info.date,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (info.keyId == 'holt') ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      Image.asset(
+                        'assets/images/holt10.png',
+                        height: 110,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        color: Colors.black.withValues(alpha: 0.2),
+                        colorBlendMode: BlendMode.darken,
+                      ),
+                      Container(
+                        height: 110,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0x990D0F18),
+                              Colors.transparent,
+                              Color(0xB30D0F18),
+                            ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Text(
-                      info.overview,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        height: 1.5,
-                        fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ] else if (info.keyId == 'worstead') ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      Image.asset(
+                        'assets/images/worstead5m.png',
+                        height: 110,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        color: Colors.black.withValues(alpha: 0.2),
+                        colorBlendMode: BlendMode.darken,
                       ),
-                      textAlign: info.keyId == 'eaccl'
-                          ? TextAlign.center
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-              if (isAdmin && info.keyId != 'eaccl')
-                IconButton(
-                  onPressed: onEditDate,
-                  icon: const Icon(
-                    Icons.edit_calendar,
-                    color: Color(0xFFFFD700),
-                  ),
-                  tooltip: 'Edit race date',
-                ),
-            ],
-          ),
-          if (info.keyId != 'eaccl') ...[
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  info.date,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                      Container(
+                        height: 110,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0x990D0F18),
+                              Colors.transparent,
+                              Color(0xB30D0F18),
+                            ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(height: 14),
+              ] else if (info.keyId == 'chase') ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      Image.asset(
+                        'assets/images/chasetrain.jpg',
+                        height: 110,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        color: Colors.black.withValues(alpha: 0.2),
+                        colorBlendMode: BlendMode.darken,
+                      ),
+                      Container(
+                        height: 110,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0x990D0F18),
+                              Colors.transparent,
+                              Color(0xB30D0F18),
+                            ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
               ],
-            ),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _InfoRow(icon: Icons.place, text: info.location),
+                    const SizedBox(height: 10),
+                    _InfoRow(icon: Icons.schedule, text: info.registration),
+                    const SizedBox(height: 10),
+                    _InfoRow(icon: Icons.flag, text: info.raceStart),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 18),
+            ],
             const SizedBox(height: 14),
-            if (info.keyId == 'holt') ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    Image.asset(
-                      'assets/images/holt10.png',
-                      height: 110,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      color: Colors.black.withOpacity(0.2),
-                      colorBlendMode: BlendMode.darken,
+            if (info.specialNote != null) ...[
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: info.specialNoteUrl != null
+                    ? () => onOpen(info.specialNoteUrl!)
+                    : null,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E3A5F), Color(0xFF0F1E3A)],
                     ),
-                    Container(
-                      height: 110,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0x990D0F18),
-                            Colors.transparent,
-                            Color(0xB30D0F18),
-                          ],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF4A90E2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.emoji_events,
+                        color: Color(0xFF4A90E2),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          info.specialNote!,
+                          style: const TextStyle(
+                            color: Color(0xFF4A90E2),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-            ] else if (info.keyId == 'worstead') ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    Image.asset(
-                      'assets/images/worstead5m.png',
-                      height: 110,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      color: Colors.black.withOpacity(0.2),
-                      colorBlendMode: BlendMode.darken,
-                    ),
-                    Container(
-                      height: 110,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0x990D0F18),
-                            Colors.transparent,
-                            Color(0xB30D0F18),
-                          ],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
+                      if (info.specialNoteUrl != null)
+                        const Icon(
+                          Icons.open_in_new,
+                          color: Color(0xFF4A90E2),
+                          size: 16,
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 14),
-            ] else if (info.keyId == 'chase') ...[
+            ],
+            const SizedBox(height: 14),
+            if (info.keyId == 'eaccl') ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
                   children: [
                     Image.asset(
-                      'assets/images/chasetrain.jpg',
+                      'assets/images/eaccl.jpg',
                       height: 110,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       colorBlendMode: BlendMode.darken,
                     ),
                     Container(
@@ -463,174 +566,77 @@ class _RaceCard extends StatelessWidget {
               ),
               const SizedBox(height: 14),
             ],
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
+            Text(
+              info.keyId == 'eaccl'
+                  ? 'Race, Dates, Venues and Facilities'
+                  : 'Facilities',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.2,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _InfoRow(icon: Icons.place, text: info.location),
-                  const SizedBox(height: 10),
-                  _InfoRow(icon: Icons.schedule, text: info.registration),
-                  const SizedBox(height: 10),
-                  _InfoRow(icon: Icons.flag, text: info.raceStart),
-                ],
-              ),
+              textAlign: info.keyId == 'eaccl' ? TextAlign.center : null,
             ),
-          ] else ...[
-            const SizedBox(height: 18),
-          ],
-          const SizedBox(height: 14),
-          if (info.specialNote != null) ...[
-            const SizedBox(height: 14),
-            GestureDetector(
-              onTap: info.specialNoteUrl != null
-                  ? () => onOpen(info.specialNoteUrl!)
-                  : null,
-              child: Container(
+            const SizedBox(height: 10),
+            if (info.keyId != 'eaccl')
+              Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E3A5F), Color(0xFF0F1E3A)],
-                  ),
+                  color: Colors.white.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF4A90E2), width: 1),
+                  border: Border.all(color: Colors.white12),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.emoji_events,
-                      color: Color(0xFF4A90E2),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        info.specialNote!,
-                        style: const TextStyle(
-                          color: Color(0xFF4A90E2),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (info.specialNoteUrl != null)
-                      const Icon(
-                        Icons.open_in_new,
-                        color: Color(0xFF4A90E2),
-                        size: 16,
-                      ),
-                  ],
+                child: Text(
+                  info.facilities,
+                  style: const TextStyle(color: Colors.white70, height: 1.6),
                 ),
               ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          if (info.keyId == 'eaccl') ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                children: [
-                  Image.asset(
-                    'assets/images/eaccl.jpg',
-                    height: 110,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    color: Colors.black.withOpacity(0.2),
-                    colorBlendMode: BlendMode.darken,
+            const SizedBox(height: 16),
+            if (info.keyId == 'eaccl')
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => onOpen(info.ticketsUrl),
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text(
+                    'Visit EACCL website',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Container(
-                    height: 110,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0x990D0F18),
-                          Colors.transparent,
-                          Color(0xB30D0F18),
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF56D3FF),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'Results',
+                      icon: Icons.emoji_events,
+                      onPressed: () => onOpen(info.ticketsUrl),
+                      color: const Color(0xFFFFD700),
+                      textColor: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ActionButton(
+                      label: 'Drive',
+                      icon: Icons.map,
+                      onPressed: () => onOpen(info.mapUrl),
+                      color: const Color(0xFF1E88E5),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 14),
           ],
-          Text(
-            info.keyId == 'eaccl'
-                ? 'Race, Dates, Venues and Facilities'
-                : 'Facilities',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.2,
-            ),
-            textAlign: info.keyId == 'eaccl' ? TextAlign.center : null,
-          ),
-          const SizedBox(height: 10),
-          if (info.keyId != 'eaccl')
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Text(
-                info.facilities,
-                style: const TextStyle(color: Colors.white70, height: 1.6),
-              ),
-            ),
-          const SizedBox(height: 16),
-          if (info.keyId == 'eaccl')
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => onOpen(info.ticketsUrl),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text(
-                  'Visit EACCL website',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF56D3FF),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Results',
-                    icon: Icons.emoji_events,
-                    onPressed: () => onOpen(info.ticketsUrl),
-                    color: const Color(0xFFFFD700),
-                    textColor: Colors.black,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Drive',
-                    icon: Icons.map,
-                    onPressed: () => onOpen(info.mapUrl),
-                    color: const Color(0xFF1E88E5),
-                  ),
-                ),
-              ],
-            ),
-        ],
+        ),
       ),
     );
   }

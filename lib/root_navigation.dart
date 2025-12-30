@@ -247,7 +247,7 @@ class _RootNavigationState extends State<RootNavigation>
                           ? BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.amber.withOpacity(0.6),
+                                  color: Colors.amber.withValues(alpha: 0.6),
                                   blurRadius: _glowAnimation.value,
                                   spreadRadius: _glowAnimation.value * 0.6,
                                 ),
@@ -296,7 +296,7 @@ class _RootNavigationState extends State<RootNavigation>
                           ? BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.amber.withOpacity(0.6),
+                                  color: Colors.amber.withValues(alpha: 0.6),
                                   blurRadius: _glowAnimation.value,
                                   spreadRadius: _glowAnimation.value * 0.6,
                                 ),
@@ -349,7 +349,9 @@ class _RootNavigationState extends State<RootNavigation>
                           ? BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.redAccent.withOpacity(0.6),
+                                  color: Colors.redAccent.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   blurRadius: _glowAnimation.value,
                                   spreadRadius: _glowAnimation.value * 0.6,
                                 ),
@@ -402,7 +404,9 @@ class _RootNavigationState extends State<RootNavigation>
                           ? BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.redAccent.withOpacity(0.6),
+                                  color: Colors.redAccent.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   blurRadius: _glowAnimation.value,
                                   spreadRadius: _glowAnimation.value * 0.6,
                                 ),

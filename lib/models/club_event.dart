@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class ClubEvent {
   final String id;
   final DateTime? createdAt;

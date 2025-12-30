@@ -28,7 +28,7 @@ class ResultCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.45),
+            color: Colors.black.withValues(alpha: 0.45),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -43,7 +43,7 @@ class ResultCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: style.badgeColor.withOpacity(0.18),
+                backgroundColor: style.badgeColor.withValues(alpha: 0.18),
                 child: Icon(style.icon, color: style.badgeColor, size: 26),
               ),
               const SizedBox(width: 12),

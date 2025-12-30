@@ -102,67 +102,31 @@ class _CreatePostPageState extends State<CreatePostPage> {
     }
   }
 
-  Future<void> _addAttachmentLink() async {
-    final controller = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Attach Link'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Paste file, image, or video URL',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Attach'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && controller.text.trim().isNotEmpty) {
-      final url = controller.text.trim();
-      final lowerUrl = url.toLowerCase();
-      
-      // Auto-detect type from URL extension
-      String attachmentType = 'link';
-      if (lowerUrl.contains('.png') || lowerUrl.contains('.jpg') || lowerUrl.contains('.jpeg') || lowerUrl.contains('.gif') || lowerUrl.contains('.webp')) {
-        attachmentType = 'image';
-      } else if (lowerUrl.contains('.mp4') || lowerUrl.contains('.mov') || lowerUrl.contains('.avi') || lowerUrl.contains('.mkv') || lowerUrl.contains('.webm') || lowerUrl.contains('.flv')) {
-        attachmentType = 'video';
-      } else if (lowerUrl.contains('.pdf') || lowerUrl.contains('.doc') || lowerUrl.contains('.xls') || lowerUrl.contains('.ppt')) {
-        attachmentType = 'file';
-      }
-      
-      setState(() {
-        _attachments.add({
-          'type': attachmentType,
-          'url': url,
-          'name': url.split('/').last.split('?').first,
-        });
-      });
-    }
-  }
-
   Future<void> _addAttachmentFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
         type: FileType.custom,
         allowedExtensions: [
-          // Documents
-          'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt',
-          // Images
-          'png', 'jpg', 'jpeg', 'gif', 'webp',
-          // Videos
-          'mp4', 'mov', 'avi', 'mkv', 'webm', 'flv',
-          // Archives
-          'zip', 'rar', '7z',
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'webp',
+          'mp4',
+          'mov',
+          'avi',
+          'mkv',
+          'webm',
+          'flv',
+          'pdf',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+          'zip',
         ],
       );
 
@@ -187,14 +151,27 @@ class _CreatePostPageState extends State<CreatePostPage> {
       // Determine attachment type based on file extension
       String attachmentType = 'file';
       final lowerName = fileName.toLowerCase();
-      if (lowerName.endsWith('.png') || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.gif') || lowerName.endsWith('.webp')) {
+      if (lowerName.endsWith('.png') ||
+          lowerName.endsWith('.jpg') ||
+          lowerName.endsWith('.jpeg') ||
+          lowerName.endsWith('.gif') ||
+          lowerName.endsWith('.webp')) {
         attachmentType = 'image';
-      } else if (lowerName.endsWith('.mp4') || lowerName.endsWith('.mov') || lowerName.endsWith('.avi') || lowerName.endsWith('.mkv') || lowerName.endsWith('.webm') || lowerName.endsWith('.flv')) {
+      } else if (lowerName.endsWith('.mp4') ||
+          lowerName.endsWith('.mov') ||
+          lowerName.endsWith('.avi') ||
+          lowerName.endsWith('.mkv') ||
+          lowerName.endsWith('.webm') ||
+          lowerName.endsWith('.flv')) {
         attachmentType = 'video';
       }
 
       setState(() {
-        _attachments.add({'type': attachmentType, 'url': publicUrl, 'name': fileName});
+        _attachments.add({
+          'type': attachmentType,
+          'url': publicUrl,
+          'name': fileName,
+        });
       });
     } catch (e) {
       if (mounted) {

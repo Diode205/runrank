@@ -8,7 +8,7 @@ class NNBRStyles {
     borderRadius: BorderRadius.circular(18),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.black.withValues(alpha: 0.4),
         blurRadius: 10,
         offset: const Offset(0, 4),
       ),
@@ -20,7 +20,7 @@ class NNBRStyles {
 
   /// Small pill used for tags / badges (if we need later)
   static final BoxDecoration pill = BoxDecoration(
-    color: const Color(0xFF0057B7).withOpacity(0.15),
+    color: const Color(0xFF0057B7).withValues(alpha: 0.15),
     borderRadius: BorderRadius.circular(999),
     border: Border.all(color: const Color(0xFF0057B7)),
   );

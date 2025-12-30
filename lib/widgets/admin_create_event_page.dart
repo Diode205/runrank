@@ -173,11 +173,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
       if (!mounted) return;
 
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+
       // Send notification to all users about new event
       if (result.isNotEmpty) {
         final eventId = result.first['id']?.toString();
         if (eventId != null) {
           final eventTitle = buildTitle();
+
           await NotificationService.notifyAllUsers(
             title: 'New Event Created',
             body: '$eventTitle has been added to the calendar',
@@ -186,14 +190,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         }
       }
 
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Event created successfully!")),
-      );
+      if (mounted) {
+        navigator.pop(true);
+        messenger.showSnackBar(
+          const SnackBar(content: Text("Event created successfully!")),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed: $e")));
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(SnackBar(content: Text("Failed: $e")));
     }
   }
 
@@ -260,7 +265,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               _section(
                 "Event Type",
                 DropdownButtonFormField<String>(
-                  value: selectedEventType,
+                  initialValue: selectedEventType,
                   items: selectedCategory == "admin"
                       ? adminTypes
                             .map(
@@ -283,7 +288,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 _section(
                   "Race Name",
                   DropdownButtonFormField<String>(
-                    value: selectedRace,
+                    initialValue: selectedRace,
                     items: raceNames
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
@@ -297,7 +302,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 _section(
                   "Handicap Event",
                   DropdownButtonFormField<String>(
-                    value: selectedHandicapDistance,
+                    initialValue: selectedHandicapDistance,
                     items: handicapDistances
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
@@ -311,7 +316,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 _section(
                   "Relay Team",
                   DropdownButtonFormField<String>(
-                    value: selectedRelayTeam,
+                    initialValue: selectedRelayTeam,
                     items: const [
                       DropdownMenuItem(value: "A", child: Text("Team A")),
                       DropdownMenuItem(value: "B", child: Text("Team B")),
@@ -396,8 +401,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                                     initialTime:
                                         selectedTime ?? TimeOfDay.now(),
                                   );
-                                  if (t != null)
+                                  if (t != null) {
                                     setState(() => selectedTime = t);
+                                  }
                                 },
                                 child: Text(
                                   selectedTime == null
