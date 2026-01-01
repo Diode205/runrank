@@ -62,7 +62,20 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
     final list = rows.map((e) => Map<String, dynamic>.from(e)).toList();
 
-    runners = list.where((e) => e["response_type"] == "running").toList();
+    // For relay events, treat anyone with relay stages
+    // recorded as a runner, even if their primary
+    // response_type is "marshalling" (e.g. they are
+    // both running and helping as Stage 6 marshal).
+    // Prefer the new relay_stages_json field but fall
+    // back to the legacy relay_stage integer.
+    runners = list.where((e) {
+      if (e["response_type"] == "running") return true;
+      if (event.eventType.toLowerCase() == "relay") {
+        if (e["relay_stages_json"] != null) return true;
+        return e["relay_stage"] != null;
+      }
+      return false;
+    }).toList();
     volunteers = list
         .where((e) => e["response_type"] == "marshalling")
         .toList();
@@ -87,16 +100,28 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       final mine = list.where((e) => e["user_id"] == user.id);
       if (mine.isNotEmpty) {
         myResponse = mine.first;
-        if (myResponse!["relay_stage"] != null) {
-          final stageValue = myResponse!["relay_stage"];
-          if (stageValue is String) {
-            try {
-              myRelayStages = List<int>.from(jsonDecode(stageValue));
-            } catch (e) {
-              myRelayStages = [];
+
+        // Prefer multi-stage JSON, fall back to legacy
+        // integer relay_stage so older responses still
+        // load correctly.
+        final stagesJson = myResponse!["relay_stages_json"];
+        if (stagesJson != null) {
+          try {
+            final raw = stagesJson is String
+                ? jsonDecode(stagesJson)
+                : stagesJson;
+            if (raw is List) {
+              myRelayStages = raw
+                  .whereType<num>()
+                  .map((n) => n.toInt())
+                  .toList();
             }
-          } else if (stageValue is int) {
-            // Legacy: single int value
+          } catch (_) {
+            myRelayStages = [];
+          }
+        } else if (myResponse!["relay_stage"] != null) {
+          final stageValue = myResponse!["relay_stage"];
+          if (stageValue is int) {
             myRelayStages = [stageValue];
           }
         }
@@ -332,6 +357,12 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         "event_id": event.id,
         "user_id": user.id,
         "response_type": dbType,
+        // For relay events, write all selected stages to
+        // relay_stages_json while keeping relay_stage set
+        // to the first stage for backwards compatibility.
+        "relay_stages_json": relayStages != null && relayStages.isNotEmpty
+            ? jsonEncode(relayStages)
+            : null,
         "relay_stage": relayStages != null && relayStages.isNotEmpty
             ? relayStages.first
             : null,

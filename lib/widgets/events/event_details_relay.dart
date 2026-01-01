@@ -1,7 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:runrank/models/club_event.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
 import 'package:runrank/widgets/events/event_venue_preview.dart';
@@ -589,17 +593,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     String label,
     int count,
     List<Map<String, dynamic>> participants, {
-    String? responseType,
+    VoidCallback? onTap,
     Map<String, int>? supportRoleCounts,
   }) {
     return InkWell(
-      onTap: count > 0
-          ? () {
-              if (responseType != null) {
-                _showParticipantsByType(label, responseType);
-              }
-            }
-          : null,
+      onTap: count > 0 ? onTap : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -702,19 +700,19 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         "🏃‍♀️ Running",
         runners.length,
         runners,
-        responseType: 'running',
+        onTap: () => _showRelayRunningList(),
       ),
       _buildParticipantLine(
         "🦺 Stage 6 Marshals",
         volunteers.length,
         volunteers,
-        responseType: 'marshalling',
+        onTap: () => _showMarshalList(),
       ),
       _buildParticipantLine(
         "⚙️ Support Crew",
         supporters.length,
         supporters,
-        responseType: 'supporting',
+        onTap: () => _showSupportList(),
         supportRoleCounts: roleCounts,
       ),
     ];
@@ -793,6 +791,16 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
             ),
           ),
           SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'marshal'),
+            child: const Row(
+              children: [
+                Icon(Icons.safety_check),
+                SizedBox(width: 8),
+                Text('Marshal (Stage 6)'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
             onPressed: () => Navigator.pop(context, 'support'),
             child: const Row(
               children: [
@@ -808,6 +816,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
     if (choice == 'running') {
       await showRelayRunningDialog();
+    } else if (choice == 'marshal') {
+      await submitResponse(type: "volunteer");
     } else if (choice == 'support') {
       await showRelaySupportingDialog();
     }
@@ -932,6 +942,616 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     );
   }
 
+  Future<void> _openRelayDebugView() async {
+    try {
+      final rows = await supabase
+          .from("club_event_responses")
+          .select()
+          .eq("event_id", widget.event.id);
+
+      final list = (rows as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      final ids = list
+          .map((e) => e["user_id"] as String?)
+          .whereType<String>()
+          .toSet();
+      final names = await fetchNamesForIds(ids);
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF121212),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (_) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Relay Responses Debug',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Raw club_event_responses for this relay, including relay_stages_json, relay_stage, roles, and predicted pace.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 320,
+                    child: list.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No responses yet',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: list.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(color: Colors.white24),
+                            itemBuilder: (_, i) {
+                              final row = list[i];
+                              final userId = row['user_id'] as String?;
+                              final name = userId != null
+                                  ? (names[userId] ?? 'Member')
+                                  : 'Unknown';
+                              final responseType =
+                                  row['response_type']?.toString() ?? '';
+                              final relayStage = row['relay_stage'];
+                              final relayStagesJson = row['relay_stages_json'];
+                              final relayRolesJson = row['relay_roles_json'];
+                              final pace = row['predicted_pace'];
+                              final expected = row['expected_time_seconds'];
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SelectableText(
+                                    'type=$responseType  stage=$relayStage  stages_json=${relayStagesJson ?? 'null'}\nroles_json=${relayRolesJson ?? 'null'}  pace=${pace ?? 'null'}  expected=${expected ?? 'null'}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      height: 1.3,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading debug data: $e')));
+    }
+  }
+
+  Future<void> _showRelayRunningList() async {
+    // Build in-memory view of runners with names, stages, and pace.
+    final ids = runners
+        .map((e) => e["user_id"] as String?)
+        .whereType<String>()
+        .toSet();
+    final names = await fetchNamesForIds(ids);
+
+    final items = <Map<String, dynamic>>[];
+    for (final r in runners) {
+      final userId = r["user_id"] as String?;
+      if (userId == null) continue;
+
+      final name = names[userId] ?? "Member";
+
+      // Prefer new relay_stages_json, but still handle
+      // legacy relay_stage values if present.
+      final stages = <int>[];
+      final stagesJson = r["relay_stages_json"];
+      if (stagesJson != null) {
+        try {
+          final raw = stagesJson is String
+              ? jsonDecode(stagesJson)
+              : stagesJson;
+          if (raw is List) {
+            for (final v in raw) {
+              if (v is num) stages.add(v.toInt());
+            }
+          }
+        } catch (_) {}
+      }
+      if (stages.isEmpty) {
+        final stageValue = r["relay_stage"];
+        if (stageValue is int) {
+          stages.add(stageValue);
+        }
+      }
+
+      final paceSeconds = r["predicted_pace"] as int?;
+      items.add({"name": name, "stages": stages, "paceSeconds": paceSeconds});
+    }
+
+    String buildExportText() {
+      final buffer = StringBuffer();
+      buffer.writeln(
+        "Relay Running List — ${event.title ?? "Relay"} (${weekday(event.dateTime)}, ${event.dateTime.day} ${month(event.dateTime.month)} ${event.dateTime.year})",
+      );
+      buffer.writeln();
+
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        final name = item["name"] as String? ?? "Member";
+        final stages = (item["stages"] as List<int>?) ?? const [];
+        final paceSeconds = item["paceSeconds"] as int?;
+
+        final parts = <String>[];
+        if (stages.isNotEmpty) {
+          if (stages.length == 1) {
+            parts.add("Stage ${stages.first}");
+          } else {
+            parts.add("Stages ${stages.join(", ")}");
+          }
+        }
+        if (paceSeconds != null) {
+          parts.add("Pace ${secondsToMMSS(paceSeconds)}/mile");
+        }
+
+        final detail = parts.isEmpty ? "" : " — ${parts.join(" • ")}";
+        buffer.writeln("${i + 1}. $name$detail");
+      }
+
+      return buffer.toString();
+    }
+
+    if (!mounted) return;
+    final exportText = buildExportText();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("🏃‍♀️ Running List"),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 360,
+          child: items.isEmpty
+              ? const Center(
+                  child: Text(
+                    "No runners yet",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (_, i) {
+                    final item = items[i];
+                    final name = item["name"] as String? ?? "Member";
+                    final stages = (item["stages"] as List<int>?) ?? const [];
+                    final paceSeconds = item["paceSeconds"] as int?;
+
+                    final parts = <String>[];
+                    if (stages.isNotEmpty) {
+                      if (stages.length == 1) {
+                        parts.add("Stage ${stages.first}");
+                      } else {
+                        parts.add("Stages ${stages.join(", ")}");
+                      }
+                    }
+                    if (paceSeconds != null) {
+                      parts.add("Pace ${secondsToMMSS(paceSeconds)}/mile");
+                    }
+
+                    final subtitle = parts.isEmpty ? null : parts.join(" • ");
+
+                    return ListTile(
+                      title: Text(name),
+                      subtitle: subtitle != null
+                          ? Text(subtitle)
+                          : const SizedBox.shrink(),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await _exportListAsPdf("Relay Running List", exportText);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text("Export PDF"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: exportText));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Running list copied")),
+                );
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text("Copy"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await _publishListAsPost(
+                title: "Relay Running List — ${event.title ?? "Relay"}",
+                content: exportText,
+              );
+            },
+            icon: const Icon(Icons.send),
+            label: const Text("Publish"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showMarshalList() async {
+    final ids = volunteers
+        .map((e) => e["user_id"] as String?)
+        .whereType<String>()
+        .toSet();
+    final names = await fetchNamesForIds(ids);
+
+    final attendees = volunteers
+        .map((e) => names[e["user_id"]] ?? "Member")
+        .toList();
+
+    String buildExportText() {
+      final buffer = StringBuffer();
+      buffer.writeln(
+        "Stage 6 Marshal List — ${event.title ?? "Relay"} (${weekday(event.dateTime)}, ${event.dateTime.day} ${month(event.dateTime.month)} ${event.dateTime.year})",
+      );
+      buffer.writeln();
+      for (var i = 0; i < attendees.length; i++) {
+        buffer.writeln("${i + 1}. ${attendees[i]}");
+      }
+      return buffer.toString();
+    }
+
+    if (!mounted) return;
+    final exportText = buildExportText();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("🦺 Stage 6 Marshals"),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 360,
+          child: attendees.isEmpty
+              ? const Center(
+                  child: Text(
+                    "No marshals yet",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: attendees.length,
+                  itemBuilder: (_, i) {
+                    return ListTile(title: Text(attendees[i]));
+                  },
+                ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await _exportListAsPdf("Stage 6 Marshal List", exportText);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text("Export PDF"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: exportText));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Marshal list copied")),
+                );
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text("Copy"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await _publishListAsPost(
+                title: "Stage 6 Marshal List — ${event.title ?? "Relay"}",
+                content: exportText,
+              );
+            },
+            icon: const Icon(Icons.send),
+            label: const Text("Publish"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSupportList() async {
+    final ids = supporters
+        .map((e) => e["user_id"] as String?)
+        .whereType<String>()
+        .toSet();
+    final names = await fetchNamesForIds(ids);
+
+    final items = <Map<String, dynamic>>[];
+    for (final s in supporters) {
+      final userId = s["user_id"] as String?;
+      if (userId == null) continue;
+
+      final name = names[userId] ?? "Member";
+      final raw = s["relay_roles_json"];
+      final roles = <String>[];
+      if (raw is String) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) {
+            for (final r in decoded) {
+              if (r is String) roles.add(r);
+            }
+          }
+        } catch (_) {}
+      } else if (raw is List) {
+        for (final r in raw) {
+          if (r is String) roles.add(r);
+        }
+      }
+
+      items.add({"name": name, "roles": roles});
+    }
+
+    String buildExportText() {
+      final buffer = StringBuffer();
+      buffer.writeln(
+        "Support Crew — ${event.title ?? "Relay"} (${weekday(event.dateTime)}, ${event.dateTime.day} ${month(event.dateTime.month)} ${event.dateTime.year})",
+      );
+      buffer.writeln();
+
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        final name = item["name"] as String? ?? "Member";
+        final roles = (item["roles"] as List<String>?) ?? const [];
+        final roleText = roles.isEmpty ? "" : " — Roles: ${roles.join(", ")}";
+        buffer.writeln("${i + 1}. $name$roleText");
+      }
+
+      return buffer.toString();
+    }
+
+    if (!mounted) return;
+    final exportText = buildExportText();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("⚙️ Support Crew"),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 360,
+          child: items.isEmpty
+              ? const Center(
+                  child: Text(
+                    "No supporters yet",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (_, i) {
+                    final item = items[i];
+                    final name = item["name"] as String? ?? "Member";
+                    final roles = (item["roles"] as List<String>?) ?? const [];
+                    final subtitle = roles.isEmpty
+                        ? null
+                        : "Roles: ${roles.join(", ")}";
+                    return ListTile(
+                      title: Text(name),
+                      subtitle: subtitle != null
+                          ? Text(subtitle)
+                          : const SizedBox.shrink(),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await _exportListAsPdf("Support Crew", exportText);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text("Export PDF"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: exportText));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Support list copied")),
+                );
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text("Copy"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await _publishListAsPost(
+                title: "Support Crew — ${event.title ?? "Relay"}",
+                content: exportText,
+              );
+            },
+            icon: const Icon(Icons.send),
+            label: const Text("Publish"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportListAsPdf(String title, String content) async {
+    try {
+      final doc = pw.Document();
+      doc.addPage(
+        pw.MultiPage(
+          build: (context) => [
+            pw.Text(
+              title,
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Text(content, style: const pw.TextStyle(fontSize: 12)),
+          ],
+        ),
+      );
+
+      final safeTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]+'),
+        '_',
+      );
+      await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: '${safeTitle}_${event.id}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting PDF: $e')));
+    }
+  }
+
+  Future<void> _publishListAsPost({
+    required String title,
+    required String content,
+  }) async {
+    if (await UserService.isBlocked(context: context)) {
+      return;
+    }
+
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must be logged in to post.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Resolve author display name similar to CreatePostPage.
+      String authorName = 'Unknown';
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+        final name = profile?['full_name'] as String?;
+        if (name != null && name.trim().isNotEmpty) {
+          authorName = name.trim();
+        } else {
+          final displayName = user.userMetadata?['full_name'] as String?;
+          if (displayName != null && displayName.trim().isNotEmpty) {
+            authorName = displayName.trim();
+          }
+        }
+      } catch (_) {
+        final displayName = user.userMetadata?['full_name'] as String?;
+        if (displayName != null && displayName.trim().isNotEmpty) {
+          authorName = displayName.trim();
+        }
+      }
+
+      final isAdmin = await UserService.isAdmin();
+      final now = DateTime.now();
+      final expiry = now.add(const Duration(days: 365));
+
+      await supabase.from('club_posts').insert({
+        'title': title,
+        'content': content,
+        'author_id': user.id,
+        'author_name': authorName,
+        'expiry_date': expiry.toIso8601String(),
+        'created_at': now.toIso8601String(),
+        'is_approved': isAdmin,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAdmin
+                  ? 'Post published with latest relay lists.'
+                  : 'Post created — awaiting admin approval.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error publishing post: $e')));
+      }
+    }
+  }
+
   Future<void> _contactHost() async {
     final hostUserId = widget.event.createdBy ?? supabase.auth.currentUser?.id;
     if (hostUserId == null || hostUserId.isEmpty) {
@@ -985,49 +1605,6 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         eventId: widget.event.id,
         commentController: commentController,
         onCommentSubmitted: _submitComment,
-      ),
-    );
-  }
-
-  Future<void> _showParticipantsByType(
-    String title,
-    String responseType,
-  ) async {
-    final attendees = await getRespondersWithNames(
-      eventId: widget.event.id,
-      responseType: responseType,
-    );
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: attendees.isEmpty
-              ? const Center(
-                  child: Text(
-                    "No participants yet",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: attendees.length,
-                  itemBuilder: (_, i) {
-                    final a = attendees[i];
-                    final name = a['fullName'] as String? ?? 'Unknown runner';
-                    return ListTile(title: Text(name));
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
       ),
     );
   }

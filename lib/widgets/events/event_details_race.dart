@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:runrank/models/club_event.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
 import 'package:runrank/widgets/events/event_venue_preview.dart';
@@ -622,7 +626,32 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
       responseType: responseType,
     );
 
+    String buildExportText() {
+      final buffer = StringBuffer();
+      final e = widget.event;
+      final dt = e.dateTime;
+      buffer.writeln(
+        "$title — ${e.title ?? "Event"} (${weekday(dt)}, ${dt.day} ${month(dt.month)} ${dt.year})",
+      );
+      buffer.writeln();
+
+      for (var i = 0; i < attendees.length; i++) {
+        final a = attendees[i];
+        final name = a['fullName'] as String? ?? 'Unknown runner';
+        final expected = a['expectedTimeSeconds'] as int?;
+        String detail = '';
+        if (showExpectedTime && expected != null) {
+          detail = ' — Predicted time: ${secondsToHHMMSS(expected)}';
+        }
+        buffer.writeln("${i + 1}. $name$detail");
+      }
+
+      return buffer.toString();
+    }
+
     if (!mounted) return;
+    final exportText = buildExportText();
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -653,6 +682,35 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await _exportListAsPdf(title, exportText);
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text("Export PDF"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: exportText));
+              if (mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('List copied')));
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text("Copy"),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await _publishListAsPost(
+                title: "$title — ${widget.event.title ?? "Event"}",
+                content: exportText,
+              );
+            },
+            icon: const Icon(Icons.send),
+            label: const Text("Publish"),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Close"),
@@ -660,5 +718,113 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         ],
       ),
     );
+  }
+
+  Future<void> _exportListAsPdf(String title, String content) async {
+    try {
+      final doc = pw.Document();
+      doc.addPage(
+        pw.MultiPage(
+          build: (context) => [
+            pw.Text(
+              title,
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Text(content, style: const pw.TextStyle(fontSize: 12)),
+          ],
+        ),
+      );
+
+      final safeTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]+'),
+        '_',
+      );
+      await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: '${safeTitle}_${event.id}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting PDF: $e')));
+    }
+  }
+
+  Future<void> _publishListAsPost({
+    required String title,
+    required String content,
+  }) async {
+    if (await UserService.isBlocked(context: context)) {
+      return;
+    }
+
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must be logged in to post.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      String authorName = 'Unknown';
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+        final name = profile?['full_name'] as String?;
+        if (name != null && name.trim().isNotEmpty) {
+          authorName = name.trim();
+        } else {
+          final displayName = user.userMetadata?['full_name'] as String?;
+          if (displayName != null && displayName.trim().isNotEmpty) {
+            authorName = displayName.trim();
+          }
+        }
+      } catch (_) {
+        final displayName = user.userMetadata?['full_name'] as String?;
+        if (displayName != null && displayName.trim().isNotEmpty) {
+          authorName = displayName.trim();
+        }
+      }
+
+      final isAdmin = await UserService.isAdmin();
+      final now = DateTime.now();
+      final expiry = now.add(const Duration(days: 365));
+
+      await supabase.from('club_posts').insert({
+        'title': title,
+        'content': content,
+        'author_id': user.id,
+        'author_name': authorName,
+        'expiry_date': expiry.toIso8601String(),
+        'created_at': now.toIso8601String(),
+        'is_approved': isAdmin,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAdmin
+                  ? 'Post published with latest list.'
+                  : 'Post created — awaiting admin approval.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error publishing post: $e')));
+      }
+    }
   }
 }
