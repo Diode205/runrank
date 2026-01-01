@@ -60,7 +60,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       final row = await _client
           .from('user_profiles')
           .select(
-              'member_since, membership_type, full_name, email, uka_number, date_of_birth')
+            'member_since, membership_type, full_name, email, uka_number, date_of_birth',
+          )
           .eq('id', user.id)
           .maybeSingle();
 
@@ -443,9 +444,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
     final amountCents = amountMap[tierName];
     if (amountCents == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unknown membership tier.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unknown membership tier.')));
       return;
     }
 

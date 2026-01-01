@@ -167,13 +167,19 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await _supabase
+      debugPrint(
+        'Setting admin status for user ${user['id']}: makeAdmin=$makeAdmin',
+      );
+
+      final result = await _supabase
           .from('user_profiles')
           .update({
             'is_admin': makeAdmin,
             'admin_since': makeAdmin ? DateTime.now().toIso8601String() : null,
           })
           .eq('id', user['id'] as String);
+
+      debugPrint('Update result: $result');
 
       messenger.showSnackBar(
         SnackBar(
@@ -183,8 +189,11 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         ),
       );
 
+      debugPrint('Refreshing search results after admin status change');
       await _searchUsers(_searchController.text, setModalState);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error setting admin status: $e');
+      debugPrintStack(stackTrace: stackTrace);
       messenger.showSnackBar(
         SnackBar(content: Text('Could not update admin status: $e')),
       );
@@ -483,49 +492,84 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                     ],
                                   ),
                                 ),
-                                Column(
+                                const SizedBox(width: 8),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      tooltip: isAdmin
-                                          ? 'Remove admin'
-                                          : 'Make admin',
-                                      onPressed: () => _setAdminStatus(
-                                        user,
-                                        !isAdmin,
-                                        setModalState,
-                                      ),
-                                      icon: Icon(
-                                        isAdmin
-                                            ? Icons.security_update_warning
-                                            : Icons.verified_user,
+                                    Container(
+                                      decoration: BoxDecoration(
                                         color: isAdmin
-                                            ? Colors.orangeAccent
-                                            : Colors.greenAccent,
+                                            ? Colors.orangeAccent.withOpacity(
+                                                0.15,
+                                              )
+                                            : Colors.greenAccent.withOpacity(
+                                                0.15,
+                                              ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: IconButton(
+                                        tooltip: isAdmin
+                                            ? 'Remove admin'
+                                            : 'Make admin',
+                                        onPressed: () => _setAdminStatus(
+                                          user,
+                                          !isAdmin,
+                                          setModalState,
+                                        ),
+                                        icon: Icon(
+                                          isAdmin
+                                              ? Icons.security_update_warning
+                                              : Icons.verified_user,
+                                          color: isAdmin
+                                              ? Colors.orangeAccent
+                                              : Colors.greenAccent,
+                                        ),
                                       ),
                                     ),
-                                    IconButton(
-                                      tooltip: 'Warn user',
-                                      onPressed: () =>
-                                          _warnUser(user, setModalState),
-                                      icon: const Icon(
-                                        Icons.warning_amber_rounded,
-                                        color: Colors.amber,
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: IconButton(
+                                        tooltip: 'Warn user',
+                                        onPressed: () =>
+                                            _warnUser(user, setModalState),
+                                        icon: const Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Colors.amber,
+                                        ),
                                       ),
                                     ),
-                                    IconButton(
-                                      tooltip: isBlocked ? 'Unblock' : 'Block',
-                                      onPressed: () => _blockUser(
-                                        user,
-                                        !isBlocked,
-                                        setModalState,
-                                      ),
-                                      icon: Icon(
-                                        isBlocked
-                                            ? Icons.lock_open
-                                            : Icons.block,
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      decoration: BoxDecoration(
                                         color: isBlocked
                                             ? Colors.lightGreenAccent
-                                            : Colors.redAccent,
+                                                  .withOpacity(0.15)
+                                            : Colors.redAccent.withOpacity(
+                                                0.15,
+                                              ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: IconButton(
+                                        tooltip: isBlocked
+                                            ? 'Unblock'
+                                            : 'Block',
+                                        onPressed: () => _blockUser(
+                                          user,
+                                          !isBlocked,
+                                          setModalState,
+                                        ),
+                                        icon: Icon(
+                                          isBlocked
+                                              ? Icons.lock_open
+                                              : Icons.block,
+                                          color: isBlocked
+                                              ? Colors.lightGreenAccent
+                                              : Colors.redAccent,
+                                        ),
                                       ),
                                     ),
                                   ],

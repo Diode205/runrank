@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/calculator_logic.dart';
 import 'package:runrank/standards_data.dart';
 import 'package:runrank/widgets/result_card.dart';
@@ -15,13 +17,32 @@ class ClubStandardsView extends StatefulWidget {
 class _ClubStandardsViewState extends State<ClubStandardsView>
     with TickerProviderStateMixin {
   // ---------------------------------------------------------
-  // Animation for subtitle fade + slide
+  // Animation for subtitle fade + slide + image carousel
   // ---------------------------------------------------------
   late AnimationController _subTitleController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late ScrollController _scrollController;
   double _scrollOffset = 0.0;
+
+  // Image carousel
+  late Timer _imageTimer;
+  int _currentImageIndex = 0;
+  final List<String> _carouselImages = [
+    'assets/images/pic1.png',
+    'assets/images/pic2.png',
+    'assets/images/pic3.png',
+    'assets/images/pic4.png',
+    'assets/images/pic5.png',
+    'assets/images/pic6.png',
+    'assets/images/pic7.png',
+    'assets/images/pic8.png',
+    'assets/images/pic9.png',
+    'assets/images/pic10.png',
+    'assets/images/pic11.png',
+  ];
+  late AnimationController _imageController;
+  late Animation<double> _imageFadeAnimation;
 
   @override
   void initState() {
@@ -47,6 +68,30 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           _scrollOffset = _scrollController.offset * 0.25;
         });
       });
+
+    // Image carousel animation
+    _imageController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _imageFadeAnimation = CurvedAnimation(
+      parent: _imageController,
+      curve: Curves.easeInOut,
+    );
+
+    // Start image carousel
+    _imageController.forward();
+    _imageTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted) {
+        _imageController.reverse().then((_) {
+          setState(() {
+            _currentImageIndex =
+                (_currentImageIndex + 1) % _carouselImages.length;
+          });
+          _imageController.forward();
+        });
+      }
+    });
 
     Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) _subTitleController.forward();
@@ -75,8 +120,16 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     _dateController.dispose();
     _subTitleController.dispose();
     _scrollController.dispose();
-
+    _imageTimer.cancel();
+    _imageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
   }
 
   // ---------------------------------------------------------
@@ -358,284 +411,378 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           ],
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // --------------------------------------
-        // INFO TEXT
+        // IMAGE CAROUSEL
         // --------------------------------------
-        const Text(
-          'NNBR Club Standards require members to achieve qualifying times '
-          'in four of six distances over a calendar year to earn an award.\n'
-          'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n'
-          'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n'
-          'Awards will be presented at the Annual Awards evening.\n'
-          'For more information, visit the NNBR website.\n\n'
-          'Age-graded percentages are provided for guidance only and do not form part of the Club Standards assessment.\n'
-          'Age record tables used are from ARRS, the Association of Road Racing Statisticians, which they maintained and updates as necessary.\n'
-          'The distance record updates are as follows:\n'
-          '5km last update on 06 Deecember 2017\n'
-          '10km last update on 28 November 2017\n'
-          '5miles last update on 10 December 2017\n'
-          '10miles last update on 16 March 2020\n'
-          'Half Marathon last update on 20 November 2017\n'
-          'Marathon last update on 01 November 2019\n'
-          'ARRS is actively looking for people to help maintain their records, as well as sponsorships.\n'
-          'For full details, visit https://arrs.run/.',
-          style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-          textAlign: TextAlign.center,
+        FadeTransition(
+          opacity: _imageFadeAnimation,
+          child: Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF0055FF), width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                _carouselImages[_currentImageIndex],
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey.shade800,
+                    child: const Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.white38,
+                        size: 48,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
 
   // ---------------------------------------------------------
-  // Buttons
+  // Info sections for scrollable content
   // ---------------------------------------------------------
+  Widget _buildInfoSection(
+    String title,
+    String content, {
+    String? url,
+    String? linkLabel,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (title.isNotEmpty) ...[
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFFD700),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white70,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (url != null) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => _launchUrl(url),
+              child: Text(
+                linkLabel ?? url,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.lightBlueAccent,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ---------------------------------------------------------
-  // BUILD UI
+  // BUILD UI with CustomScrollView
   // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Column(
-          children: [
-            // HEADER (glassy effect with opacity)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 22,
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // HEADER
+            SliverAppBar(
+              backgroundColor: Colors.black,
+              elevation: _scrollOffset > 0 ? 4 : 0,
+              floating: false,
+              pinned: true,
+              expandedHeight: 130,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 22,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.yellowAccent.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white30, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.yellowAccent.withValues(
+                            alpha: _scrollOffset > 0 ? 0.4 : 0.3,
+                          ),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Image.asset('assets/images/rank_logo.png', height: 70),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'CLUB STANDARDS',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 23,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color.fromARGB(255, 77, 3, 224),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: SlideTransition(
+                                  position: _slideAnimation,
+                                  child: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Calculate your club standard!',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color.fromARGB(221, 235, 81, 5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+              ),
+            ),
+
+            // TOP NNBR PHOTO (static)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/images/nnbr_cover.png',
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+
+            // INPUT FORM
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black45, blurRadius: 12),
+                    ],
+                  ),
+                  child: _buildInputForm(),
+                ),
+              ),
+            ),
+
+            // RESULT MESSAGE
+            SliverToBoxAdapter(
+              child: _resultMessage == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      child: Text(
+                        _resultMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+            ),
+
+            // INFO SECTIONS (Scrollable)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildInfoSection(
+                    'Club Standards',
+                    'NNBR Club Standards require members to achieve qualifying times '
+                        'in four of six distances over a calendar year to earn an award.\n\n'
+                        'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
+                        'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
+                        'Awards will be presented at the Annual Awards evening.',
+                    url:
+                        'https://www.northnorfolkbeachrunners.com/club-standards',
+                    linkLabel: 'View full club standards on NNBR website',
+                  ),
+                  _buildInfoSection(
+                    'Age-Grading',
+                    'Age-graded percentages are provided for guidance only and do not form part of the Club Standards assessment.\n\n'
+                        'Age record tables used are from ARRS, the Association of Road Racing Statisticians, which they maintained and updates as necessary.\n\n'
+                        'The distance record updates are as follows:\n'
+                        '\u2022 5km last update on 06 December 2017\n'
+                        '\u2022 10km last update on 28 November 2017\n'
+                        '\u2022 5miles last update on 10 December 2017\n'
+                        '\u2022 10miles last update on 16 March 2020\n'
+                        '\u2022 Half Marathon last update on 20 November 2017\n'
+                        '\u2022 Marathon last update on 01 November 2019\n\n'
+                        'ARRS is actively looking for people to help maintain their records, as well as sponsorships.',
+                    url: 'https://arrs.run/',
+                    linkLabel:
+                        'View full age-grading tables at ARRS (arrs.run)',
+                  ),
+                  const SizedBox(height: 80),
+                ]),
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // FIXED BUTTON BAR at bottom
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: Colors.black,
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.yellowAccent.withValues(alpha: 0.55),
+                  color: Colors.yellow.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white30, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.yellowAccent.withValues(alpha: 0.3),
+                      color: Colors.yellow.withValues(alpha: 0.3),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
                   ],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Image.asset('assets/images/rank_logo.png', height: 70),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              'CLUB STANDARDS',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 23,
-                                fontWeight: FontWeight.w900,
-                                color: Color.fromARGB(255, 77, 3, 224),
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 1),
-                          FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: SlideTransition(
-                              position: _slideAnimation,
-                              child: const FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  'Race & Team Admin On The Go',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontStyle: FontStyle.italic,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color.fromARGB(221, 235, 81, 5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                child: ElevatedButton(
+                  onPressed: _onCalculate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.black,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                  ),
+                  child: const Text(
+                    'Check\nAchievement',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ),
-            //SCROLL AREA
+            const SizedBox(width: 10),
             Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    // Cover Image
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          height: 170,
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final parallax = (_scrollOffset * 0.25).clamp(
-                                0.0,
-                                60.0,
-                              );
-                              return Transform.translate(
-                                offset: Offset(0, parallax),
-                                child: Image.asset(
-                                  'assets/images/nnbr_cover.png',
-                                  height: 230,
-                                  width: constraints.maxWidth,
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment(1.0, 0),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white30, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blueAccent.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      spreadRadius: 2,
                     ),
-                    const SizedBox(height: 8),
-
-                    // INPUT FORM
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade900,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black45, blurRadius: 12),
-                          ],
-                        ),
-                        child: _buildInputForm(),
-                      ),
-                    ),
-                    // RESULT MESSAGE
-                    if (_resultMessage != null) ...[
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          _resultMessage!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
                   ],
                 ),
-              ),
-            ),
-            // FIXED BUTTON BAR
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: Colors.black,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.yellow.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white30, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.yellow.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _onCalculate,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.black,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Check\nAchievement',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => HistoryScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white30, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blueAccent.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => HistoryScreen()),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.white,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Check\nRace Records',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: const Text(
+                    'Check\nRace Records',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
-                ],
+                ),
               ),
             ),
-          ], // Close Column children
-        ), // Close Column
-      ), // Close SafeArea
-    ); // Close Scaffold
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -415,6 +415,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               );
             },
           ),
+          _menuTile(
+            icon: Icons.people_alt,
+            title: 'Administrative Team',
+            subtitle: 'Management Committee & Contacts',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdministrativeTeamPage(),
+                ),
+              );
+            },
+          ),
           if (_isAdmin)
             _menuTile(
               icon: Icons.volunteer_activism,
@@ -429,19 +442,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 );
               },
             ),
-          _menuTile(
-            icon: Icons.people_alt,
-            title: 'Administrative Team',
-            subtitle: 'Management Committee & Contacts',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdministrativeTeamPage(),
-                ),
-              );
-            },
-          ),
           _menuTile(
             icon: Icons.description,
             title: 'Policies, Forms, and Notices',

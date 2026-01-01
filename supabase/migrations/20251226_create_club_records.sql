@@ -22,6 +22,12 @@ CREATE INDEX IF NOT EXISTS idx_club_records_user ON public.club_records(user_id)
 -- Enable RLS
 ALTER TABLE public.club_records ENABLE ROW LEVEL SECURITY;
 
+-- Drop any existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Anyone can view club records" ON public.club_records;
+DROP POLICY IF EXISTS "Admins can insert club records" ON public.club_records;
+DROP POLICY IF EXISTS "Admins can update club records" ON public.club_records;
+DROP POLICY IF EXISTS "Admins can delete club records" ON public.club_records;
+
 -- Policy: Everyone can view records
 CREATE POLICY "Anyone can view club records"
   ON public.club_records
@@ -79,6 +85,8 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS club_records_updated_at ON public.club_records;
 
 CREATE TRIGGER club_records_updated_at
   BEFORE UPDATE ON public.club_records
