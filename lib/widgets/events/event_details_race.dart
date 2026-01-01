@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
-// import removed: notification_service (not used here)
-import 'package:runrank/services/weather_service.dart';
+import 'package:runrank/widgets/events/event_venue_preview.dart';
 // import removed: admin_edit_event_page.dart (controls moved to calendar)
 
 /// Event details page for race events (Race, Handicap_Series)
@@ -19,18 +18,8 @@ class RaceEventDetailsPage extends StatefulWidget {
 
 class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     with EventDetailsBaseMixin<RaceEventDetailsPage> {
-  WeatherAtTime? _weather;
-  bool _weatherLoading = false;
-  String? _weatherError;
-
   @override
   ClubEvent get event => widget.event;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadWeather();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,52 +193,6 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                       ),
                       const Divider(height: 32, color: Colors.white12),
 
-                      // Venue
-                      Text(
-                        "Venue",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        e.venue,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      ...(e.venueAddress.isNotEmpty
-                          ? [
-                              const SizedBox(height: 4),
-                              Text(
-                                e.venueAddress,
-                                style: const TextStyle(color: Colors.white60),
-                              ),
-                            ]
-                          : []),
-                      ...(e.latitude != null && e.longitude != null
-                          ? [
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: openMaps,
-                                icon: const Icon(Icons.map),
-                                label: const Text("Open in Maps"),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFD300),
-                                  side: const BorderSide(
-                                    color: Color(0xFFFFD300),
-                                  ),
-                                ),
-                              ),
-                            ]
-                          : []),
-                      const Divider(height: 32, color: Colors.white12),
-
                       // Details
                       Text(
                         "Details",
@@ -276,7 +219,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 ),
                 if (e.latitude != null && e.longitude != null) ...[
                   const SizedBox(height: 20),
-                  _buildMapAndWeatherCard(e),
+                  EventVenuePreview(event: e, onOpenMaps: openMaps),
                 ],
                 const SizedBox(height: 24),
 
@@ -507,186 +450,6 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         ),
       ],
     );
-  }
-
-  Future<void> _loadWeather() async {
-    final lat = event.latitude;
-    final lng = event.longitude;
-    if (lat == null || lng == null) return;
-
-    setState(() {
-      _weatherLoading = true;
-      _weatherError = null;
-    });
-
-    try {
-      final result = await WeatherService.fetchWeather(
-        latitude: lat,
-        longitude: lng,
-        when: event.dateTime,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _weather = result;
-        _weatherLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _weatherError = "Weather unavailable right now";
-        _weatherLoading = false;
-      });
-    }
-  }
-
-  Widget _buildMapAndWeatherCard(ClubEvent e) {
-    final lat = e.latitude!;
-    final lng = e.longitude!;
-    final mapUrl = _mapPreviewUrl(lat, lng);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Venue Preview",
-            style: TextStyle(
-              color: Colors.grey.shade300,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.network(
-                      mapUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          color: Colors.black12,
-                          child: const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      },
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.black26,
-                        child: const Center(
-                          child: Icon(
-                            Icons.map_outlined,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: FilledButton.icon(
-                      onPressed: openMaps,
-                      icon: const Icon(Icons.navigation),
-                      label: const Text("Directions"),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0057B7),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildWeatherStrip(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherStrip() {
-    if (_weatherLoading) {
-      return Row(
-        children: const [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 8),
-          Text("Loading weather...", style: TextStyle(color: Colors.white70)),
-        ],
-      );
-    }
-
-    if (_weather != null) {
-      final w = _weather!;
-      return Row(
-        children: [
-          Icon(_weatherIcon(w.code), color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            "${w.tempC.round()}°C • ${w.windMph.round()} mph",
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              w.description,
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_weatherError != null) {
-      return Text(
-        _weatherError!,
-        style: const TextStyle(color: Colors.white70),
-      );
-    }
-
-    return const Text(
-      "Weather not available",
-      style: TextStyle(color: Colors.white70),
-    );
-  }
-
-  IconData _weatherIcon(int code) {
-    if (code == 0) return Icons.wb_sunny_rounded;
-    if (code == 1 || code == 2) return Icons.wb_cloudy_rounded;
-    if (code == 3 || code == 45 || code == 48) return Icons.cloud;
-    if (code >= 51 && code <= 67) return Icons.grain_rounded;
-    if ((code >= 71 && code <= 77) || code == 85 || code == 86) {
-      return Icons.ac_unit_rounded;
-    }
-    if ((code >= 80 && code <= 82) || (code >= 61 && code <= 65)) {
-      return Icons.grain_rounded;
-    }
-    if (code >= 95) return Icons.thunderstorm_rounded;
-    return Icons.cloud_queue;
-  }
-
-  String _mapPreviewUrl(double lat, double lng) {
-    return "https://staticmap.openstreetmap.de/staticmap.php"
-        "?center=$lat,$lng&zoom=14&size=600x300&markers=$lat,$lng,red-pushpin";
   }
 
   Widget _buildParticipantLine(

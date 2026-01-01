@@ -48,6 +48,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   final venueCtrl = TextEditingController();
   final venueAddressCtrl = TextEditingController();
   final descriptionCtrl = TextEditingController();
+  final latitudeCtrl = TextEditingController();
+  final longitudeCtrl = TextEditingController();
 
   // Date fields
   DateTime? selectedDate;
@@ -71,6 +73,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     venueCtrl.dispose();
     venueAddressCtrl.dispose();
     descriptionCtrl.dispose();
+    latitudeCtrl.dispose();
+    longitudeCtrl.dispose();
     super.dispose();
   }
 
@@ -137,6 +141,31 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         ? "00:00"
         : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
 
+    double? latitude;
+    double? longitude;
+    if (latitudeCtrl.text.trim().isNotEmpty) {
+      latitude = double.tryParse(latitudeCtrl.text.trim());
+      if (latitude == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Latitude must be a number (e.g. 52.9501)"),
+          ),
+        );
+        return;
+      }
+    }
+    if (longitudeCtrl.text.trim().isNotEmpty) {
+      longitude = double.tryParse(longitudeCtrl.text.trim());
+      if (longitude == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Longitude must be a number (e.g. 1.3012)"),
+          ),
+        );
+        return;
+      }
+    }
+
     final map = {
       "event_type": selectedEventType.toLowerCase().replaceAll(" ", "_"),
       "training_number": selectedEventType == "Training 1"
@@ -156,6 +185,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "venue": venueCtrl.text.trim(),
       "venue_address": venueAddressCtrl.text.trim(),
       "description": descriptionCtrl.text.trim(),
+      "latitude": latitude,
+      "longitude": longitude,
       "marshal_call_date":
           (selectedEventType == "Race" ||
               selectedEventType == "Handicap Series")
@@ -347,6 +378,33 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                       decoration: const InputDecoration(
                         labelText: "Venue Address",
                       ),
+                    ),
+                    TextFormField(
+                      controller: latitudeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: "Latitude (optional)",
+                        hintText: "52.9501",
+                      ),
+                    ),
+                    TextFormField(
+                      controller: longitudeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: "Longitude (optional)",
+                        hintText: "1.3012",
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "Tip: In Google Maps, right‑click the venue and copy the first number (lat) and second number (lon).",
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
                     ),
                     TextFormField(
                       controller: descriptionCtrl,

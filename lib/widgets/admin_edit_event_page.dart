@@ -20,6 +20,8 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
   late TextEditingController venueCtrl;
   late TextEditingController venueAddressCtrl;
   late TextEditingController descriptionCtrl;
+  late TextEditingController latitudeCtrl;
+  late TextEditingController longitudeCtrl;
 
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
@@ -36,6 +38,12 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     venueCtrl = TextEditingController(text: e.venue);
     venueAddressCtrl = TextEditingController(text: e.venueAddress);
     descriptionCtrl = TextEditingController(text: e.description);
+    latitudeCtrl = TextEditingController(
+      text: e.latitude != null ? e.latitude!.toStringAsFixed(6) : '',
+    );
+    longitudeCtrl = TextEditingController(
+      text: e.longitude != null ? e.longitude!.toStringAsFixed(6) : '',
+    );
     selectedDate = DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day);
     selectedTime = TimeOfDay(hour: e.dateTime.hour, minute: e.dateTime.minute);
     marshalCallDate = e.marshalCallDate;
@@ -48,6 +56,8 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     venueCtrl.dispose();
     venueAddressCtrl.dispose();
     descriptionCtrl.dispose();
+    latitudeCtrl.dispose();
+    longitudeCtrl.dispose();
     super.dispose();
   }
 
@@ -93,6 +103,31 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     final timeString =
         "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
 
+    double? latitude;
+    double? longitude;
+    if (latitudeCtrl.text.trim().isNotEmpty) {
+      latitude = double.tryParse(latitudeCtrl.text.trim());
+      if (latitude == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Latitude must be a number (e.g. 52.9501)'),
+          ),
+        );
+        return;
+      }
+    }
+    if (longitudeCtrl.text.trim().isNotEmpty) {
+      longitude = double.tryParse(longitudeCtrl.text.trim());
+      if (longitude == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Longitude must be a number (e.g. 1.3012)'),
+          ),
+        );
+        return;
+      }
+    }
+
     final payload = {
       'title': titleCtrl.text.trim().isEmpty
           ? widget.event.title
@@ -103,6 +138,8 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
       'venue': venueCtrl.text.trim(),
       'venue_address': venueAddressCtrl.text.trim(),
       'description': descriptionCtrl.text.trim(),
+      'latitude': latitude,
+      'longitude': longitude,
       'marshal_call_date':
           (widget.event.eventType == 'race' ||
               widget.event.eventType == 'handicap_series')
@@ -196,6 +233,33 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
               TextFormField(
                 controller: venueAddressCtrl,
                 decoration: const InputDecoration(labelText: 'Venue Address'),
+              ),
+              TextFormField(
+                controller: latitudeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Latitude (optional)',
+                  hintText: '52.9501',
+                ),
+              ),
+              TextFormField(
+                controller: longitudeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Longitude (optional)',
+                  hintText: '1.3012',
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Tip: In Google Maps, right‑click the venue and copy the first number (lat) and second number (lon).",
+                style: TextStyle(fontSize: 12, color: Colors.white70),
               ),
               TextFormField(
                 controller: descriptionCtrl,

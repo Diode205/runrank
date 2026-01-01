@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
+import 'package:runrank/widgets/events/event_venue_preview.dart';
 
 /// Event details page for relay events (Relay)
 /// Group 3: Relay with multi-stage selection, pacing, and support roles
@@ -247,52 +248,6 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                       ),
                       const Divider(height: 32, color: Colors.white12),
 
-                      // Venue
-                      Text(
-                        "Venue",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        e.venue,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      ...(e.venueAddress.isNotEmpty
-                          ? [
-                              const SizedBox(height: 4),
-                              Text(
-                                e.venueAddress,
-                                style: const TextStyle(color: Colors.white60),
-                              ),
-                            ]
-                          : []),
-                      ...(e.latitude != null && e.longitude != null
-                          ? [
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: openMaps,
-                                icon: const Icon(Icons.map),
-                                label: const Text("Open in Maps"),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFD300),
-                                  side: const BorderSide(
-                                    color: Color(0xFFFFD300),
-                                  ),
-                                ),
-                              ),
-                            ]
-                          : []),
-                      const Divider(height: 32, color: Colors.white12),
-
                       // Details
                       Text(
                         "Details",
@@ -306,7 +261,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                       const SizedBox(height: 6),
                       Text(
                         e.description.isEmpty
-                            ? "No description provided."
+                            ? "No extra details yet. Check the map & weather above or contact the host if you have questions."
                             : e.description,
                         style: const TextStyle(
                           fontSize: 15,
@@ -317,6 +272,10 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                     ],
                   ),
                 ),
+                if (e.latitude != null && e.longitude != null) ...[
+                  const SizedBox(height: 20),
+                  EventVenuePreview(event: e, onOpenMaps: openMaps),
+                ],
                 const SizedBox(height: 24),
 
                 // Responses section

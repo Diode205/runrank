@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
+import 'package:runrank/widgets/events/event_venue_preview.dart';
 
 /// Event details page for simple events (Training, Special Event, Social Run, etc.)
 /// Group 1: Training_1/2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
@@ -22,6 +23,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
   @override
   Widget build(BuildContext context) {
     final e = widget.event;
+    final dt = e.dateTime;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -107,6 +109,87 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Date row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0x33FFD300),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.calendar_month,
+                              color: Color(0xFFFFD300),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "${weekday(dt)}, ${dt.day} ${month(dt.month)} ${dt.year}",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Time row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0x330057B7),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.access_time,
+                              color: Color(0xFF0057B7),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 32, color: Colors.white12),
+
+                      // Hosted By
+                      Text(
+                        "Hosted By",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        e.hostOrDirector.isNotEmpty
+                            ? e.hostOrDirector
+                            : "Not specified",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Divider(height: 32, color: Colors.white12),
+
                       // Details
                       Text(
                         "Details",
@@ -120,7 +203,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                       const SizedBox(height: 6),
                       Text(
                         e.description.isEmpty
-                            ? "No description provided."
+                            ? "No extra details yet. Check the map & weather above or contact the host if you have questions."
                             : e.description,
                         style: const TextStyle(
                           fontSize: 15,
@@ -131,6 +214,10 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                     ],
                   ),
                 ),
+                if (e.latitude != null && e.longitude != null) ...[
+                  const SizedBox(height: 20),
+                  EventVenuePreview(event: e, onOpenMaps: openMaps),
+                ],
                 const SizedBox(height: 24),
 
                 // Responses section
