@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
 import 'package:runrank/calculator_logic.dart';
-import 'package:runrank/standards_data.dart';
 import 'package:runrank/widgets/result_card.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
@@ -67,117 +68,129 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     'Marathon',
   ];
 
+  // Distances for the input form dropdown
+  final List<String> distances = const [
+    '5K',
+    '5M',
+    '10K',
+    '10M',
+    'Half M',
+    'Marathon',
+  ];
+
+  // Input controllers
+  final TextEditingController _raceNameController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _timeController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+
+  DateTime? _selectedRaceDate;
+  String _selectedDistance = '5K';
+  String _selectedGender = 'M';
+  String? _resultMessage;
+
+  // Award / badge state
   bool _loadingAwardStatus = false;
   String? _awardLevel;
   int _awardCount = 0;
   String? _awardError;
   bool _showBadgeOnRecordsButton = false;
 
+  // Admin flag
   bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
 
+    _scrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _scrollOffset = _scrollController.offset;
+        });
+      });
+
     _subTitleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     );
 
     _fadeAnimation = CurvedAnimation(
       parent: _subTitleController,
-      curve: Curves.easeOut,
+      curve: Curves.easeIn,
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
           CurvedAnimation(parent: _subTitleController, curve: Curves.easeOut),
         );
-    _scrollController = ScrollController()
-      ..addListener(() {
-        setState(() {
-          _scrollOffset = _scrollController.offset * 0.25;
-        });
-      });
 
-    // Image carousel animation
     _imageController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
     _imageFadeAnimation = CurvedAnimation(
       parent: _imageController,
       curve: Curves.easeInOut,
     );
 
-    // Start image carousel
+    _subTitleController.forward();
     _imageController.forward();
-    _imageTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
-        _imageController.reverse().then((_) {
-          setState(() {
-            _currentImageIndex =
-                (_currentImageIndex + 1) % _carouselImages.length;
-          });
-          _imageController.forward();
-        });
-      }
-    });
+    _startImageTimer();
 
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) _subTitleController.forward();
-    });
+    _initAdminAndStatus();
+  }
 
-    // Load admin flag for extra tools
-    UserService.isAdmin().then((isAdmin) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = isAdmin;
-        });
-      }
+  @override
+  void dispose() {
+    _imageTimer.cancel();
+    _scrollController.dispose();
+    _subTitleController.dispose();
+    _imageController.dispose();
+    _raceNameController.dispose();
+    _dateController.dispose();
+    _timeController.dispose();
+    _ageController.dispose();
+    super.dispose();
+  }
+
+  void _startImageTimer() {
+    _imageTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      setState(() {
+        _currentImageIndex = (_currentImageIndex + 1) % _carouselImages.length;
+      });
+      _imageController.forward(from: 0);
     });
   }
 
-  // ---------------------------------------------------------
-  // Helpers for Club Standard award computation
-  // ---------------------------------------------------------
-  int _levelIndex(String level) => _awardLevels.indexOf(level);
-
-  Color _levelColor(String level) {
-    switch (level) {
-      case 'Copper':
-        return const Color(0xFFB87333); // warm copper
-      case 'Bronze':
-        return const Color(0xFFCD7F32);
-      case 'Silver':
-        return const Color(0xFFC0C0C0);
-      case 'Gold':
-        return const Color(0xFFFFD700);
-      case 'Diamond':
-        return const Color(0xFF7DF9FF); // electric diamond blue
-      default:
-        return Colors.white70;
+  Future<void> _initAdminAndStatus() async {
+    _isAdmin = await UserService.isAdmin();
+    if (mounted) {
+      setState(() {});
     }
+    await _loadCurrentAwardStatus();
   }
 
   Future<void> _loadCurrentAwardStatus() async {
-    setState(() {
-      _loadingAwardStatus = true;
-      _awardError = null;
-    });
-
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
 
     if (user == null) {
       setState(() {
-        _loadingAwardStatus = false;
-        _awardError = 'Please sign in to see your club standard status.';
         _awardLevel = null;
         _awardCount = 0;
+        _awardError =
+            'Log in to see your Club Standard Award based on your race history.';
+        _showBadgeOnRecordsButton = false;
       });
       return;
     }
+
+    setState(() {
+      _loadingAwardStatus = true;
+      _awardError = null;
+    });
 
     try {
       final rows = await client
@@ -185,8 +198,18 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           .select('distance, level')
           .eq('user_id', user.id);
 
-      // Track best level achieved per distance
-      final Map<String, String> bestLevelByDistance = {
+      if (rows.isEmpty) {
+        setState(() {
+          _awardLevel = null;
+          _awardCount = 0;
+          _awardError =
+              'Once you have race records across our six key club distances, you\'ll see your overall Club Standard Award here.';
+          _showBadgeOnRecordsButton = false;
+        });
+        return;
+      }
+
+      final Map<String, String> bestByDistance = {
         for (final d in _awardDistances) d: '',
       };
 
@@ -197,27 +220,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         if (!_awardDistances.contains(distance)) continue;
         if (!_awardLevels.contains(level)) continue;
 
-        final current = bestLevelByDistance[distance] ?? '';
-        if (current.isEmpty) {
-          bestLevelByDistance[distance] = level;
-        } else {
-          final currentIdx = _levelIndex(current);
-          final newIdx = _levelIndex(level);
-          if (newIdx > currentIdx) {
-            bestLevelByDistance[distance] = level;
-          }
+        final current = bestByDistance[distance] ?? '';
+        if (current.isEmpty || _levelIndex(level) > _levelIndex(current)) {
+          bestByDistance[distance] = level;
         }
       }
 
-      // Count how many distances meet each possible award level (Copper..Diamond)
       String? achievedLevel;
-      int achievedCount = 0;
+      int contributingDistances = 0;
 
       for (final level in _awardLevels.reversed) {
         final requiredIdx = _levelIndex(level);
         int count = 0;
         for (final d in _awardDistances) {
-          final lv = bestLevelByDistance[d];
+          final lv = bestByDistance[d];
           if (lv == null || lv.isEmpty) continue;
           if (_levelIndex(lv) >= requiredIdx) {
             count++;
@@ -225,72 +241,88 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         }
         if (count >= 4) {
           achievedLevel = level;
-          achievedCount = count;
+          contributingDistances = count;
           break;
         }
       }
 
-      if (!mounted) return;
-
       setState(() {
-        _loadingAwardStatus = false;
         _awardLevel = achievedLevel;
-        _awardCount = achievedCount;
+        _awardCount = contributingDistances;
         if (achievedLevel == null) {
           _awardError =
-              'Not enough qualifying race results yet to earn an overall award.';
+              'You have some race records, but not yet across enough distances for an overall Club Standard Award.';
+          _showBadgeOnRecordsButton = false;
+        } else {
+          _awardError = null;
+          _showBadgeOnRecordsButton = true;
         }
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (_) {
       setState(() {
-        _loadingAwardStatus = false;
-        _awardError = 'Could not load your race history just now.';
         _awardLevel = null;
         _awardCount = 0;
+        _awardError = 'Could not load Club Standard status.';
+        _showBadgeOnRecordsButton = false;
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingAwardStatus = false;
+        });
+      }
     }
   }
 
-  // ---------------------------------------------------------
-  // Controllers
-  // ---------------------------------------------------------
-  final TextEditingController _raceNameController = TextEditingController();
-  final TextEditingController _timeController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController();
+  int _levelIndex(String level) {
+    final idx = _awardLevels.indexOf(level);
+    return idx < 0 ? -1 : idx;
+  }
 
-  String _selectedGender = 'M';
-  String _selectedDistance = '5K';
-  DateTime? _selectedRaceDate;
-
-  String? _resultMessage;
-
-  @override
-  void dispose() {
-    _raceNameController.dispose();
-    _timeController.dispose();
-    _ageController.dispose();
-    _dateController.dispose();
-    _subTitleController.dispose();
-    _scrollController.dispose();
-    _imageTimer.cancel();
-    _imageController.dispose();
-    super.dispose();
+  Color _levelColor(String level) {
+    switch (level) {
+      case 'Copper':
+        return const Color(0xFFB87333);
+      case 'Bronze':
+        return const Color(0xFFCD7F32);
+      case 'Silver':
+        return const Color(0xFFC0C0C0);
+      case 'Gold':
+        return const Color(0xFFFFD700);
+      case 'Diamond':
+        return const Color(0xFF00E5FF);
+      default:
+        return Colors.white;
+    }
   }
 
   Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      debugPrint('Could not launch $url');
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _pickRaceDate() async {
+    final now = DateTime.now();
+    final initial = _selectedRaceDate ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedRaceDate = picked;
+        _dateController.text =
+            '${picked.day.toString().padLeft(2, '0')} '
+            '${_monthShort(picked.month)} ${picked.year}';
+      });
     }
   }
 
-  // ---------------------------------------------------------
-  // Month formatting
-  // ---------------------------------------------------------
-  String _monthShort(int m) {
-    const months = [
+  String _monthShort(int month) {
+    const names = [
       'Jan',
       'Feb',
       'Mar',
@@ -304,37 +336,23 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       'Nov',
       'Dec',
     ];
-    return months[m - 1];
+    if (month < 1 || month > 12) return '';
+    return names[month - 1];
   }
 
-  // ---------------------------------------------------------
-  // Date picker
-  // ---------------------------------------------------------
-  Future<void> _pickRaceDate() async {
-    final today = DateTime.now();
-    final lastDate = DateTime(today.year, today.month, today.day);
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: lastDate,
-      firstDate: DateTime(2000),
-      lastDate: lastDate,
-    );
-
-    if (picked != null) {
-      _selectedRaceDate = picked;
-      setState(() {
-        _dateController.text =
-            "${picked.day.toString().padLeft(2, '0')} "
-            "${_monthShort(picked.month)} "
-            "${picked.year % 100}";
-      });
+  String _formatTime(int seconds) {
+    final hrs = seconds ~/ 3600;
+    final mins = (seconds % 3600) ~/ 60;
+    final secs = seconds % 60;
+    if (hrs > 0) {
+      return '${hrs.toString().padLeft(2, '0')}:'
+          '${mins.toString().padLeft(2, '0')}:'
+          '${secs.toString().padLeft(2, '0')}';
     }
+    return '${mins.toString().padLeft(2, '0')}:'
+        '${secs.toString().padLeft(2, '0')}';
   }
 
-  // ---------------------------------------------------------
-  // Submit to Supabase
-  // ---------------------------------------------------------
   Future<void> _submitToSupabase({
     required String race,
     required int age,
@@ -743,7 +761,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     } else {
       content = Text(
         _awardError ??
-            'Once you have race records across our six key club distances, you\'ll see your overall Club Standard Award here.',
+            'Tap "Check Your Award" to see your current overall Club Standard once you have race records across our six key club distances.',
         textAlign: TextAlign.center,
         style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
       );
@@ -805,7 +823,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                       ? null
                       : _loadCurrentAwardStatus,
                   icon: const Icon(Icons.flag_circle, size: 18),
-                  label: const Text('Check current status'),
+                  label: const Text('Check Your Award'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD700),
                     foregroundColor: Colors.black,
@@ -852,7 +870,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final client = Supabase.instance.client;
     final rows = await client
         .from('race_results')
-        .select('user_id, distance, level');
+        .select('user_id, distance, level, raceDate');
 
     final Map<String, Map<String, String>> perUserBestByDistance = {};
 
@@ -943,6 +961,350 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     return awardeesByLevel;
   }
 
+  Future<void> _exportVaultReportAsPdf(String title, String content) async {
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            content,
+            style: const pw.TextStyle(fontSize: 11, height: 1.3),
+          ),
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => doc.save());
+  }
+
+  Future<void> _showVaultReportSheet({
+    required String title,
+    required String content,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              media.viewInsets.bottom + 20,
+            ),
+            child: SizedBox(
+              height: media.size.height * 0.65,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        content,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(text: content),
+                            );
+                            if (Navigator.canPop(sheetContext)) {
+                              Navigator.pop(sheetContext);
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Copied report to clipboard.'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Copy'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(
+                              color: Colors.white38,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _exportVaultReportAsPdf(title, content);
+                          },
+                          icon: const Icon(Icons.picture_as_pdf, size: 18),
+                          label: const Text('Export PDF'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(
+                              color: Colors.white38,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            await Navigator.maybePop(sheetContext);
+                            await _publishListAsPostFromStandards(
+                              title: title,
+                              content: content,
+                            );
+                          },
+                          icon: const Icon(Icons.campaign, size: 18),
+                          label: const Text('Publish as post'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.yellow,
+                            foregroundColor: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<String?> _buildAgeGradeTopsReport() async {
+    final client = Supabase.instance.client;
+    final rows = await client
+        .from('race_results')
+        .select('user_id, race_name, distance, age_grade, level, raceDate')
+        .order('raceDate', ascending: false);
+
+    if (rows.isEmpty) return null;
+
+    final Map<String, List<Map<String, dynamic>>> byDistance = {};
+    final Set<String> userIds = {};
+
+    for (final row in rows) {
+      final distance = (row['distance'] as String?) ?? '';
+      if (!_awardDistances.contains(distance)) continue;
+
+      final ageGradeRaw = row['age_grade'];
+      final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+      if (ageGrade <= 0) continue;
+
+      byDistance.putIfAbsent(distance, () => <Map<String, dynamic>>[]);
+      byDistance[distance]!.add(row);
+
+      final userId = row['user_id'] as String?;
+      if (userId != null) {
+        userIds.add(userId);
+      }
+    }
+
+    if (byDistance.isEmpty) return null;
+
+    final Map<String, String> idToName = {};
+    if (userIds.isNotEmpty) {
+      final profiles = await client
+          .from('user_profiles')
+          .select('id, full_name')
+          .inFilter('id', userIds.toList());
+
+      for (final p in profiles) {
+        final id = p['id'] as String?;
+        if (id == null) continue;
+        final name = (p['full_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          idToName[id] = name;
+        }
+      }
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Latest Age-Grade Tops');
+    buffer.writeln('');
+
+    for (final distance in _awardDistances) {
+      final list = byDistance[distance];
+      if (list == null || list.isEmpty) continue;
+
+      list.sort((a, b) {
+        final agA = (a['age_grade'] is num)
+            ? (a['age_grade'] as num).toDouble()
+            : 0.0;
+        final agB = (b['age_grade'] is num)
+            ? (b['age_grade'] as num).toDouble()
+            : 0.0;
+        final dateA =
+            DateTime.tryParse(a['raceDate'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB =
+            DateTime.tryParse(b['raceDate'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+
+        final cmp = agB.compareTo(agA);
+        if (cmp != 0) return cmp;
+        return dateB.compareTo(dateA);
+      });
+
+      final top = list.take(3).toList();
+      buffer.writeln('$distance — Top ${top.length}');
+
+      for (var i = 0; i < top.length; i++) {
+        final row = top[i];
+        final userId = row['user_id'] as String?;
+        final name = idToName[userId] ?? 'Unknown member';
+        final raceName = (row['race_name'] as String?)?.trim();
+        final level = (row['level'] as String?) ?? '';
+        final ageGradeRaw = row['age_grade'];
+        final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+        final raceDateStr = row['raceDate'] as String?;
+        String dateLabel = '';
+        if (raceDateStr != null) {
+          final dt = DateTime.tryParse(raceDateStr);
+          if (dt != null) {
+            dateLabel =
+                '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year % 100}';
+          }
+        }
+
+        buffer.writeln(
+          '${i + 1}) $name — ${raceName ?? 'Unknown race'} — '
+          '${ageGrade.toStringAsFixed(1)}%'
+          '${level.isNotEmpty ? ' ($level)' : ''}'
+          '${dateLabel.isNotEmpty ? ' — $dateLabel' : ''}',
+        );
+      }
+
+      buffer.writeln('');
+    }
+
+    final text = buffer.toString().trimRight();
+    return text.isEmpty ? null : text;
+  }
+
+  Future<String?> _buildWeeklyRunningReport() async {
+    final client = Supabase.instance.client;
+
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartDate = DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day,
+    );
+    final weekEndDate = weekStartDate.add(const Duration(days: 7));
+
+    final rows = await client
+        .from('race_results')
+        .select(
+          'user_id, race_name, distance, age_grade, level, raceDate, time_seconds',
+        )
+        .gte('raceDate', weekStartDate.toIso8601String())
+        .lt('raceDate', weekEndDate.toIso8601String())
+        .order('raceDate', ascending: true);
+
+    if (rows.isEmpty) return null;
+
+    final Set<String> userIds = {};
+    for (final row in rows) {
+      final userId = row['user_id'] as String?;
+      if (userId != null) {
+        userIds.add(userId);
+      }
+    }
+
+    final Map<String, String> idToName = {};
+    if (userIds.isNotEmpty) {
+      final profiles = await client
+          .from('user_profiles')
+          .select('id, full_name')
+          .inFilter('id', userIds.toList());
+
+      for (final p in profiles) {
+        final id = p['id'] as String?;
+        if (id == null) continue;
+        final name = (p['full_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          idToName[id] = name;
+        }
+      }
+    }
+
+    final weekEndInclusive = weekStartDate.add(const Duration(days: 6));
+
+    final buffer = StringBuffer();
+    buffer.writeln("Sunday's Running Report");
+    buffer.writeln(
+      'Week of '
+      '${weekStartDate.day.toString().padLeft(2, '0')} '
+      '${_monthShort(weekStartDate.month)} ${weekStartDate.year} '
+      'to '
+      '${weekEndInclusive.day.toString().padLeft(2, '0')} '
+      '${_monthShort(weekEndInclusive.month)} ${weekEndInclusive.year}',
+    );
+    buffer.writeln('');
+
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    for (final row in rows) {
+      final userId = row['user_id'] as String?;
+      final name = idToName[userId] ?? 'Unknown member';
+      final raceName = (row['race_name'] as String?)?.trim();
+      final distance = (row['distance'] as String?) ?? '';
+      final level = (row['level'] as String?) ?? '';
+      final ageGradeRaw = row['age_grade'];
+      final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+      final timeSecondsRaw = row['time_seconds'];
+      final timeSeconds = timeSecondsRaw is num ? timeSecondsRaw.toInt() : 0;
+
+      final raceDateStr = row['raceDate'] as String?;
+      String dateLabel = '';
+      if (raceDateStr != null) {
+        final dt = DateTime.tryParse(raceDateStr);
+        if (dt != null) {
+          final weekday = weekdays[dt.weekday - 1];
+          dateLabel =
+              '$weekday ${dt.day.toString().padLeft(2, '0')} ${_monthShort(dt.month)}';
+        }
+      }
+
+      final timeLabel = timeSeconds > 0 ? _formatTime(timeSeconds) : null;
+
+      buffer.writeln(
+        '• ${dateLabel.isNotEmpty ? '$dateLabel — ' : ''}'
+        '$name — ${raceName ?? 'Unknown race'} '
+        '(${distance.isNotEmpty ? distance : 'distance n/a'})'
+        '${timeLabel != null ? ' — $timeLabel' : ''}'
+        '${ageGrade > 0 ? ' — ${ageGrade.toStringAsFixed(1)}%' : ''}'
+        '${level.isNotEmpty ? ' — [$level]' : ''}',
+      );
+    }
+
+    final text = buffer.toString().trimRight();
+    return text.isEmpty ? null : text;
+  }
+
   Widget _buildAdminAwardsSection() {
     if (!_isAdmin) return const SizedBox.shrink();
 
@@ -957,31 +1319,33 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: const [
               Icon(
                 Icons.admin_panel_settings,
                 color: Colors.redAccent,
-                size: 22,
+                size: 24,
               ),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Admin 3 Club Standard Awardees',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+              SizedBox(height: 6),
+              Text(
+                "The Secretary's Vault",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
           const Text(
-            'Quickly see and export today\'s snapshot of members who currently qualify for a Club Standard award (based on submitted race records).',
+            'Admin-only reports based on all submitted race records.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () async {
               final awardeesByLevel = await _loadAllAwardsSnapshot();
@@ -998,7 +1362,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
               final now = DateTime.now();
               final title =
-                  'Club Standards Awardees 3 ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+                  'Latest Club Standard Awardees'
+                  ' — updated to '
+                  '${now.day.toString().padLeft(2, '0')} '
+                  '${_monthShort(now.month)} ${now.year}';
 
               final buffer = StringBuffer();
               buffer.writeln(title);
@@ -1014,99 +1381,60 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               }
 
               final content = buffer.toString().trimRight();
-
-              await showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.grey.shade900,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (_) {
-                  return Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Text(
-                              content,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  await Clipboard.setData(
-                                    ClipboardData(text: content),
-                                  );
-                                  if (Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  }
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Copied awardees list.'),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.copy, size: 18),
-                                label: const Text('Copy'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: const BorderSide(
-                                    color: Colors.white38,
-                                    width: 1,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  await Navigator.maybePop(context);
-                                  await _publishListAsPostFromStandards(
-                                    title: title,
-                                    content: content,
-                                  );
-                                },
-                                icon: const Icon(Icons.campaign, size: 18),
-                                label: const Text('Publish as post'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.yellow,
-                                  foregroundColor: Colors.black,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
+              await _showVaultReportSheet(title: title, content: content);
             },
-            icon: const Icon(Icons.list_alt, size: 18),
-            label: const Text('Admin: Club Standards Awardees (today)'),
+            icon: const Icon(Icons.workspace_premium, size: 18),
+            label: const Text('Latest Club Standard Awardees'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
+              backgroundColor: Colors.redAccent.withValues(alpha: 0.85),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final content = await _buildAgeGradeTopsReport();
+              if (!mounted) return;
+              if (content == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No age-grade records found yet.'),
+                  ),
+                );
+                return;
+              }
+
+              const title = 'Latest Age-Grade Tops';
+              await _showVaultReportSheet(title: title, content: content);
+            },
+            icon: const Icon(Icons.leaderboard, size: 18),
+            label: const Text('Latest Age-Grade Tops'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0055FF),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final content = await _buildWeeklyRunningReport();
+              if (!mounted) return;
+              if (content == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No race results found for this week yet.'),
+                  ),
+                );
+                return;
+              }
+
+              const title = "Sunday's Running Report";
+              await _showVaultReportSheet(title: title, content: content);
+            },
+            icon: const Icon(Icons.calendar_today, size: 18),
+            label: const Text("Sunday's Running Report"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.withValues(alpha: 0.85),
               foregroundColor: Colors.white,
             ),
           ),
@@ -1469,7 +1797,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                       ),
                     ),
-                    if (_showBadgeOnRecordsButton && _awardLevel != null)
+                    if (_showBadgeOnRecordsButton)
                       Positioned(
                         top: -6,
                         right: -6,

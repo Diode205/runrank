@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/payment_service.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:runrank/main.dart' show routeObserver;
 
 class MembershipPage extends StatefulWidget {
@@ -14,6 +18,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   final _client = Supabase.instance.client;
 
   bool _loading = true;
+  bool _isAdmin = false;
   String? _memberSince;
   String? _membershipType;
   String? _fullName;
@@ -25,6 +30,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   @override
   void initState() {
     super.initState();
+    _initAdmin();
     _loadMembershipData();
   }
 
@@ -109,6 +115,34 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     } catch (_) {
       return "Not set";
     }
+  }
+
+  String _formatFullDate(DateTime dt) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = months[dt.month - 1];
+    return "$day $month ${dt.year}";
+  }
+
+  Future<void> _initAdmin() async {
+    final isAdmin = await UserService.isAdmin();
+    if (!mounted) return;
+    setState(() {
+      _isAdmin = isAdmin;
+    });
   }
 
   @override
@@ -397,26 +431,39 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white12),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "About NNBR Membership",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Text(
+                  "About NNBR Membership",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              if (_isAdmin)
+                IconButton(
+                  icon: const Icon(Icons.list_alt, color: Colors.white70),
+                  tooltip: 'View membership status report (admin only)',
+                  onPressed: _showMembershipStatusReport,
+                ),
+            ],
           ),
-          SizedBox(height: 12),
-          Text(
+          const SizedBox(height: 12),
+          const Text(
             "North Norfolk Beach Runners welcome runners of all levels. "
             "Memberships include access to club training sessions, group runs, "
             "club events, social activities, and being part of a friendly and inclusive community.",
             style: TextStyle(fontSize: 13, color: Colors.white70),
           ),
-          SizedBox(height: 12),
-          Text(
+          const SizedBox(height: 12),
+          const Text(
             "Membership is renewed annually. Fees directly support club activities, "
             "equipment, coaching, and community events.",
             style: TextStyle(fontSize: 13, color: Colors.white70),
@@ -424,6 +471,211 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ],
       ),
     );
+  }
+
+  Future<void> _showMembershipStatusReport() async {
+    try {
+      final rows = await _client
+          .from('user_profiles')
+          .select('full_name, email, membership_type, member_since')
+          .order('full_name');
+
+      if (rows.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No members found for report.')),
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final buffer = StringBuffer();
+      buffer.writeln('NNBR Membership Status Report');
+      buffer.writeln('Generated on ${_formatFullDate(now)}');
+      buffer.writeln('');
+      buffer.writeln('Name — Membership type — Member since — Renewal due');
+      buffer.writeln('');
+
+      for (final row in rows) {
+        final name = (row['full_name'] as String?)?.trim();
+        final email = (row['email'] as String?)?.trim();
+        final membershipType = (row['membership_type'] as String?)?.trim();
+        final memberSinceStr = row['member_since'] as String?;
+
+        String memberSinceLabel = 'Not set';
+        String renewalLabel = 'Unknown';
+
+        if (memberSinceStr != null) {
+          try {
+            final dt = DateTime.parse(memberSinceStr);
+            memberSinceLabel = _formatMonthYear(memberSinceStr);
+            final due = DateTime(dt.year + 1, dt.month, dt.day);
+            renewalLabel = _formatFullDate(due);
+          } catch (_) {
+            memberSinceLabel = 'Not set';
+            renewalLabel = 'Unknown';
+          }
+        }
+
+        final displayName = (name != null && name.isNotEmpty)
+            ? name
+            : (email ?? 'Unknown');
+        final typeLabel = (membershipType != null && membershipType.isNotEmpty)
+            ? membershipType
+            : 'Not assigned';
+
+        buffer.writeln(
+          '$displayName — $typeLabel — $memberSinceLabel — $renewalLabel',
+        );
+      }
+
+      final content = buffer.toString().trimRight();
+      if (!mounted) return;
+      await _showMembershipReportSheet(
+        title: 'NNBR Membership Status Report',
+        content: content,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading membership report: $e')),
+      );
+    }
+  }
+
+  Future<void> _showMembershipReportSheet({
+    required String title,
+    required String content,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              media.viewInsets.bottom + 20,
+            ),
+            child: SizedBox(
+              height: media.size.height * 0.65,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        content,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(text: content),
+                            );
+                            if (Navigator.canPop(sheetContext)) {
+                              Navigator.pop(sheetContext);
+                            }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Copied membership report to clipboard.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Copy'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(
+                              color: Colors.white38,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _exportMembershipReportAsPdf(title, content);
+                          },
+                          icon: const Icon(Icons.picture_as_pdf, size: 18),
+                          label: const Text('Export PDF'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(
+                              color: Colors.white38,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _exportMembershipReportAsPdf(
+    String title,
+    String content,
+  ) async {
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            title,
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            content,
+            style: const pw.TextStyle(fontSize: 11, height: 1.3),
+          ),
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => doc.save());
   }
 
   void _handleBuy(String tierName) {
