@@ -11,7 +11,11 @@ class ClubEvent {
   final String? title;
   final DateTime dateTime; // Combined date + time
 
+  /// Display name of the host/director for UI.
   final String hostOrDirector;
+
+  /// Optional user id of the host/director for messaging and notifications.
+  final String? hostUserId;
   final String venue;
   final String venueAddress;
   final String description;
@@ -39,6 +43,7 @@ class ClubEvent {
     required this.title,
     required this.dateTime,
     required this.hostOrDirector,
+    required this.hostUserId,
     required this.venue,
     required this.venueAddress,
     required this.description,
@@ -82,6 +87,7 @@ class ClubEvent {
       title: row['title'],
       dateTime: dt,
       hostOrDirector: row['host_or_director'] ?? "",
+      hostUserId: row['host_user_id']?.toString(),
       venue: row['venue'] ?? "",
       venueAddress: row['venue_address'] ?? "",
       description: row['description'] ?? "",

@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
 
-// Prevent log spam when the backend table is missing.
+// Prevent log spam when backend tables are missing.
 bool _commentsTableMissing = false;
+bool _commentReactionsTableMissing = false;
+bool _hostMessageReactionsTableMissing = false;
+
+// Shared reaction emoji palette (mirrors post reactions).
+const List<String> _reactionEmojis = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 
 /// Reusable dialog widgets for event details pages
 
@@ -198,6 +203,7 @@ class HostChatSheet extends StatefulWidget {
 }
 
 class HostChatSheetState extends State<HostChatSheet> {
+  final _supabase = Supabase.instance.client;
   final _headerShadow = BoxShadow(
     color: const Color(0x59000000),
     blurRadius: 16,
@@ -207,6 +213,8 @@ class HostChatSheetState extends State<HostChatSheet> {
   bool _loading = true;
   bool _sending = false;
   List<Map<String, dynamic>> _messages = [];
+  // messageId -> { emoji -> [userIds] }
+  Map<String, Map<String, List<String>>> _messageReactions = {};
   ScrollController? _listController;
 
   @override
@@ -231,6 +239,8 @@ class HostChatSheetState extends State<HostChatSheet> {
       _loading = false;
       if (mounted) setState(() {});
       _scrollToBottom();
+      // Load reactions after messages so counts are accurate.
+      await _loadMessageReactions();
     } catch (e) {
       if (!mounted) return;
       _loading = false;
@@ -253,6 +263,163 @@ class HostChatSheetState extends State<HostChatSheet> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  Future<void> _loadMessageReactions() async {
+    if (_hostMessageReactionsTableMissing) return;
+
+    final ids = _messages
+        .map((m) => m['id'])
+        .where((id) => id != null)
+        .map((id) => id.toString())
+        .toList();
+    if (ids.isEmpty) return;
+
+    try {
+      final rows = await _supabase
+          .from('event_host_message_reactions')
+          .select('message_id, user_id, emoji')
+          .inFilter('message_id', ids);
+
+      final map = <String, Map<String, List<String>>>{};
+
+      for (final row in rows) {
+        final messageId = row['message_id']?.toString();
+        final userId = row['user_id']?.toString();
+        final emoji = row['emoji'] as String?;
+        if (messageId == null || userId == null || emoji == null) continue;
+
+        map.putIfAbsent(messageId, () => <String, List<String>>{});
+        map[messageId]!.putIfAbsent(emoji, () => <String>[]);
+        map[messageId]![emoji]!.add(userId);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _messageReactions = map;
+      });
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') {
+        _hostMessageReactionsTableMissing = true;
+        debugPrint(
+          'event_host_message_reactions table missing; skipping reaction fetches',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading host message reactions: $e');
+    }
+  }
+
+  Future<void> _toggleMessageReaction(String messageId, String emoji) async {
+    if (_hostMessageReactionsTableMissing) return;
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final usersForEmoji =
+          _messageReactions[messageId]?[emoji] ?? const <String>[];
+      final hasReacted = usersForEmoji.contains(user.id);
+
+      if (hasReacted) {
+        await _supabase
+            .from('event_host_message_reactions')
+            .delete()
+            .eq('message_id', messageId)
+            .eq('user_id', user.id)
+            .eq('emoji', emoji);
+      } else {
+        await _supabase.from('event_host_message_reactions').insert({
+          'message_id': messageId,
+          'user_id': user.id,
+          'emoji': emoji,
+        });
+      }
+
+      await _loadMessageReactions();
+    } catch (e) {
+      debugPrint('❌ Error toggling host message reaction: $e');
+    }
+  }
+
+  Widget _buildMessageReactionsRow(String messageId) {
+    if (_hostMessageReactionsTableMissing || messageId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final emojiMap =
+        _messageReactions[messageId] ?? const <String, List<String>>{};
+    if (emojiMap.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final entry in emojiMap.entries)
+            if (entry.value.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(entry.key),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${entry.value.length}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showMessageReactionPicker(String messageId) async {
+    if (_hostMessageReactionsTableMissing || messageId.isEmpty) return;
+
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: _reactionEmojis
+                  .map(
+                    (emoji) => GestureDetector(
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        await _toggleMessageReaction(messageId, emoji);
+                      },
+                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _formatTime(String? isoString) {
@@ -453,6 +620,75 @@ class HostChatSheetState extends State<HostChatSheet> {
                               msg['created_at'] as String?,
                             );
 
+                            final name = sender;
+                            final initials = name.isNotEmpty
+                                ? name
+                                      .trim()
+                                      .split(' ')
+                                      .map((p) => p.isNotEmpty ? p[0] : '')
+                                      .join()
+                                : 'U';
+
+                            final messageBubble = GestureDetector(
+                              onLongPress: () => _showMessageReactionPicker(
+                                msg['id']?.toString() ?? '',
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: isMine
+                                      ? const Color(0xD90057B7)
+                                      : Colors.grey.shade800,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white12,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: isMine
+                                        ? CrossAxisAlignment.end
+                                        : CrossAxisAlignment.start,
+                                    children: [
+                                      if (ts.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                ts,
+                                                style: const TextStyle(
+                                                  color: Color(0x8CFFFFFF),
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      Text(
+                                        (msg['message'] as String?) ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      _buildMessageReactionsRow(
+                                        msg['id']?.toString() ?? '',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Align(
@@ -462,64 +698,30 @@ class HostChatSheetState extends State<HostChatSheet> {
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
                                     maxWidth:
-                                        MediaQuery.of(context).size.width *
-                                        0.75,
+                                        MediaQuery.of(context).size.width * 0.8,
                                   ),
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: isMine
-                                          ? const Color(0xD90057B7)
-                                          : Colors.grey.shade800,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: Colors.white12,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        crossAxisAlignment: isMine
-                                            ? CrossAxisAlignment.end
-                                            : CrossAxisAlignment.start,
-                                        children: [
-                                          if (!isMine)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4,
-                                              ),
+                                  child: isMine
+                                      ? messageBubble
+                                      : Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 18,
+                                              backgroundColor: Colors.white12,
                                               child: Text(
-                                                sender,
+                                                initials.toUpperCase(),
                                                 style: const TextStyle(
-                                                  color: Colors.white70,
+                                                  color: Colors.white,
+                                                  fontSize: 13,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ),
-                                          Text(
-                                            (msg['message'] as String?) ?? '',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                          if (ts.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 6,
-                                              ),
-                                              child: Text(
-                                                ts,
-                                                style: const TextStyle(
-                                                  color: Color(0x8CFFFFFF),
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: messageBubble),
+                                          ],
+                                        ),
                                 ),
                               ),
                             );
@@ -676,8 +878,11 @@ class CommentsSheet extends StatefulWidget {
 }
 
 class CommentsSheetState extends State<CommentsSheet> {
+  final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _comments = [];
   bool _loading = true;
+  // commentId -> { emoji -> [userIds] }
+  Map<String, Map<String, List<String>>> _commentReactions = {};
 
   @override
   void initState() {
@@ -695,10 +900,152 @@ class CommentsSheetState extends State<CommentsSheet> {
         _comments = data;
         _loading = false;
       });
+      await _loadCommentReactions();
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadCommentReactions() async {
+    if (_commentReactionsTableMissing) return;
+
+    final ids = _comments
+        .map((c) => c['id'])
+        .where((id) => id != null)
+        .map((id) => id.toString())
+        .toList();
+    if (ids.isEmpty) return;
+
+    try {
+      final rows = await _supabase
+          .from('event_comment_reactions')
+          .select('comment_id, user_id, emoji')
+          .inFilter('comment_id', ids);
+
+      final map = <String, Map<String, List<String>>>{};
+
+      for (final row in rows) {
+        final commentId = row['comment_id']?.toString();
+        final userId = row['user_id']?.toString();
+        final emoji = row['emoji'] as String?;
+        if (commentId == null || userId == null || emoji == null) continue;
+
+        map.putIfAbsent(commentId, () => <String, List<String>>{});
+        map[commentId]!.putIfAbsent(emoji, () => <String>[]);
+        map[commentId]![emoji]!.add(userId);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _commentReactions = map;
+      });
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') {
+        _commentReactionsTableMissing = true;
+        debugPrint(
+          'event_comment_reactions table missing; skipping reaction fetches',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading comment reactions: $e');
+    }
+  }
+
+  Future<void> _toggleCommentReaction(String commentId, String emoji) async {
+    if (_commentReactionsTableMissing) return;
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final usersForEmoji =
+          _commentReactions[commentId]?[emoji] ?? const <String>[];
+      final hasReacted = usersForEmoji.contains(user.id);
+
+      if (hasReacted) {
+        await _supabase
+            .from('event_comment_reactions')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', user.id)
+            .eq('emoji', emoji);
+      } else {
+        await _supabase.from('event_comment_reactions').insert({
+          'comment_id': commentId,
+          'user_id': user.id,
+          'emoji': emoji,
+        });
+      }
+
+      await _loadCommentReactions();
+    } catch (e) {
+      debugPrint('❌ Error toggling comment reaction: $e');
+    }
+  }
+
+  Widget _buildCommentReactionsRow(String commentId) {
+    if (_commentReactionsTableMissing || commentId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final currentUserId = _supabase.auth.currentUser?.id;
+    final emojiMap =
+        _commentReactions[commentId] ?? const <String, List<String>>{};
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _reactionEmojis.map((emoji) {
+            final users = emojiMap[emoji] ?? const <String>[];
+            final count = users.length;
+            final isSelected =
+                currentUserId != null && users.contains(currentUserId);
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: GestureDetector(
+                onTap: () => _toggleCommentReaction(commentId, emoji),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.blue.withValues(alpha: 0.3)
+                        : Colors.grey.shade900,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.white10,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 14)),
+                      if (count > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade300,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -798,6 +1145,7 @@ class CommentsSheetState extends State<CommentsSheet> {
                             final name = c['fullName'] as String? ?? 'User';
                             final text = c['comment'] as String? ?? '';
                             final ts = c['timestamp'] as String?;
+                            final commentId = c['id']?.toString() ?? '';
                             return ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: Colors.white10,
@@ -831,6 +1179,7 @@ class CommentsSheetState extends State<CommentsSheet> {
                                         ),
                                       ),
                                     ),
+                                  _buildCommentReactionsRow(commentId),
                                 ],
                               ),
                             );
@@ -950,7 +1299,7 @@ Future<List<Map<String, dynamic>>> getCommentsWithNames({
   try {
     final commentRows = await supabase
         .from('event_comments')
-        .select('user_id, comment, timestamp')
+        .select('id, user_id, comment, timestamp')
         .eq('event_id', eventId)
         .order('timestamp');
 
@@ -973,6 +1322,7 @@ Future<List<Map<String, dynamic>>> getCommentsWithNames({
     return [
       for (final c in commentRows)
         {
+          'id': c['id'],
           'userId': c['user_id'] as String?,
           'fullName': idToName[(c['user_id'] as String?) ?? ''] ?? 'Unknown',
           'comment': c['comment'] as String?,

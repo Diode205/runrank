@@ -54,9 +54,6 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   void initState() {
     super.initState();
     loadResponses();
-    // Also load existing comments immediately so the inline
-    // comments section is populated on first open.
-    loadComments();
   }
 
   Future<void> loadResponses() async {

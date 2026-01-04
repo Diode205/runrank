@@ -468,6 +468,20 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             "equipment, coaching, and community events.",
             style: TextStyle(fontSize: 13, color: Colors.white70),
           ),
+          SizedBox(height: 12),
+          if (_isAdmin)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _showLapsedRenewalsReport,
+                icon: const Icon(Icons.warning_amber_rounded, size: 18),
+                label: const Text('View lapsed renewals list'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orangeAccent,
+                  side: const BorderSide(color: Colors.orangeAccent, width: 1),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -539,6 +553,103 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading membership report: $e')),
+      );
+    }
+  }
+
+  Future<void> _showLapsedRenewalsReport() async {
+    try {
+      final rows = await _client
+          .from('user_profiles')
+          .select('full_name, email, membership_type, member_since')
+          .order('full_name');
+
+      if (rows.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No members found for report.')),
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      final lapsed = <Map<String, dynamic>>[];
+
+      for (final row in rows) {
+        final name = (row['full_name'] as String?)?.trim();
+        final email = (row['email'] as String?)?.trim();
+        final membershipType = (row['membership_type'] as String?)?.trim();
+        final memberSinceStr = row['member_since'] as String?;
+
+        if (memberSinceStr == null) {
+          continue; // cannot compute renewal without a start date
+        }
+
+        try {
+          final dt = DateTime.parse(memberSinceStr);
+          final due = DateTime(dt.year + 1, dt.month, dt.day);
+          final dueDateOnly = DateTime(due.year, due.month, due.day);
+          if (dueDateOnly.isBefore(today)) {
+            final displayName = (name != null && name.isNotEmpty)
+                ? name
+                : (email ?? 'Unknown');
+            final typeLabel =
+                (membershipType != null && membershipType.isNotEmpty)
+                ? membershipType
+                : 'Not assigned';
+            lapsed.add({
+              'name': displayName,
+              'type': typeLabel,
+              'memberSinceLabel': _formatMonthYear(memberSinceStr),
+              'renewalLabel': _formatFullDate(due),
+              'due': dueDateOnly,
+            });
+          }
+        } catch (_) {
+          // ignore rows with invalid dates
+        }
+      }
+
+      if (lapsed.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No lapsed renewals found.')),
+        );
+        return;
+      }
+
+      lapsed.sort((a, b) {
+        final da = a['due'] as DateTime;
+        final db = b['due'] as DateTime;
+        return da.compareTo(db);
+      });
+
+      final buffer = StringBuffer();
+      buffer.writeln('Lapsed Membership Renewals');
+      buffer.writeln('Generated on ${_formatFullDate(now)}');
+      buffer.writeln('');
+      buffer.writeln('Name — Membership type — Member since — Renewal due');
+      buffer.writeln('');
+
+      for (final entry in lapsed) {
+        buffer.writeln(
+          '${entry['name']} — ${entry['type']} — '
+          '${entry['memberSinceLabel']} — ${entry['renewalLabel']}',
+        );
+      }
+
+      final content = buffer.toString().trimRight();
+      if (!mounted) return;
+      await _showMembershipReportSheet(
+        title: 'Lapsed Membership Renewals',
+        content: content,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading lapsed renewals: $e')),
       );
     }
   }

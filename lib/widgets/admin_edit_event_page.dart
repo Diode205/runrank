@@ -29,6 +29,10 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
 
   bool _saving = false;
 
+  // Host selection
+  List<Map<String, dynamic>> _hosts = [];
+  String? _selectedHostId;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +51,8 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     selectedDate = DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day);
     selectedTime = TimeOfDay(hour: e.dateTime.hour, minute: e.dateTime.minute);
     marshalCallDate = e.marshalCallDate;
+
+    _loadHosts();
   }
 
   @override
@@ -89,6 +95,48 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
       lastDate: now.add(const Duration(days: 365 * 2)),
     );
     if (picked != null) setState(() => marshalCallDate = picked);
+  }
+
+  Future<void> _loadHosts() async {
+    try {
+      final rows = await supabase
+          .from('user_profiles')
+          .select('id, full_name')
+          .order('full_name');
+
+      setState(() {
+        _hosts = rows
+            .map<Map<String, dynamic>>(
+              (r) => {
+                'id': r['id'] as String,
+                'full_name': (r['full_name'] as String?) ?? 'Member',
+              },
+            )
+            .toList();
+
+        // Prefer explicit host_user_id, then created_by, then keep existing.
+        final existingHostId =
+            widget.event.hostUserId ?? widget.event.createdBy;
+        Map<String, dynamic>? initial;
+        if (existingHostId != null) {
+          initial = _hosts.firstWhere(
+            (h) => h['id'] == existingHostId,
+            orElse: () => _hosts.isNotEmpty
+                ? _hosts.first
+                : <String, dynamic>{'id': null, 'full_name': ''},
+          );
+        } else if (_hosts.isNotEmpty) {
+          initial = _hosts.first;
+        }
+
+        if (initial != null && initial['id'] != null) {
+          _selectedHostId = initial['id'] as String;
+          hostCtrl.text = initial['full_name'] as String;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading hosts for edit: $e');
+    }
   }
 
   Future<void> _save() async {
@@ -135,6 +183,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
       'date': selectedDate!.toIso8601String().split('T').first,
       'time': timeString,
       'host_or_director': hostCtrl.text.trim(),
+      'host_user_id': _selectedHostId,
       'venue': venueCtrl.text.trim(),
       'venue_address': venueAddressCtrl.text.trim(),
       'description': descriptionCtrl.text.trim(),
@@ -220,9 +269,27 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: hostCtrl,
+              DropdownButtonFormField<String>(
+                value: _selectedHostId,
                 decoration: const InputDecoration(labelText: 'Host / Director'),
+                items: _hosts
+                    .map(
+                      (h) => DropdownMenuItem<String>(
+                        value: h['id'] as String,
+                        child: Text((h['full_name'] as String?) ?? 'Member'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedHostId = value;
+                    final match = _hosts.firstWhere(
+                      (h) => h['id'] == value,
+                      orElse: () => <String, dynamic>{'full_name': ''},
+                    );
+                    hostCtrl.text = (match['full_name'] as String?) ?? '';
+                  });
+                },
               ),
               TextFormField(
                 controller: venueCtrl,

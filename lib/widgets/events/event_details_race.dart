@@ -304,49 +304,69 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 // Comments section
                 Text("Comments", style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: _openCommentsSheet,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0x40000000),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0x40000000),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                buildInlineCommentsPreview(),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x40000000),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0x40000000),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.white12,
+                        child: Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.white70,
+                          size: 18,
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: const [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.white12,
-                          child: Icon(
-                            Icons.add,
-                            color: Colors.white70,
-                            size: 18,
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            "Add a comment...",
-                            style: TextStyle(
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: commentController,
+                          minLines: 1,
+                          maxLines: 3,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: 'Add a comment...',
+                            hintStyle: TextStyle(
                               color: Colors.white54,
                               fontSize: 15,
                             ),
+                            border: InputBorder.none,
+                            isCollapsed: false,
+                            contentPadding: EdgeInsets.symmetric(vertical: 10),
                           ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) async {
+                            await _submitComment();
+                            commentController.clear();
+                          },
                         ),
-                        Icon(Icons.keyboard_arrow_up, color: Colors.white38),
-                      ],
-                    ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send, color: Colors.white70),
+                        onPressed: () async {
+                          if (commentController.text.trim().isEmpty) return;
+                          await _submitComment();
+                          commentController.clear();
+                        },
+                      ),
+                    ],
                   ),
                 ),
 
@@ -558,7 +578,10 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   }
 
   Future<void> _contactHost() async {
-    final hostUserId = widget.event.createdBy ?? supabase.auth.currentUser?.id;
+    final hostUserId =
+        widget.event.hostUserId ??
+        widget.event.createdBy ??
+        supabase.auth.currentUser?.id;
     if (hostUserId == null || hostUserId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -590,28 +613,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   Future<void> _submitComment() async {
     final comment = commentController.text.trim();
     if (comment.isEmpty) return;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    await supabase.from("event_comments").insert({
-      "event_id": widget.event.id,
-      "user_id": user.id,
-      "comment": comment,
-      "timestamp": DateTime.now().toIso8601String(),
-    });
-  }
-
-  Future<void> _openCommentsSheet() async {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => CommentsSheet(
-        eventId: widget.event.id,
-        commentController: commentController,
-        onCommentSubmitted: _submitComment,
-      ),
-    );
+    await addComment(comment);
   }
 
   // Legacy cancel/delete methods removed (controls are now via calendar swipes)

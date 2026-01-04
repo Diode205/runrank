@@ -19,6 +19,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   late List<String> adminTypes;
   late List<String> socialTypes;
 
+  // Host selection
+  List<Map<String, dynamic>> _hosts = [];
+  String? _selectedHostId;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +42,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     selectedEventType = selectedCategory == "admin"
         ? adminTypes.first
         : socialTypes.first;
+
+    _loadHosts();
   }
 
   String selectedEventType = "";
@@ -66,6 +72,49 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   // RACE LIST
   final raceNames = const ["Holt 10K", "Worstead 5M", "Chase The Train"];
   String? selectedRace;
+
+  Future<void> _loadHosts() async {
+    try {
+      final rows = await supabase
+          .from('user_profiles')
+          .select('id, full_name, is_admin')
+          .order('full_name');
+
+      final currentUserId = supabase.auth.currentUser?.id;
+
+      setState(() {
+        _hosts = rows
+            .map<Map<String, dynamic>>(
+              (r) => {
+                'id': r['id'] as String,
+                'full_name': (r['full_name'] as String?) ?? 'Member',
+                'is_admin': (r['is_admin'] as bool?) ?? false,
+              },
+            )
+            .toList();
+
+        // Default host to current user if present, otherwise first in list.
+        Map<String, dynamic>? initial;
+        if (currentUserId != null) {
+          initial = _hosts.firstWhere(
+            (h) => h['id'] == currentUserId,
+            orElse: () => _hosts.isNotEmpty
+                ? _hosts.first
+                : <String, dynamic>{'id': null, 'full_name': ''},
+          );
+        } else if (_hosts.isNotEmpty) {
+          initial = _hosts.first;
+        }
+
+        if (initial != null && initial['id'] != null) {
+          _selectedHostId = initial['id'] as String;
+          hostCtrl.text = initial['full_name'] as String;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading hosts: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -182,6 +231,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "date": selectedDate!.toIso8601String().split("T").first,
       "time": timeString,
       "host_or_director": hostCtrl.text.trim(),
+      "host_user_id": _selectedHostId,
       "venue": venueCtrl.text.trim(),
       "venue_address": venueAddressCtrl.text.trim(),
       "description": descriptionCtrl.text.trim(),
@@ -363,11 +413,53 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 "Event Details",
                 Column(
                   children: [
-                    TextFormField(
-                      controller: hostCtrl,
-                      decoration: const InputDecoration(labelText: "Host"),
-                      validator: (v) => v!.trim().isEmpty ? "Required" : null,
+                    DropdownButtonFormField<String>(
+                      value: _selectedHostId,
+                      decoration: const InputDecoration(
+                        labelText: "Host / Director",
+                      ),
+                      items: _hosts
+                          .where(
+                            (h) => selectedCategory == "admin"
+                                ? (h['is_admin'] as bool? ?? false)
+                                : true,
+                          )
+                          .map(
+                            (h) => DropdownMenuItem<String>(
+                              value: h['id'] as String,
+                              child: Text(
+                                (h['full_name'] as String?) ?? 'Member',
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedHostId = value;
+                          final match = _hosts.firstWhere(
+                            (h) => h['id'] == value,
+                            orElse: () => <String, dynamic>{'full_name': ''},
+                          );
+                          hostCtrl.text = (match['full_name'] as String?) ?? '';
+                        });
+                      },
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
                     ),
+                    if (selectedCategory == "admin")
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6.0, bottom: 4.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "For Admin Events, only admin users can be selected as hosts.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
                     TextFormField(
                       controller: venueCtrl,
                       decoration: const InputDecoration(labelText: "Venue"),
