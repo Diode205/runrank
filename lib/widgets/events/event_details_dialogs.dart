@@ -620,6 +620,8 @@ class HostChatSheetState extends State<HostChatSheet> {
                               msg['created_at'] as String?,
                             );
 
+                            final avatarUrl = msg['avatarUrl'] as String?;
+
                             final name = sender;
                             final initials = name.isNotEmpty
                                 ? name
@@ -709,14 +711,26 @@ class HostChatSheetState extends State<HostChatSheet> {
                                             CircleAvatar(
                                               radius: 18,
                                               backgroundColor: Colors.white12,
-                                              child: Text(
-                                                initials.toUpperCase(),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
+                                              backgroundImage:
+                                                  avatarUrl != null &&
+                                                      avatarUrl.isNotEmpty
+                                                  ? NetworkImage(
+                                                      '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                                    )
+                                                  : null,
+                                              child:
+                                                  avatarUrl == null ||
+                                                      avatarUrl.isEmpty
+                                                  ? Text(
+                                                      initials.toUpperCase(),
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    )
+                                                  : null,
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(child: messageBubble),
@@ -1146,13 +1160,26 @@ class CommentsSheetState extends State<CommentsSheet> {
                             final text = c['comment'] as String? ?? '';
                             final ts = c['timestamp'] as String?;
                             final commentId = c['id']?.toString() ?? '';
+                            final avatarUrl = c['avatarUrl'] as String?;
                             return ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: Colors.white10,
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                                backgroundImage:
+                                    avatarUrl != null && avatarUrl.isNotEmpty
+                                    ? NetworkImage(
+                                        '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                      )
+                                    : null,
+                                child: avatarUrl == null || avatarUrl.isEmpty
+                                    ? Text(
+                                        name.isNotEmpty
+                                            ? name[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : null,
                               ),
                               title: Text(
                                 name,

@@ -9,6 +9,7 @@ import 'package:runrank/menu/membership_page.dart';
 import 'package:runrank/menu/races_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
+import 'package:runrank/menu/runners_banquet_page.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -407,7 +408,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           _menuTile(
             icon: Icons.shopping_bag,
             title: 'Kit & Merchandise',
-            subtitle: 'Order Kit & Event Food',
+            subtitle: 'Order Vests, Shorts, Hoodies & More',
             onTap: () {
               Navigator.push(
                 context,
@@ -442,6 +443,17 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 );
               },
             ),
+          _menuTile(
+            icon: Icons.celebration,
+            title: 'Runners Banquette',
+            subtitle: 'Party Pass & Food Orders',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RunnersBanquetPage()),
+              );
+            },
+          ),
           _menuTile(
             icon: Icons.description,
             title: 'Policies, Forms, and Notices',

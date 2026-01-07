@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/events/event_details_base.dart';
 import 'package:runrank/widgets/events/event_details_dialogs.dart';
+import 'package:runrank/menu/runners_banquet_page.dart';
 import 'package:runrank/widgets/events/event_venue_preview.dart';
 
 /// Event details page for simple events (Training, Special Event, Social Run, etc.)
@@ -291,6 +292,50 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 ),
                 const SizedBox(height: 20),
 
+                // Special event extras (e.g. Runners Banquet)
+                if (e.eventType.toLowerCase() == 'special_event') ...[
+                  Center(
+                    child: Text(
+                      'Special Event Extras',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFFFD300),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RunnersBanquetPage(
+                              eventId: e.id,
+                              eventTitle: e.title ?? 'Special Event',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.celebration),
+                      label: const Text(
+                        'Runners Banquette – Party Pass & Food Orders',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0057B7),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
                 // Comments section
                 Text("Comments", style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
@@ -384,10 +429,17 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              Text(
-                "• Type: ${myResponse!["response_type"]}",
-                style: const TextStyle(fontSize: 16),
-              ),
+              Text(() {
+                final rawType = (myResponse!["response_type"] as String?) ?? "";
+                var displayType = rawType;
+
+                final eventType = widget.event.eventType?.toLowerCase() ?? "";
+                if (eventType == "special_event" && rawType == "running") {
+                  displayType = "Attending";
+                }
+
+                return "9 Type: $displayType";
+              }(), style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => setState(() => myResponse = null),

@@ -962,20 +962,35 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   }
 
   Future<void> _exportVaultReportAsPdf(String title, String content) async {
-    final doc = pw.Document();
+    try {
+      final doc = pw.Document();
 
-    doc.addPage(
-      pw.MultiPage(
-        build: (context) => [
-          pw.Text(
-            content,
-            style: const pw.TextStyle(fontSize: 11, height: 1.3),
-          ),
-        ],
-      ),
-    );
+      doc.addPage(
+        pw.MultiPage(
+          build: (context) => [
+            pw.Text(
+              content,
+              style: const pw.TextStyle(fontSize: 11, height: 1.3),
+            ),
+          ],
+        ),
+      );
 
-    await Printing.layoutPdf(onLayout: (format) async => doc.save());
+      final safeTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]+'),
+        '_',
+      );
+
+      await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: '${safeTitle}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting PDF: $e')));
+    }
   }
 
   Future<void> _showVaultReportSheet({

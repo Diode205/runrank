@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:runrank/menu/expenses_claim_page.dart';
 
 class PoliciesFormsNoticesPage extends StatelessWidget {
   const PoliciesFormsNoticesPage({super.key});
@@ -19,10 +20,6 @@ class PoliciesFormsNoticesPage extends StatelessWidget {
       'title': 'Inclusion Policy',
       'url':
           'https://cdn.website-editor.net/s/f5f7040afe41439ba9e3a87ec810eef0/files/uploaded/Inclusion_Policy_v1.0_June2025.pdf?Expires=1769482352&Signature=niNcxoxuUFxyXSMTLJ7RZeAaBLMyL0tYNmmoPrRmnSDmdW61L0bzfPq9ODDrmkbQz5WlIYpeJNBTZiIb9US9u5eIsDqiSY4LKVjYFMD~DU0xbaLVLvnxnqJfEQ0JhmPNljMaci2CUUDDdALjxryvDxK8VkPH4g6U6oS-1FlKAepdCg-TkPNQAVs-wfmrXYCKZhXG7GTe696DV91TvfBh0Pr01SD7EM-rojbbsNhKVcK6vzvppgG~htR0ppNAPxGVLJh~KA-nQPp0jOCtg2OHNoDX-3r4g~1HYh83CrmWWkSkxNJLcz1hw7ELDoZ2PXj1E2RwEoLCpqMMBiGociwOAA__&Key-Pair-Id=K2NXBXLF010TJW',
-    },
-    {
-      'title': 'Forms, Waivers & Surveys',
-      'url': 'https://www.northnorfolkbeachrunners.com/',
     },
   ];
 
@@ -55,6 +52,15 @@ class PoliciesFormsNoticesPage extends StatelessWidget {
         children: [
           _hero(),
           const SizedBox(height: 20),
+          _DocTile(
+            title: 'Expenses Claim Form',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ExpensesClaimPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
           ..._docs.map(
             (doc) => _DocTile(
               title: doc['title']!,

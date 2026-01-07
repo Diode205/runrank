@@ -4,6 +4,8 @@ import 'firebase_options.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'splash_screen.dart';
 import 'auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,43 +18,65 @@ import 'package:runrank/services/payment_service.dart';
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // 1️⃣ Initialize Firebase FIRST
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // 2️⃣ Initialize Supabase SECOND
-  await Supabase.initialize(
-    url: 'https://yzccwmhgqlgguighfhsk.supabase.co',
-    anonKey: 'sb_publishable_PxUqRg99ug7dqYnWG82M9A_pRukqS1k',
-  );
-
-  // 2b️⃣ Stripe setup (safe if keys not provided)
-  await PaymentService.init();
-
-  // 3️⃣ Crashlytics: capture Dart & platform errors
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-  };
-  ui.PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true; // handled
-  };
-
-  // Trim image cache to reduce memory pressure on iOS
-  try {
-    painting.PaintingBinding.instance.imageCache
-      ..maximumSize = 200
-      ..maximumSizeBytes = 60 * 1024 * 1024; // 60MB
-  } catch (_) {}
-
+void main() {
   runZonedGuarded(
-    () {
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // 1️⃣ Initialize Firebase FIRST
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // 2️⃣ Initialize Supabase SECOND
+      await Supabase.initialize(
+        url: 'https://yzccwmhgqlgguighfhsk.supabase.co',
+        anonKey: 'sb_publishable_PxUqRg99ug7dqYnWG82M9A_pRukqS1k',
+      );
+
+      // 2b️⃣ Stripe setup (safe if keys not provided)
+      await PaymentService.init();
+
+      // 3️⃣ Crashlytics: capture Dart & platform errors
+      final bool crashlyticsEnabled =
+          !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.android);
+
+      if (crashlyticsEnabled) {
+        FlutterError.onError = (FlutterErrorDetails details) {
+          FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+        };
+        ui.PlatformDispatcher.instance.onError = (error, stack) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          return true; // handled
+        };
+      } else {
+        // On web/unsupported platforms, avoid Crashlytics calls
+        FlutterError.onError = FlutterError.dumpErrorToConsole;
+        ui.PlatformDispatcher.instance.onError = (error, stack) {
+          // Return false to allow default error handling
+          return false;
+        };
+      }
+
+      // Trim image cache to reduce memory pressure on iOS
+      try {
+        painting.PaintingBinding.instance.imageCache
+          ..maximumSize = 200
+          ..maximumSizeBytes = 60 * 1024 * 1024; // 60MB
+      } catch (_) {}
+
       runApp(const LifecycleProbe(child: RunRankApp()));
     },
     (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      final bool crashlyticsEnabled =
+          !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.android);
+      if (crashlyticsEnabled) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
     },
   );
 }
@@ -82,7 +106,13 @@ class _LifecycleProbeState extends State<LifecycleProbe>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    FirebaseCrashlytics.instance.log('AppLifecycleState: $state');
+    final bool crashlyticsEnabled =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.android);
+    if (crashlyticsEnabled) {
+      FirebaseCrashlytics.instance.log('AppLifecycleState: $state');
+    }
   }
 
   @override

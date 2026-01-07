@@ -40,6 +40,8 @@ dependencies:
   webview_flutter: ^4.8.0
   pdf: ^3.11.0
   printing: ^5.13.0
+  flutter_email_sender: ^6.0.2
+  share_plus: ^7.2.0
 
 
   # The following adds the Cupertino Icons font to your application.

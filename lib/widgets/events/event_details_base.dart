@@ -552,11 +552,30 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       if (sender != null) ids.add(sender);
     }
 
-    final names = await fetchNamesForIds(ids);
+    if (ids.isEmpty) return messages;
 
-    return messages
-        .map((m) => {...m, 'senderName': names[m['sender_id']] ?? 'Member'})
-        .toList();
+    final profiles = await supabase
+        .from('user_profiles')
+        .select('id, full_name, avatar_url')
+        .inFilter('id', ids.toList());
+
+    final Map<String, String> idToName = {
+      for (final p in profiles)
+        p['id'] as String: (p['full_name'] as String?) ?? 'Member',
+    };
+
+    final Map<String, String?> idToAvatar = {
+      for (final p in profiles) p['id'] as String: p['avatar_url'] as String?,
+    };
+
+    return [
+      for (final m in messages)
+        {
+          ...m,
+          'senderName': idToName[m['sender_id']] ?? 'Member',
+          'avatarUrl': idToAvatar[m['sender_id']],
+        },
+    ];
   }
 
   Future<void> sendHostMessage(String hostUserId, String message) async {
@@ -694,12 +713,17 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       final orFilter = userIds.map((id) => 'id.eq.$id').join(',');
       final profileRows = await supabase
           .from('user_profiles')
-          .select('id, full_name')
+          .select('id, full_name, avatar_url')
           .or(orFilter);
 
       final Map<String, String> idToName = {
         for (final p in profileRows)
           p['id'] as String: (p['full_name'] as String?) ?? 'Unknown user',
+      };
+
+      final Map<String, String?> idToAvatar = {
+        for (final p in profileRows)
+          p['id'] as String: p['avatar_url'] as String?,
       };
 
       return [
@@ -708,6 +732,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             'id': c['id'],
             'userId': c['user_id'] as String?,
             'fullName': idToName[(c['user_id'] as String?) ?? ''] ?? 'Unknown',
+            'avatarUrl': idToAvatar[(c['user_id'] as String?) ?? ''],
             'comment': c['comment'] as String?,
             'timestamp': c['timestamp'] as String?,
           },
@@ -877,6 +902,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         final text = c['comment'] as String? ?? '';
         final ts = c['timestamp'] as String?;
         final commentId = c['id']?.toString() ?? '';
+        final avatarUrl = c['avatarUrl'] as String?;
         final emojiMap =
             commentReactions[commentId] ?? const <String, List<String>>{};
 
@@ -894,14 +920,21 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.white12,
-                  child: Text(
-                    initials.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                      ? NetworkImage(
+                          '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                        )
+                      : null,
+                  child: avatarUrl == null || avatarUrl.isEmpty
+                      ? Text(
+                          initials.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
