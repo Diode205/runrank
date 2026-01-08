@@ -23,6 +23,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   List<AwardWinnerItem> _winners = [];
   bool _isAdmin = false;
   List<String> _memberNames = [];
+  Map<String, Map<String, int>> _emojiCounts = {};
+  bool _storyExpanded = false;
 
   @override
   void initState() {
@@ -52,6 +54,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           .whereType<String>()
           .where((s) => s.isNotEmpty)
           .toList(growable: false);
+      final emojiCounts = await _service.fetchEmojiCounts(
+        nominees.map((n) => n.id).toSet(),
+      );
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
@@ -59,6 +64,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         _winners = winners;
         _isAdmin = admin;
         _memberNames = memberNames;
+        _emojiCounts = emojiCounts;
         _loading = false;
         _commentNomineeId = nominees.isNotEmpty ? nominees.first.id : null;
       });
@@ -204,7 +210,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                             SizedBox(height: 4),
                             Text(
                               'The Nominations',
-                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -217,7 +226,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                   onRefresh: _load,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(top: headerHeight - 40),
+                    padding: const EdgeInsets.only(top: headerHeight + 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -337,6 +346,37 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 ),
               ),
               const SizedBox(height: 8),
+              if (_memberNames.isNotEmpty) ...[
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue tv) {
+                    final q = tv.text.trim().toLowerCase();
+                    if (q.isEmpty) return const Iterable<String>.empty();
+                    return _memberNames.where(
+                      (n) => n.toLowerCase().contains(q),
+                    );
+                  },
+                  onSelected: (sel) {
+                    nameController.text = sel;
+                  },
+                  fieldViewBuilder:
+                      (ctx2, controller, focusNode, onFieldSubmitted) {
+                        controller.text = nameController.text;
+                        controller.addListener(() {
+                          nameController.text = controller.text;
+                        });
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          onSubmitted: (_) => onFieldSubmitted(),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            labelText: 'Search member (optional)',
+                          ),
+                        );
+                      },
+                ),
+                const SizedBox(height: 8),
+              ],
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
@@ -397,7 +437,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         'His fastest marathon time was two hours, 56 minutes and 49 seconds at London in 1990.\n'
         'As well as running 35-40 miles a week, Mr Ball goes to the gym every day and attends aqua Zumba and aqua fitness classes three times a week.\n'
         'He also trains newcomers to the North Norfolk Beach Runners.';
-    const credit = '— Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
+    const credit =
+        '— Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
+
+    final breakIdx = body.indexOf('\n\n');
+    final firstPara = breakIdx > 0 ? body.substring(0, breakIdx) : body;
+    final rest = breakIdx > 0 ? body.substring(breakIdx + 2) : '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -408,17 +453,50 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFF5C542), width: 1),
         ),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              body,
-              style: TextStyle(color: Colors.white, height: 1.35),
+              firstPara,
+              style: const TextStyle(color: Colors.white, height: 1.35),
             ),
-            SizedBox(height: 10),
-            Text(
-              credit,
-              style: TextStyle(color: Colors.white54, fontSize: 11, fontStyle: FontStyle.italic, height: 1.3),
+            if (!_storyExpanded && rest.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setState(() => _storyExpanded = true),
+                  child: const Text('Read more ⌄'),
+                ),
+              ),
+            ],
+            if (_storyExpanded && rest.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                rest,
+                style: const TextStyle(color: Colors.white, height: 1.35),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setState(() => _storyExpanded = false),
+                  child: const Text('Show less ⌃'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                credit,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  height: 1.3,
+                ),
+              ),
             ),
           ],
         ),
@@ -526,6 +604,48 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               _emojiButton(n.id, '❤️'),
             ],
           ),
+          const SizedBox(height: 8),
+          Builder(
+            builder: (context) {
+              final counts = _emojiCounts[n.id] ?? const {};
+              final entries = ['👍', '🎉', '🏃‍♂️', '❤️']
+                  .map((e) => MapEntry(e, counts[e] ?? 0))
+                  .where((e) => e.value > 0);
+              if (entries.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: entries
+                    .map(
+                      (e) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(e.key, style: const TextStyle(fontSize: 14)),
+                            const SizedBox(width: 6),
+                            Text(
+                              e.value.toString(),
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -568,11 +688,42 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               ),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'Nominee full name'),
-            ),
+            if (_memberNames.isNotEmpty)
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue tv) {
+                  final q = tv.text.trim().toLowerCase();
+                  if (q.isEmpty) return const Iterable<String>.empty();
+                  return _memberNames.where((n) => n.toLowerCase().contains(q));
+                },
+                onSelected: (selection) {
+                  _nameController.text = selection;
+                },
+                fieldViewBuilder:
+                    (ctx, controller, focusNode, onFieldSubmitted) {
+                      // Bind our controller so we can submit free text too
+                      controller.text = _nameController.text;
+                      controller.addListener(() {
+                        _nameController.text = controller.text;
+                      });
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        onSubmitted: (_) => onFieldSubmitted(),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Nominee full name (type or pick)',
+                        ),
+                      );
+                    },
+              )
+            else
+              TextField(
+                controller: _nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Nominee full name',
+                ),
+              ),
             const SizedBox(height: 10),
             TextField(
               controller: _reasonController,
@@ -684,24 +835,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         ),
                       ],
                     ),
-                            const SizedBox(height: 10),
-                            if (_memberNames.isNotEmpty)
-                              DropdownButtonFormField<String>(
-                                value: null,
-                                items: _memberNames
-                                    .map((n) => DropdownMenuItem(value: n, child: Text(n)))
-                                    .toList(growable: false),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    _nameController.text = val;
-                                  }
-                                },
-                                decoration: const InputDecoration(
-                                  labelText: 'Or pick from members',
-                                ),
-                                dropdownColor: const Color(0xFF0F111A),
-                                style: const TextStyle(color: Colors.white),
-                              ),
+                    const SizedBox(height: 10),
                     const SizedBox(height: 6),
                     Text(
                       c.content,

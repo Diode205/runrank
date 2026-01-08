@@ -174,21 +174,35 @@ class MalcolmBallAwardService {
   }
 
   Future<List<AwardWinnerItem>> fetchWinners() async {
-    final rows = await _supabase
-        .from('award_winners')
-        .select('id, year, name, nominee_id')
-        .order('year', ascending: false);
-    return (rows as List)
-        .map((r) => AwardWinnerItem(
+    try {
+      final rows = await _supabase
+          .from('award_winners')
+          .select('id, year, name, nominee_id')
+          .order('year', ascending: false);
+      return (rows as List)
+          .map(
+            (r) => AwardWinnerItem(
               id: r['id'] as String,
               year: r['year'] as int,
               name: r['name'] as String,
               nomineeId: r['nominee_id'] as String?,
-            ))
-        .toList();
+            ),
+          )
+          .toList();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') {
+        // Table not found in API schema yet; return empty list gracefully
+        return [];
+      }
+      rethrow;
+    }
   }
 
-  Future<void> addWinner({required int year, required String name, String? nomineeId}) async {
+  Future<void> addWinner({
+    required int year,
+    required String name,
+    String? nomineeId,
+  }) async {
     await _supabase.from('award_winners').insert({
       'year': year,
       'name': name.trim(),
@@ -225,5 +239,23 @@ class MalcolmBallAwardService {
   void unsubscribe() {
     _channel?.unsubscribe();
     _channel = null;
+  }
+
+  Future<Map<String, Map<String, int>>> fetchEmojiCounts(
+    Set<String> nomineeIds,
+  ) async {
+    if (nomineeIds.isEmpty) return {};
+    final rows = await _supabase
+        .from('award_emojis')
+        .select('nominee_id, emoji');
+    final Map<String, Map<String, int>> counts = {};
+    for (final r in rows as List) {
+      final nId = r['nominee_id'] as String;
+      if (!nomineeIds.contains(nId)) continue;
+      final emoji = r['emoji'] as String;
+      counts.putIfAbsent(nId, () => {});
+      counts[nId]![emoji] = (counts[nId]![emoji] ?? 0) + 1;
+    }
+    return counts;
   }
 }

@@ -457,15 +457,12 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           ),
           _menuTile(
             icon: Icons.emoji_events,
-            title:
-                'The Malcolm Ball Inspirational Running Award 2026',
+            title: 'The Malcolm Ball Inspirational Running Award 2026',
             subtitle: 'The Nominations, Votes, Reactions & Comments',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const MalcolmBallAwardPage(),
-                ),
+                MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
               );
             },
           ),

@@ -110,6 +110,7 @@ flutter:
     - assets/images/pic9.png
     - assets/images/pic10.png
     - assets/images/pic11.png
+    - assets/images/malcolmball.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
