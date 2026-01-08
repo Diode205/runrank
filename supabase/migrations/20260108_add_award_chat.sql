@@ -12,29 +12,72 @@ create table if not exists public.award_chat_messages (
 
 alter table public.award_chat_messages enable row level security;
 
--- Select: anyone logged in can read chat
-create policy if not exists "read chat messages"
-  on public.award_chat_messages
-  for select
-  using (true);
+-- RLS policies (idempotent): use DO blocks to avoid duplicates
+-- Read: authenticated users can read chat
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where policyname = 'read_chat_messages'
+      and schemaname = 'public'
+      and tablename = 'award_chat_messages'
+  ) then
+    create policy read_chat_messages
+      on public.award_chat_messages
+      for select
+      using (auth.uid() is not null);
+  end if;
+end$$;
 
--- Insert: any authenticated user can post
-create policy if not exists "insert own chat message"
-  on public.award_chat_messages
-  for insert
-  with check (auth.uid() = user_id);
+-- Insert: only authenticated users; row must match author
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'insert_chat_message'
+      and schemaname = 'public'
+      and tablename = 'award_chat_messages'
+  ) then
+    create policy insert_chat_message
+      on public.award_chat_messages
+      for insert
+      with check (auth.uid() = user_id);
+  end if;
+end$$;
 
--- Delete/Update: only author can modify (optional)
-create policy if not exists "update own chat message"
-  on public.award_chat_messages
-  for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+-- Update: only the author can modify
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'update_own_chat_message'
+      and schemaname = 'public'
+      and tablename = 'award_chat_messages'
+  ) then
+    create policy update_own_chat_message
+      on public.award_chat_messages
+      for update
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end$$;
 
-create policy if not exists "delete own chat message"
-  on public.award_chat_messages
-  for delete
-  using (auth.uid() = user_id);
+-- Delete: only the author can delete
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'delete_own_chat_message'
+      and schemaname = 'public'
+      and tablename = 'award_chat_messages'
+  ) then
+    create policy delete_own_chat_message
+      on public.award_chat_messages
+      for delete
+      using (auth.uid() = user_id);
+  end if;
+end$$;
 
 -- Reactions to chat messages
 create table if not exists public.award_message_emojis (
@@ -47,15 +90,42 @@ create table if not exists public.award_message_emojis (
 
 alter table public.award_message_emojis enable row level security;
 
-create policy if not exists "read message emojis"
-  on public.award_message_emojis
-  for select
-  using (true);
+-- Unique to prevent duplicate reactions per user/emoji/message
+-- Use a unique index (portable across PG versions)
+create unique index if not exists ux_award_message_emojis_unique
+  on public.award_message_emojis(message_id, user_id, emoji);
 
-create policy if not exists "insert own message emoji"
-  on public.award_message_emojis
-  for insert
-  with check (auth.uid() = user_id);
+-- Read: authenticated users can read emojis
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'read_message_emojis'
+      and schemaname = 'public'
+      and tablename = 'award_message_emojis'
+  ) then
+    create policy read_message_emojis
+      on public.award_message_emojis
+      for select
+      using (auth.uid() is not null);
+  end if;
+end$$;
+
+-- Insert: only authenticated user for self
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'insert_message_emoji'
+      and schemaname = 'public'
+      and tablename = 'award_message_emojis'
+  ) then
+    create policy insert_message_emoji
+      on public.award_message_emojis
+      for insert
+      with check (auth.uid() = user_id);
+  end if;
+end$$;
 
 create index if not exists idx_award_message_emojis_message on public.award_message_emojis(message_id);
 
