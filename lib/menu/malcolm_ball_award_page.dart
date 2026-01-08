@@ -23,6 +23,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   void initState() {
     super.initState();
     _load();
+    _service.subscribeToChanges(onAnyChange: () {
+      // Refresh nominees and comments whenever any table changes
+      _load();
+    });
   }
 
   Future<void> _load() async {
@@ -40,9 +44,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load data: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
     }
   }
 
@@ -51,6 +55,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     _nameController.dispose();
     _reasonController.dispose();
     _commentController.dispose();
+    _service.unsubscribe();
     super.dispose();
   }
 
@@ -69,13 +74,13 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       _reasonController.clear();
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nomination submitted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nomination submitted')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nomination failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Nomination failed: $e')));
     }
   }
 
@@ -94,13 +99,13 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     try {
       await _service.addEmoji(nomineeId, emoji);
       // We won't reload for emoji reactions to keep UI snappy
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reacted $emoji')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Reacted $emoji')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reaction failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Reaction failed: $e')));
     }
   }
 
@@ -120,9 +125,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       if (!mounted) return;
       setState(() => _comments = comments);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Comment failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Comment failed: $e')));
     }
   }
 
@@ -298,8 +303,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0x33F5C542),
                   borderRadius: BorderRadius.circular(16),
@@ -387,9 +391,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             TextField(
               controller: _nameController,
               style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Nominee full name',
-              ),
+              decoration: const InputDecoration(labelText: 'Nominee full name'),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -443,10 +445,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               value: _commentNomineeId,
               items: _nominees
                   .map(
-                    (n) => DropdownMenuItem(
-                      value: n.id,
-                      child: Text(n.name),
-                    ),
+                    (n) => DropdownMenuItem(value: n.id, child: Text(n.name)),
                   )
                   .toList(),
               onChanged: (v) => setState(() => _commentNomineeId = v),

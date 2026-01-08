@@ -28,6 +28,7 @@ class AwardCommentItem {
 
 class MalcolmBallAwardService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  RealtimeChannel? _channel;
 
   Future<List<AwardNominee>> fetchNominees() async {
     final rows = await _supabase
@@ -44,11 +45,7 @@ class MalcolmBallAwardService {
           .select('id')
           .eq('nominee_id', id);
       list.add(
-        AwardNominee(
-          id: id,
-          name: name,
-          votes: (votesRows as List).length,
-        ),
+        AwardNominee(id: id, name: name, votes: (votesRows as List).length),
       );
     }
     return list;
@@ -68,16 +65,16 @@ class MalcolmBallAwardService {
     if (existing != null) return existing['id'] as String;
     final inserted = await _supabase
         .from('award_nominees')
-        .insert({
-          'name': name.trim(),
-          'created_by': user.id,
-        })
+        .insert({'name': name.trim(), 'created_by': user.id})
         .select()
         .single();
     return inserted['id'] as String;
   }
 
-  Future<void> submitNomination({required String name, required String reason}) async {
+  Future<void> submitNomination({
+    required String name,
+    required String reason,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to nominate');
@@ -121,7 +118,10 @@ class MalcolmBallAwardService {
     });
   }
 
-  Future<void> addComment({required String nomineeId, required String content}) async {
+  Future<void> addComment({
+    required String nomineeId,
+    required String content,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to comment');
@@ -141,22 +141,52 @@ class MalcolmBallAwardService {
         .limit(limit);
 
     // Map nominee ids to names
-    final nominees = await _supabase
-        .from('award_nominees')
-        .select('id,name');
+    final nominees = await _supabase.from('award_nominees').select('id,name');
     final Map<String, String> nameById = {
-      for (final r in nominees as List) r['id'] as String: r['name'] as String
+      for (final r in nominees as List) r['id'] as String: r['name'] as String,
     };
 
     return (rows as List)
-        .map((r) => AwardCommentItem(
-              id: r['id'] as String,
-              nomineeId: r['nominee_id'] as String,
-              nomineeName: nameById[r['nominee_id'] as String] ?? 'Unknown',
-              userId: r['user_id'] as String,
-              content: r['content'] as String,
-              createdAt: DateTime.parse(r['created_at'] as String),
-            ))
+        .map(
+          (r) => AwardCommentItem(
+            id: r['id'] as String,
+            nomineeId: r['nominee_id'] as String,
+            nomineeName: nameById[r['nominee_id'] as String] ?? 'Unknown',
+            userId: r['user_id'] as String,
+            content: r['content'] as String,
+            createdAt: DateTime.parse(r['created_at'] as String),
+          ),
+        )
         .toList();
+  }
+
+  RealtimeChannel subscribeToChanges({required void Function() onAnyChange}) {
+    // Unsubscribe any previous channel first
+    _channel?.unsubscribe();
+    final ch = _supabase.channel('malcolm-ball-award');
+    for (final table in [
+      'award_nominees',
+      'award_votes',
+      'award_emojis',
+      'award_comments',
+      'award_nominations',
+    ]) {
+      ch.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) {
+          onAnyChange();
+        },
+      );
+    }
+    ch.subscribe();
+    _channel = ch;
+    return ch;
+  }
+
+  void unsubscribe() {
+    _channel?.unsubscribe();
+    _channel = null;
   }
 }
