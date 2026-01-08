@@ -39,6 +39,24 @@ class AwardWinnerItem {
   });
 }
 
+class AwardChatMessage {
+  final String id;
+  final String userId;
+  final String userName;
+  final String? avatarUrl;
+  final String content;
+  final DateTime createdAt;
+
+  AwardChatMessage({
+    required this.id,
+    required this.userId,
+    required this.userName,
+    required this.avatarUrl,
+    required this.content,
+    required this.createdAt,
+  });
+}
+
 class MalcolmBallAwardService {
   final SupabaseClient _supabase = Supabase.instance.client;
   RealtimeChannel? _channel;
@@ -221,6 +239,8 @@ class MalcolmBallAwardService {
       'award_comments',
       'award_nominations',
       'award_winners',
+      'award_chat_messages',
+      'award_message_emojis',
     ]) {
       ch.onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -257,5 +277,123 @@ class MalcolmBallAwardService {
       counts[nId]![emoji] = (counts[nId]![emoji] ?? 0) + 1;
     }
     return counts;
+  }
+
+  // ---------------- General chat (comments) ----------------
+  Future<List<AwardChatMessage>> fetchChatMessages({int limit = 50}) async {
+    final rows = await _supabase
+        .from('award_chat_messages')
+        .select('id, user_id, content, created_at')
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    // Get user profiles for avatars/names
+    final userIds = {
+      for (final r in rows as List) r['user_id'] as String,
+    }.toList();
+    Map<String, Map<String, dynamic>> profileById = {};
+    if (userIds.isNotEmpty) {
+      final profiles = await _supabase
+          .from('user_profiles')
+          .select('id, full_name, avatar_url');
+      for (final p in profiles as List) {
+        if (!userIds.contains(p['id'])) continue;
+        profileById[p['id'] as String] = p as Map<String, dynamic>;
+      }
+    }
+
+    return (rows as List).map((r) {
+      final uid = r['user_id'] as String;
+      final prof = profileById[uid] ?? {};
+      return AwardChatMessage(
+        id: r['id'] as String,
+        userId: uid,
+        userName: (prof['full_name'] as String?) ?? 'Unknown',
+        avatarUrl: prof['avatar_url'] as String?,
+        content: r['content'] as String,
+        createdAt: DateTime.parse(r['created_at'] as String),
+      );
+    }).toList();
+  }
+
+  Future<void> addChatMessage({required String content}) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in to comment');
+    }
+    await _supabase.from('award_chat_messages').insert({
+      'user_id': user.id,
+      'content': content.trim(),
+    });
+  }
+
+  Future<void> addMessageEmoji({
+    required String messageId,
+    required String emoji,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in to react');
+    }
+    await _supabase.from('award_message_emojis').insert({
+      'message_id': messageId,
+      'user_id': user.id,
+      'emoji': emoji,
+    });
+  }
+
+  Future<Map<String, Map<String, int>>> fetchMessageEmojiCounts(
+    Set<String> messageIds,
+  ) async {
+    if (messageIds.isEmpty) return {};
+    final rows = await _supabase
+        .from('award_message_emojis')
+        .select('message_id, emoji');
+    final Map<String, Map<String, int>> counts = {};
+    for (final r in rows as List) {
+      final mId = r['message_id'] as String;
+      if (!messageIds.contains(mId)) continue;
+      final emoji = r['emoji'] as String;
+      counts.putIfAbsent(mId, () => {});
+      counts[mId]![emoji] = (counts[mId]![emoji] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  // ---------------- Admin vote tally ----------------
+  Future<List<Map<String, dynamic>>> fetchVotesTallyDetailed() async {
+    // returns list of {nominee_id, nominee_name, count, voters: [full_name,...]}
+    final nominees = await _supabase.from('award_nominees').select('id,name');
+    final List<Map<String, dynamic>> results = [];
+    for (final n in nominees as List) {
+      final id = n['id'] as String;
+      final name = n['name'] as String;
+      final votes = await _supabase
+          .from('award_votes')
+          .select('user_id')
+          .eq('nominee_id', id);
+      final userIds = (votes as List)
+          .map((v) => v['user_id'] as String)
+          .toList();
+      List<String> voterNames = [];
+      if (userIds.isNotEmpty) {
+        final profs = await _supabase
+            .from('user_profiles')
+            .select('id, full_name');
+        voterNames = (profs as List)
+            .where((p) => userIds.contains(p['id']))
+            .map((p) => (p['full_name'] as String?) ?? 'Unknown')
+            .toList();
+      }
+      results.add({
+        'nominee_id': id,
+        'nominee_name': name,
+        'count': userIds.length,
+        'voters': voterNames,
+      });
+    }
+    // Sort by count desc
+    results.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+    return results;
   }
 }

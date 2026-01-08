@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/malcolm_ball_award_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MalcolmBallAwardPage extends StatefulWidget {
@@ -15,16 +16,16 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   final _nameController = TextEditingController();
   final _reasonController = TextEditingController();
   final _commentController = TextEditingController();
-  String? _commentNomineeId;
 
   bool _loading = true;
   List<AwardNominee> _nominees = [];
-  List<AwardCommentItem> _comments = [];
   List<AwardWinnerItem> _winners = [];
   bool _isAdmin = false;
   List<String> _memberNames = [];
-  Map<String, Map<String, int>> _emojiCounts = {};
+  // Nominee emoji counts no longer displayed
   bool _storyExpanded = false;
+  List<AwardChatMessage> _chatMessages = [];
+  Map<String, Map<String, int>> _messageEmojiCounts = {};
 
   @override
   void initState() {
@@ -42,7 +43,6 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     setState(() => _loading = true);
     try {
       final nominees = await _service.fetchNominees();
-      final comments = await _service.fetchRecentComments();
       final winners = await _service.fetchWinners();
       final admin = await UserService.isAdmin();
       final membersRows = await Supabase.instance.client
@@ -54,19 +54,20 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           .whereType<String>()
           .where((s) => s.isNotEmpty)
           .toList(growable: false);
-      final emojiCounts = await _service.fetchEmojiCounts(
-        nominees.map((n) => n.id).toSet(),
+      // Nominee emoji counts removed from UI
+      final chat = await _service.fetchChatMessages();
+      final chatCounts = await _service.fetchMessageEmojiCounts(
+        chat.map((m) => m.id).toSet(),
       );
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
-        _comments = comments;
         _winners = winners;
         _isAdmin = admin;
         _memberNames = memberNames;
-        _emojiCounts = emojiCounts;
+        _chatMessages = chat;
+        _messageEmojiCounts = chatCounts;
         _loading = false;
-        _commentNomineeId = nominees.isNotEmpty ? nominees.first.id : null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -99,6 +100,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       await _service.submitNomination(name: name, reason: reason);
       _nameController.clear();
       _reasonController.clear();
+      try {
+        await NotificationService.notifyAllUsers(
+          title: 'New nomination',
+          body: '$name was nominated for the Malcolm Ball Award',
+        );
+      } catch (_) {}
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -122,13 +129,20 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     }
   }
 
-  Future<void> _react(String nomineeId, String emoji) async {
+  Future<void> _reactToMessage(String messageId, String emoji) async {
     try {
-      await _service.addEmoji(nomineeId, emoji);
-      // We won't reload for emoji reactions to keep UI snappy
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Reacted $emoji')));
+      await _service.addMessageEmoji(messageId: messageId, emoji: emoji);
+      try {
+        await NotificationService.notifyAllUsers(
+          title: 'New reaction',
+          body: 'Someone reacted $emoji in Malcolm Ball chat',
+        );
+      } catch (_) {}
+      final counts = await _service.fetchMessageEmojiCounts({messageId});
+      if (!mounted) return;
+      setState(() {
+        _messageEmojiCounts[messageId] = counts[messageId] ?? {};
+      });
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -136,27 +150,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     }
   }
 
-  Future<void> _addComment() async {
-    final text = _commentController.text.trim();
-    final nomineeId = _commentNomineeId;
-    if (nomineeId == null || text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose a nominee and enter a comment')),
-      );
-      return;
-    }
-    try {
-      await _service.addComment(nomineeId: nomineeId, content: text);
-      _commentController.clear();
-      final comments = await _service.fetchRecentComments();
-      if (!mounted) return;
-      setState(() => _comments = comments);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Comment failed: $e')));
-    }
-  }
+  // _addComment removed in favor of general chat
 
   @override
   Widget build(BuildContext context) {
@@ -510,13 +504,25 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'And The Nominees Are...',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'And The Nominees Are...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (_isAdmin)
+                IconButton(
+                  tooltip: 'View vote tally',
+                  onPressed: _showVotesTallyDialog,
+                  icon: const Icon(Icons.bar_chart, color: Color(0xFFFFD700)),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           if (_nominees.isEmpty)
@@ -525,146 +531,51 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               style: TextStyle(color: Colors.white70),
             )
           else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _nominees
-                  .map((n) => _nomineeCard(n))
-                  .toList(growable: false),
-            ),
+            Column(children: _nominees.map((n) => _nomineeRow(n)).toList()),
         ],
       ),
     );
   }
 
-  Widget _nomineeCard(AwardNominee n) {
+  Widget _nomineeRow(AwardNominee n) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF161B26),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFF5C542)),
       ),
-      width: 220,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  n.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          Expanded(
+            child: Text(
+              n.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0x33F5C542),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF5C542)),
-                ),
-                child: Text(
-                  '${n.votes} votes',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0057B7),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0057B7),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () => _vote(n.id),
-                  icon: const Icon(Icons.how_to_vote),
-                  label: const Text('Vote'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _emojiButton(n.id, '👍'),
-              _emojiButton(n.id, '🎉'),
-              _emojiButton(n.id, '🏃‍♂️'),
-              _emojiButton(n.id, '❤️'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Builder(
-            builder: (context) {
-              final counts = _emojiCounts[n.id] ?? const {};
-              final entries = ['👍', '🎉', '🏃‍♂️', '❤️']
-                  .map((e) => MapEntry(e, counts[e] ?? 0))
-                  .where((e) => e.value > 0);
-              if (entries.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: entries
-                    .map(
-                      (e) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(e.key, style: const TextStyle(fontSize: 14)),
-                            const SizedBox(width: 6),
-                            Text(
-                              e.value.toString(),
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(growable: false),
-              );
-            },
+            ),
+            onPressed: () => _vote(n.id),
+            icon: const Icon(Icons.how_to_vote, size: 18),
+            label: const Text('Vote'),
           ),
         ],
       ),
     );
   }
 
-  Widget _emojiButton(String nomineeId, String emoji) {
-    return InkWell(
-      onTap: () => _react(nomineeId, emoji),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Text(emoji, style: const TextStyle(fontSize: 16)),
-      ),
-    );
-  }
+  // reactions moved to chat messages
 
   Widget _nominationForm() {
     return Padding(
@@ -771,84 +682,242 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             ),
           ),
           const SizedBox(height: 8),
-          if (_nominees.isNotEmpty)
-            DropdownButtonFormField<String>(
-              value: _commentNomineeId,
-              items: _nominees
-                  .map(
-                    (n) => DropdownMenuItem(value: n.id, child: Text(n.name)),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => _commentNomineeId = v),
-              decoration: const InputDecoration(labelText: 'Nominee'),
-              dropdownColor: const Color(0xFF0F111A),
-              style: const TextStyle(color: Colors.white),
-            ),
-          const SizedBox(height: 8),
           TextField(
             controller: _commentController,
             style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: 'Write a comment about this nominee',
-            ),
+            decoration: const InputDecoration(labelText: 'Write a comment'),
           ),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
-              onPressed: _addComment,
+              onPressed: _addChatMessage,
               icon: const Icon(Icons.send),
               label: const Text('Post Comment'),
             ),
           ),
           const SizedBox(height: 12),
-          ..._comments.map(
-            (c) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF161B26),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            c.nomineeName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _formatTime(c.createdAt),
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const SizedBox(height: 6),
-                    Text(
-                      c.content,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          ..._chatMessages.map(_chatMessageTile),
         ],
       ),
     );
+  }
+
+  Widget _chatMessageTile(AwardChatMessage m) {
+    final counts = _messageEmojiCounts[m.id] ?? const {};
+    final emojis = ['👍', '🎉', '🏃‍♂️', '❤️'];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161B26),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: (m.avatarUrl != null && m.avatarUrl!.isNotEmpty)
+                  ? NetworkImage(m.avatarUrl!)
+                  : null,
+              child: (m.avatarUrl == null || m.avatarUrl!.isEmpty)
+                  ? Text(
+                      (m.userName.isNotEmpty ? m.userName[0] : '?'),
+                      style: const TextStyle(color: Colors.white),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          m.userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatTime(m.createdAt),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(m.content, style: const TextStyle(color: Colors.white)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ...emojis.map(
+                        (e) => InkWell(
+                          onTap: () => _reactToMessage(m.id, e),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(e),
+                                if ((counts[e] ?? 0) > 0) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    (counts[e] ?? 0).toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addChatMessage() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    try {
+      await _service.addChatMessage(content: text);
+      try {
+        await NotificationService.notifyAllUsers(
+          title: 'New comment',
+          body: text.length > 80 ? text.substring(0, 80) + '…' : text,
+        );
+      } catch (_) {}
+      _commentController.clear();
+      final chat = await _service.fetchChatMessages();
+      final chatCounts = await _service.fetchMessageEmojiCounts(
+        chat.map((m) => m.id).toSet(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _chatMessages = chat;
+        _messageEmojiCounts = chatCounts;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Comment failed: $e')));
+    }
+  }
+
+  Future<void> _showVotesTallyDialog() async {
+    try {
+      final tally = await _service.fetchVotesTallyDetailed();
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: const Text(
+            'Vote Tally',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: tally.map((t) {
+                  final voters = (t['voters'] as List).cast<String>();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                t['nominee_name'] as String,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0x33F5C542),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFF5C542),
+                                ),
+                              ),
+                              child: Text(
+                                '${t['count']} votes',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (voters.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            voters.join(', '),
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load tally: $e')));
+    }
   }
 
   String _formatTime(DateTime dt) {
