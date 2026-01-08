@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/malcolm_ball_award_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MalcolmBallAwardPage extends StatefulWidget {
   const MalcolmBallAwardPage({super.key});
@@ -21,6 +22,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   List<AwardCommentItem> _comments = [];
   List<AwardWinnerItem> _winners = [];
   bool _isAdmin = false;
+  List<String> _memberNames = [];
 
   @override
   void initState() {
@@ -41,12 +43,22 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       final comments = await _service.fetchRecentComments();
       final winners = await _service.fetchWinners();
       final admin = await UserService.isAdmin();
+      final membersRows = await Supabase.instance.client
+          .from('user_profiles')
+          .select('full_name')
+          .order('full_name');
+      final memberNames = (membersRows as List)
+          .map((r) => (r['full_name'] as String?)?.trim())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toList(growable: false);
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
         _comments = comments;
         _winners = winners;
         _isAdmin = admin;
+        _memberNames = memberNames;
         _loading = false;
         _commentNomineeId = nominees.isNotEmpty ? nominees.first.id : null;
       });
@@ -142,6 +154,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
   @override
   Widget build(BuildContext context) {
+    const headerHeight = 260.0;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Malcolm Ball Award 2026'),
@@ -149,28 +162,80 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _heroHeader(),
-                    const SizedBox(height: 12),
-                    _storyCard(),
-                    const SizedBox(height: 16),
-                    _hallOfFameSection(),
-                    const SizedBox(height: 16),
-                    _nomineesSection(),
-                    const SizedBox(height: 16),
-                    _nominationForm(),
-                    const SizedBox(height: 16),
-                    _commentsSection(),
-                    const SizedBox(height: 24),
-                  ],
+          : Stack(
+              children: [
+                // Fixed header image
+                SizedBox(
+                  height: headerHeight,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        'assets/images/malcolmball.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      ),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.transparent, Colors.black54],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                      // Title overlay
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'The Malcolm Ball Inspirational\nRunning Award 2026',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'The Nominations',
+                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                // Scrollable content overlays below the image
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(top: headerHeight - 40),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _storyCard(),
+                        const SizedBox(height: 16),
+                        _hallOfFameSection(),
+                        const SizedBox(height: 16),
+                        _nomineesSection(),
+                        const SizedBox(height: 16),
+                        _nominationForm(),
+                        const SizedBox(height: 16),
+                        _commentsSection(),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -256,7 +321,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: const Color(0xFF0F111A),
-          title: const Text('Add Previous Winner', style: TextStyle(color: Colors.white)),
+          title: const Text(
+            'Add Previous Winner',
+            style: TextStyle(color: Colors.white),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -264,7 +332,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 controller: yearController,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Year (e.g. 2024)'),
+                decoration: const InputDecoration(
+                  labelText: 'Year (e.g. 2024)',
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -302,70 +372,21 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       await _service.addWinner(year: year, name: name);
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Winner added')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Winner added')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add winner: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to add winner: $e')));
     }
   }
 
-  Widget _heroHeader() {
-    return Stack(
-      children: [
-        SizedBox(
-          height: 180,
-          width: double.infinity,
-          child: Image.asset(
-            'assets/images/malcolmball.png',
-            fit: BoxFit.cover,
-            color: Colors.black.withOpacity(0.35),
-            colorBlendMode: BlendMode.darken,
-          ),
-        ),
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.transparent, Colors.black54],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 16,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'The Malcolm Ball Inspirational\nRunning Award 2026',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'The Nominations',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // (header moved to top-level Stack in build)
 
   Widget _storyCard() {
-    const story =
+    const body =
         'He has run across the mountainous Lake District terrain, completed 39 marathons, run for the England cross country team and gone through scores of trainers.\n\n'
         'An amateur running enthusiast Malcolm Ball, from Ridgeway in Cromer, has no plans to give up.\n'
         'Mr Ball, who served as a Royal Marines Commando for two years in Malaya as a teenager for his National Service, is a member of the North Norfolk Beach Runners.\n'
@@ -375,8 +396,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         'He has also completed eight marathons in under three hours.\n'
         'His fastest marathon time was two hours, 56 minutes and 49 seconds at London in 1990.\n'
         'As well as running 35-40 miles a week, Mr Ball goes to the gym every day and attends aqua Zumba and aqua fitness classes three times a week.\n'
-        'He also trains newcomers to the North Norfolk Beach Runners.\n\n'
-        '— Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
+        'He also trains newcomers to the North Norfolk Beach Runners.';
+    const credit = '— Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -387,9 +408,19 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFF5C542), width: 1),
         ),
-        child: const Text(
-          story,
-          style: TextStyle(color: Colors.white, height: 1.35),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              body,
+              style: TextStyle(color: Colors.white, height: 1.35),
+            ),
+            SizedBox(height: 10),
+            Text(
+              credit,
+              style: TextStyle(color: Colors.white54, fontSize: 11, fontStyle: FontStyle.italic, height: 1.3),
+            ),
+          ],
         ),
       ),
     );
@@ -653,6 +684,24 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         ),
                       ],
                     ),
+                            const SizedBox(height: 10),
+                            if (_memberNames.isNotEmpty)
+                              DropdownButtonFormField<String>(
+                                value: null,
+                                items: _memberNames
+                                    .map((n) => DropdownMenuItem(value: n, child: Text(n)))
+                                    .toList(growable: false),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    _nameController.text = val;
+                                  }
+                                },
+                                decoration: const InputDecoration(
+                                  labelText: 'Or pick from members',
+                                ),
+                                dropdownColor: const Color(0xFF0F111A),
+                                style: const TextStyle(color: Colors.white),
+                              ),
                     const SizedBox(height: 6),
                     Text(
                       c.content,
