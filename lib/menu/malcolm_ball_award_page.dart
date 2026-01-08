@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/malcolm_ball_award_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 class MalcolmBallAwardPage extends StatefulWidget {
   const MalcolmBallAwardPage({super.key});
@@ -18,15 +19,19 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   bool _loading = true;
   List<AwardNominee> _nominees = [];
   List<AwardCommentItem> _comments = [];
+  List<AwardWinnerItem> _winners = [];
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _service.subscribeToChanges(onAnyChange: () {
-      // Refresh nominees and comments whenever any table changes
-      _load();
-    });
+    _service.subscribeToChanges(
+      onAnyChange: () {
+        // Refresh nominees and comments whenever any table changes
+        _load();
+      },
+    );
   }
 
   Future<void> _load() async {
@@ -34,10 +39,14 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     try {
       final nominees = await _service.fetchNominees();
       final comments = await _service.fetchRecentComments();
+      final winners = await _service.fetchWinners();
+      final admin = await UserService.isAdmin();
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
         _comments = comments;
+        _winners = winners;
+        _isAdmin = admin;
         _loading = false;
         _commentNomineeId = nominees.isNotEmpty ? nominees.first.id : null;
       });
@@ -151,6 +160,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     const SizedBox(height: 12),
                     _storyCard(),
                     const SizedBox(height: 16),
+                    _hallOfFameSection(),
+                    const SizedBox(height: 16),
                     _nomineesSection(),
                     const SizedBox(height: 16),
                     _nominationForm(),
@@ -162,6 +173,144 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               ),
             ),
     );
+  }
+
+  Widget _hallOfFameSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F111A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF5C542), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Hall Of Fame',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (_isAdmin)
+                  OutlinedButton.icon(
+                    onPressed: _showAddWinnerDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Previous Winner'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFFD700),
+                      side: const BorderSide(color: Color(0xFFFFD700)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_winners.isEmpty)
+              const Text(
+                'No winners recorded yet.',
+                style: TextStyle(color: Colors.white70),
+              )
+            else
+              ..._winners.map(
+                (w) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Text(
+                        w.year.toString(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          w.name,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddWinnerDialog() async {
+    final yearController = TextEditingController();
+    final nameController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: const Text('Add Previous Winner', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: yearController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Year (e.g. 2024)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Winner name'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true) return;
+    final yearRaw = yearController.text.trim();
+    final name = nameController.text.trim();
+    final year = int.tryParse(yearRaw);
+    if (year == null || name.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid year and name')),
+      );
+      return;
+    }
+    try {
+      await _service.addWinner(year: year, name: name);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Winner added')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add winner: $e')),
+      );
+    }
   }
 
   Widget _heroHeader() {

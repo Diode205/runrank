@@ -26,6 +26,19 @@ class AwardCommentItem {
   });
 }
 
+class AwardWinnerItem {
+  final String id;
+  final int year;
+  final String name;
+  final String? nomineeId;
+  AwardWinnerItem({
+    required this.id,
+    required this.year,
+    required this.name,
+    this.nomineeId,
+  });
+}
+
 class MalcolmBallAwardService {
   final SupabaseClient _supabase = Supabase.instance.client;
   RealtimeChannel? _channel;
@@ -160,6 +173,29 @@ class MalcolmBallAwardService {
         .toList();
   }
 
+  Future<List<AwardWinnerItem>> fetchWinners() async {
+    final rows = await _supabase
+        .from('award_winners')
+        .select('id, year, name, nominee_id')
+        .order('year', ascending: false);
+    return (rows as List)
+        .map((r) => AwardWinnerItem(
+              id: r['id'] as String,
+              year: r['year'] as int,
+              name: r['name'] as String,
+              nomineeId: r['nominee_id'] as String?,
+            ))
+        .toList();
+  }
+
+  Future<void> addWinner({required int year, required String name, String? nomineeId}) async {
+    await _supabase.from('award_winners').insert({
+      'year': year,
+      'name': name.trim(),
+      if (nomineeId != null) 'nominee_id': nomineeId,
+    });
+  }
+
   RealtimeChannel subscribeToChanges({required void Function() onAnyChange}) {
     // Unsubscribe any previous channel first
     _channel?.unsubscribe();
@@ -170,6 +206,7 @@ class MalcolmBallAwardService {
       'award_emojis',
       'award_comments',
       'award_nominations',
+      'award_winners',
     ]) {
       ch.onPostgresChanges(
         event: PostgresChangeEvent.all,
