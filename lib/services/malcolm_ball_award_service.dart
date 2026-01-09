@@ -241,6 +241,7 @@ class MalcolmBallAwardService {
       'award_winners',
       'award_chat_messages',
       'award_message_emojis',
+      'award_settings',
     ]) {
       ch.onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -395,5 +396,66 @@ class MalcolmBallAwardService {
     // Sort by count desc
     results.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
     return results;
+  }
+
+  // ---------------- Voting end date (settings) ----------------
+  Future<DateTime?> fetchVotingEndsAt() async {
+    try {
+      final row = await _supabase
+          .from('award_settings')
+          .select('voting_ends_at')
+          .maybeSingle();
+      if (row == null) return null;
+      final val = row['voting_ends_at'] as String?;
+      return val != null ? DateTime.parse(val) : null;
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') return null;
+      rethrow;
+    }
+  }
+
+  Future<void> setVotingEndsAt(DateTime? dt) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in');
+    }
+    await _supabase.from('award_settings').upsert({
+      'singleton': true,
+      'voting_ends_at': dt?.toIso8601String(),
+      'updated_by': user.id,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // ---------------- Voting end date (settings) ----------------
+  Future<DateTime?> fetchVotingEndDate() async {
+    try {
+      final row = await _supabase
+          .from('award_settings')
+          .select('value')
+          .eq('key', 'voting_end_date')
+          .maybeSingle();
+      if (row == null) return null;
+      final val = row['value'] as String?;
+      if (val == null || val.trim().isEmpty) return null;
+      // Expecting ISO date (YYYY-MM-DD)
+      return DateTime.tryParse(val);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') return null; // table not in schema yet
+      rethrow;
+    }
+  }
+
+  Future<void> setVotingEndDate(DateTime date) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in as admin');
+    }
+    final iso = date.toIso8601String().split('T').first; // YYYY-MM-DD
+    await _supabase.from('award_settings').upsert({
+      'key': 'voting_end_date',
+      'value': iso,
+      'updated_by': user.id,
+    });
   }
 }

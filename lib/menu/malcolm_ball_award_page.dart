@@ -26,6 +26,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   bool _storyExpanded = false;
   List<AwardChatMessage> _chatMessages = [];
   Map<String, Map<String, int>> _messageEmojiCounts = {};
+  DateTime? _votingEndsAt;
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       final chatCounts = await _service.fetchMessageEmojiCounts(
         chat.map((m) => m.id).toSet(),
       );
+      final votingEndsAt = await _service.fetchVotingEndsAt();
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
@@ -67,6 +69,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         _memberNames = memberNames;
         _chatMessages = chat;
         _messageEmojiCounts = chatCounts;
+        _votingEndsAt = votingEndsAt;
         _loading = false;
       });
     } catch (e) {
@@ -194,7 +197,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
                             Text(
-                              'The Malcolm Ball Inspirational\nRunning Award 2026',
+                              'The Malcolm Ball Inspirational\nRunner Award 2026',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -254,56 +257,70 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           border: Border.all(color: const Color(0xFFF5C542), width: 1),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Hall Of Fame',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            if (_isAdmin)
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  tooltip: 'Add previous winner',
+                  onPressed: _showAddWinnerDialog,
+                  icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
                 ),
-                if (_isAdmin)
-                  OutlinedButton.icon(
-                    onPressed: _showAddWinnerDialog,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Previous Winner'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFFFD700),
-                      side: const BorderSide(color: Color(0xFFFFD700)),
-                    ),
-                  ),
-              ],
+              ),
+            const Text(
+              'Hall Of Fame',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            const SizedBox(height: 8),
             const SizedBox(height: 8),
             if (_winners.isEmpty)
               const Text(
                 'No winners recorded yet.',
+                textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70),
               )
             else
               ..._winners.map(
                 (w) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        w.year.toString(),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x33F5C542),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF5C542)),
+                        ),
+                        child: Text(
+                          w.year.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                      const SizedBox(width: 10),
+                      Flexible(
                         child: Text(
                           w.name,
-                          style: const TextStyle(color: Colors.white),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -317,6 +334,13 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   }
 
   Future<void> _showAddWinnerDialog() async {
+    if (!_isAdmin) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Admins only')));
+      return;
+    }
     final yearController = TextEditingController();
     final nameController = TextEditingController();
     final ok = await showDialog<bool>(
@@ -364,7 +388,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                           onSubmitted: (_) => onFieldSubmitted(),
                           style: const TextStyle(color: Colors.white),
                           decoration: const InputDecoration(
-                            labelText: 'Search member (optional)',
+                            labelText: 'Search Member (Optional)',
                           ),
                         );
                       },
@@ -374,7 +398,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Winner name'),
+                decoration: const InputDecoration(labelText: 'Winner Name'),
               ),
             ],
           ),
@@ -432,7 +456,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         'As well as running 35-40 miles a week, Mr Ball goes to the gym every day and attends aqua Zumba and aqua fitness classes three times a week.\n'
         'He also trains newcomers to the North Norfolk Beach Runners.';
     const credit =
-        '— Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
+        '         — Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
 
     final breakIdx = body.indexOf('\n\n');
     final firstPara = breakIdx > 0 ? body.substring(0, breakIdx) : body;
@@ -447,9 +471,11 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFF5C542), width: 1),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             Text(
               firstPara,
               style: const TextStyle(color: Colors.white, height: 1.35),
@@ -591,7 +617,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Nominate an inspiring NNBR runner',
+              '     Nominate An Inspiring NNBR Member',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
@@ -622,7 +648,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         onSubmitted: (_) => onFieldSubmitted(),
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
-                          labelText: 'Nominee full name (type or pick)',
+                          labelText: 'Nominee Full Name (Type Or Pick)',
                         ),
                       );
                     },
@@ -632,7 +658,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  labelText: 'Nominee full name',
+                  labelText: 'Nominee Full Name',
                 ),
               ),
             const SizedBox(height: 10),
@@ -640,7 +666,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               controller: _reasonController,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
-                labelText: 'Reason for nomination',
+                labelText: 'Reason For Nomination',
               ),
               maxLines: 3,
             ),
@@ -661,6 +687,27 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 label: const Text('Submit Nomination'),
               ),
             ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                _votingEndsAt != null
+                    ? 'Voting Ends On ${_formatDate(_votingEndsAt!)}'
+                    : 'Voting Ends On TBD',
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
+          ],
+            ),
+            if (_isAdmin)
+              Positioned(
+                bottom: 4,
+                right: 4,
+                child: IconButton(
+                  tooltip: 'Set Voting End Date',
+                  onPressed: _pickVotingEndDate,
+                  icon: const Icon(Icons.calendar_today, size: 20, color: Color(0xFFFFD700)),
+                ),
+              ),
           ],
         ),
       ),
@@ -685,7 +732,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           TextField(
             controller: _commentController,
             style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(labelText: 'Write a comment'),
+            decoration: const InputDecoration(labelText: 'Write A Comment'),
           ),
           const SizedBox(height: 10),
           Align(
@@ -811,7 +858,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       await _service.addChatMessage(content: text);
       try {
         await NotificationService.notifyAllUsers(
-          title: 'New comment',
+          title: 'New Comment',
           body: text.length > 80 ? text.substring(0, 80) + '…' : text,
         );
       } catch (_) {}
@@ -829,7 +876,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Comment failed: $e')));
+      ).showSnackBar(SnackBar(content: Text('Comment Failed: $e')));
     }
   }
 
@@ -892,9 +939,36 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         ),
                         if (voters.isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          Text(
-                            voters.join(', '),
-                            style: const TextStyle(color: Colors.white70),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: voters
+                                  .map(
+                                    (name) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Row(
+                                        children: [
+                                          const Text(
+                                            '• ',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              name,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
                           ),
                         ],
                       ],
@@ -927,5 +1001,32 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime dt) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  Future<void> _pickVotingEndDate() async {
+    final initial = _votingEndsAt ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(DateTime.now().year - 1),
+      lastDate: DateTime(DateTime.now().year + 5),
+    );
+    if (picked == null) return;
+    try {
+      final dateOnly = DateTime(picked.year, picked.month, picked.day);
+      await _service.setVotingEndsAt(dateOnly);
+      if (!mounted) return;
+      setState(() => _votingEndsAt = dateOnly);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to set date: $e')),
+      );
+    }
   }
 }
