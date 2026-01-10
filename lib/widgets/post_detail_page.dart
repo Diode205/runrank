@@ -35,6 +35,21 @@ class _PostDetailPageState extends State<PostDetailPage> {
     '😡',
   ];
 
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,7 +65,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .from('club_posts')
           .select('''
             *,
-            user_profiles!club_posts_author_id_fkey(full_name, avatar_url)
+        user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type)
           ''')
           .eq('id', widget.postId)
           .maybeSingle();
@@ -76,7 +91,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .from('club_post_comments')
           .select('''
             *,
-            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url)
+        user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
           ''')
           .eq('post_id', widget.postId)
           .order('created_at', ascending: true);
@@ -426,6 +441,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
     final authorName = post!['user_profiles']?['full_name'] ?? 'Unknown';
     final authorAvatarUrl = post!['user_profiles']?['avatar_url'] as String?;
+    final authorMembershipType =
+        post!['user_profiles']?['membership_type'] as String?;
     final imageUrl = post!['image_url'] as String?;
 
     return Scaffold(
@@ -479,23 +496,33 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.blue,
-                          backgroundImage: authorAvatarUrl != null
-                              ? NetworkImage(
-                                  '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                )
-                              : null,
-                          child: authorAvatarUrl == null
-                              ? Text(
-                                  authorName[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
+                        Container(
+                          padding: const EdgeInsets.all(1.6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _membershipColor(authorMembershipType),
+                              width: 1.6,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.white12,
+                            backgroundImage: authorAvatarUrl != null
+                                ? NetworkImage(
+                                    '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                  )
+                                : null,
+                            child: authorAvatarUrl == null
+                                ? Text(
+                                    authorName[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -801,6 +828,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         comment['user_profiles']?['full_name'] ?? 'Unknown';
                     final avatarUrl =
                         comment['user_profiles']?['avatar_url'] as String?;
+                    final membershipType =
+                        comment['user_profiles']?['membership_type'] as String?;
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -809,23 +838,33 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Colors.green,
-                            backgroundImage: avatarUrl != null
-                                ? NetworkImage(
-                                    '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                  )
-                                : null,
-                            child: avatarUrl == null
-                                ? Text(
-                                    commentAuthor[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : null,
+                          Container(
+                            padding: const EdgeInsets.all(1.4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _membershipColor(membershipType),
+                                width: 1.4,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Colors.white12,
+                              backgroundImage: avatarUrl != null
+                                  ? NetworkImage(
+                                      '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                    )
+                                  : null,
+                              child: avatarUrl == null
+                                  ? Text(
+                                      commentAuthor[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : null,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(

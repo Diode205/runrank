@@ -278,6 +278,21 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     return list[m - 1];
   }
 
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
+
   int hhmmssToSeconds(String text) {
     final parts = text.split(':').map(int.parse).toList();
     return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -556,7 +571,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
     final profiles = await supabase
         .from('user_profiles')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url, membership_type')
         .inFilter('id', ids.toList());
 
     final Map<String, String> idToName = {
@@ -568,12 +583,18 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       for (final p in profiles) p['id'] as String: p['avatar_url'] as String?,
     };
 
+    final Map<String, String?> idToMembership = {
+      for (final p in profiles)
+        p['id'] as String: p['membership_type'] as String?,
+    };
+
     return [
       for (final m in messages)
         {
           ...m,
           'senderName': idToName[m['sender_id']] ?? 'Member',
           'avatarUrl': idToAvatar[m['sender_id']],
+          'membershipType': idToMembership[m['sender_id']],
         },
     ];
   }
@@ -713,7 +734,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       final orFilter = userIds.map((id) => 'id.eq.$id').join(',');
       final profileRows = await supabase
           .from('user_profiles')
-          .select('id, full_name, avatar_url')
+          .select('id, full_name, avatar_url, membership_type')
           .or(orFilter);
 
       final Map<String, String> idToName = {
@@ -726,6 +747,11 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           p['id'] as String: p['avatar_url'] as String?,
       };
 
+      final Map<String, String?> idToMembership = {
+        for (final p in profileRows)
+          p['id'] as String: p['membership_type'] as String?,
+      };
+
       return [
         for (final c in commentRows)
           {
@@ -733,6 +759,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             'userId': c['user_id'] as String?,
             'fullName': idToName[(c['user_id'] as String?) ?? ''] ?? 'Unknown',
             'avatarUrl': idToAvatar[(c['user_id'] as String?) ?? ''],
+            'membershipType': idToMembership[(c['user_id'] as String?) ?? ''],
             'comment': c['comment'] as String?,
             'timestamp': c['timestamp'] as String?,
           },
@@ -903,6 +930,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         final ts = c['timestamp'] as String?;
         final commentId = c['id']?.toString() ?? '';
         final avatarUrl = c['avatarUrl'] as String?;
+        final membershipType = c['membershipType'] as String?;
         final emojiMap =
             commentReactions[commentId] ?? const <String, List<String>>{};
 
@@ -917,24 +945,34 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.white12,
-                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                      ? NetworkImage(
-                          '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                        )
-                      : null,
-                  child: avatarUrl == null || avatarUrl.isEmpty
-                      ? Text(
-                          initials.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : null,
+                Container(
+                  padding: const EdgeInsets.all(1.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _membershipColor(membershipType),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white12,
+                    backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? NetworkImage(
+                            '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                          )
+                        : null,
+                    child: avatarUrl == null || avatarUrl.isEmpty
+                        ? Text(
+                            initials.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(

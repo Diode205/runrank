@@ -16,6 +16,20 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
 
   @override
   void initState() {
@@ -68,7 +82,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -79,7 +93,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -90,7 +104,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -280,23 +294,36 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                             // Header with author and time
                             Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: Colors.blue,
-                                  backgroundImage: authorAvatarUrl != null
-                                      ? NetworkImage(
-                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                        )
-                                      : null,
-                                  child: authorAvatarUrl == null
-                                      ? Text(
-                                          displayAuthor[0].toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
+                                Container(
+                                  padding: const EdgeInsets.all(1.6),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _membershipColor(
+                                        post['user_profiles']?['membership_type']
+                                            as String?,
+                                      ),
+                                      width: 1.6,
+                                    ),
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Colors.white12,
+                                    backgroundImage: authorAvatarUrl != null
+                                        ? NetworkImage(
+                                            '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                          )
+                                        : null,
+                                    child: authorAvatarUrl == null
+                                        ? Text(
+                                            displayAuthor[0].toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

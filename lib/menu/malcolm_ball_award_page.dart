@@ -250,7 +250,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        // Reduced top padding; normal bottom since button sits after content
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
         decoration: BoxDecoration(
           color: const Color(0xFF0F111A),
           borderRadius: BorderRadius.circular(12),
@@ -259,25 +260,21 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (_isAdmin)
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  tooltip: 'Add previous winner',
-                  onPressed: _showAddWinnerDialog,
-                  icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
+            // Centered header
+            const SizedBox(
+              height: 36,
+              child: Center(
+                child: Text(
+                  '🏆 Hall Of Fame 🏆',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-            const Text(
-              'Hall Of Fame',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
             ),
-            const SizedBox(height: 8),
             const SizedBox(height: 8),
             if (_winners.isEmpty)
               const Text(
@@ -286,44 +283,74 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 style: TextStyle(color: Colors.white70),
               )
             else
-              ..._winners.map(
-                (w) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final winners = [..._winners]
+                    ..sort((a, b) => b.year.compareTo(a.year));
+                  const spacing = 10.0;
+                  final itemWidth = (constraints.maxWidth - spacing) / 2;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: 8,
+                    children: winners.map((w) {
+                      return SizedBox(
+                        width: itemWidth,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0x33F5C542),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFF5C542),
+                                ),
+                              ),
+                              child: Text(
+                                w.year.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                w.name,
+                                textAlign: TextAlign.left,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x33F5C542),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFF5C542)),
-                        ),
-                        child: Text(
-                          w.year.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(
-                          w.name,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            if (_isAdmin)
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: IconButton(
+                    tooltip: 'Add previous winner',
+                    onPressed: _showAddWinnerDialog,
+                    icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
+                    iconSize: 22,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ),
@@ -476,47 +503,49 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-            Text(
-              firstPara,
-              style: const TextStyle(color: Colors.white, height: 1.35),
-            ),
-            if (!_storyExpanded && rest.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => setState(() => _storyExpanded = true),
-                  child: const Text('Read more ⌄'),
+                Text(
+                  firstPara,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
                 ),
-              ),
-            ],
-            if (_storyExpanded && rest.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                rest,
-                style: const TextStyle(color: Colors.white, height: 1.35),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => setState(() => _storyExpanded = false),
-                  child: const Text('Show less ⌃'),
+                if (!_storyExpanded && rest.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => setState(() => _storyExpanded = true),
+                      child: const Text('Read more ⌄'),
+                    ),
+                  ),
+                ],
+                if (_storyExpanded && rest.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    rest,
+                    style: const TextStyle(color: Colors.white, height: 1.35),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => setState(() => _storyExpanded = false),
+                      child: const Text('Show less ⌃'),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    credit,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-            const SizedBox(height: 10),
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                credit,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                  height: 1.3,
-                ),
-              ),
+              ],
             ),
           ],
         ),
@@ -606,110 +635,117 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Widget _nominationForm() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F111A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF5C542), width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '     Nominate An Inspiring NNBR Member',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F111A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF5C542), width: 1),
             ),
-            const SizedBox(height: 10),
-            if (_memberNames.isNotEmpty)
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue tv) {
-                  final q = tv.text.trim().toLowerCase();
-                  if (q.isEmpty) return const Iterable<String>.empty();
-                  return _memberNames.where((n) => n.toLowerCase().contains(q));
-                },
-                onSelected: (selection) {
-                  _nameController.text = selection;
-                },
-                fieldViewBuilder:
-                    (ctx, controller, focusNode, onFieldSubmitted) {
-                      // Bind our controller so we can submit free text too
-                      controller.text = _nameController.text;
-                      controller.addListener(() {
-                        _nameController.text = controller.text;
-                      });
-                      return TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onSubmitted: (_) => onFieldSubmitted(),
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          labelText: 'Nominee Full Name (Type Or Pick)',
-                        ),
-                      );
-                    },
-              )
-            else
-              TextField(
-                controller: _nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Nominee Full Name',
-                ),
-              ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _reasonController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Reason For Nomination',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD700),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '     Nominate An Inspiring NNBR Member',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                onPressed: _submitNomination,
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('Submit Nomination'),
-              ),
+                const SizedBox(height: 10),
+                if (_memberNames.isNotEmpty)
+                  Autocomplete<String>(
+                    optionsBuilder: (TextEditingValue tv) {
+                      final q = tv.text.trim().toLowerCase();
+                      if (q.isEmpty) return const Iterable<String>.empty();
+                      return _memberNames.where(
+                        (n) => n.toLowerCase().contains(q),
+                      );
+                    },
+                    onSelected: (selection) {
+                      _nameController.text = selection;
+                    },
+                    fieldViewBuilder:
+                        (ctx, controller, focusNode, onFieldSubmitted) {
+                          controller.text = _nameController.text;
+                          controller.addListener(() {
+                            _nameController.text = controller.text;
+                          });
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            onSubmitted: (_) => onFieldSubmitted(),
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              labelText: 'Nominee Full Name (Type Or Pick)',
+                            ),
+                          );
+                        },
+                  )
+                else
+                  TextField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Nominee Full Name',
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _reasonController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Reason For Nomination',
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD700),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _submitNomination,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('Submit Nomination'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    _votingEndsAt != null
+                        ? 'Voting Ends On ${_formatDate(_votingEndsAt!)}'
+                        : 'Voting Ends On TBD',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                _votingEndsAt != null
-                    ? 'Voting Ends On ${_formatDate(_votingEndsAt!)}'
-                    : 'Voting Ends On TBD',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ),
-          ],
-            ),
-            if (_isAdmin)
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: IconButton(
-                  tooltip: 'Set Voting End Date',
-                  onPressed: _pickVotingEndDate,
-                  icon: const Icon(Icons.calendar_today, size: 20, color: Color(0xFFFFD700)),
+          ),
+          if (_isAdmin)
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: IconButton(
+                tooltip: 'Set Voting End Date',
+                onPressed: _pickVotingEndDate,
+                icon: const Icon(
+                  Icons.calendar_today,
+                  size: 20,
+                  color: Color(0xFFFFD700),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -753,6 +789,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Widget _chatMessageTile(AwardChatMessage m) {
     final counts = _messageEmojiCounts[m.id] ?? const {};
     final emojis = ['👍', '🎉', '🏃‍♂️', '❤️'];
+    Color borderColor = _membershipColor(m.membershipType);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -765,17 +802,26 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: (m.avatarUrl != null && m.avatarUrl!.isNotEmpty)
-                  ? NetworkImage(m.avatarUrl!)
-                  : null,
-              child: (m.avatarUrl == null || m.avatarUrl!.isEmpty)
-                  ? Text(
-                      (m.userName.isNotEmpty ? m.userName[0] : '?'),
-                      style: const TextStyle(color: Colors.white),
-                    )
-                  : null,
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundImage:
+                    (m.avatarUrl != null && m.avatarUrl!.isNotEmpty)
+                    ? NetworkImage(m.avatarUrl!)
+                    : null,
+                child: (m.avatarUrl == null || m.avatarUrl!.isEmpty)
+                    ? Text(
+                        (m.userName.isNotEmpty ? m.userName[0] : '?'),
+                        style: const TextStyle(color: Colors.white),
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -849,6 +895,21 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         ),
       ),
     );
+  }
+
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
   }
 
   Future<void> _addChatMessage() async {
@@ -1004,7 +1065,20 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   }
 
   String _formatDate(DateTime dt) {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
@@ -1024,9 +1098,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       setState(() => _votingEndsAt = dateOnly);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to set date: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to set date: $e')));
     }
   }
 }

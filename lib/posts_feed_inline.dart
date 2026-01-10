@@ -72,6 +72,21 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
     }
   }
 
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
+
   Future<void> _loadReactions(String postId) async {
     try {
       final user = supabase.auth.currentUser;
@@ -137,7 +152,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           .from('club_post_comments')
           .select('''
             id, user_id, comment, created_at,
-            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url)
+        user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
           ''')
           .eq('post_id', postId)
           .order('created_at', ascending: true);
@@ -186,7 +201,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         data = await supabase
             .from('club_posts')
             .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url), club_post_attachments(*)',
+              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type), club_post_attachments(*)',
             )
             .gte('expiry_date', now)
             .order('created_at', ascending: false);
@@ -194,7 +209,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         final approved = await supabase
             .from('club_posts')
             .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url), club_post_attachments(*)',
+              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type), club_post_attachments(*)',
             )
             .gte('expiry_date', now)
             .eq('is_approved', true)
@@ -203,7 +218,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         final mine = await supabase
             .from('club_posts')
             .select(
-              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url), club_post_attachments(*)',
+              '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type), club_post_attachments(*)',
             )
             .gte('expiry_date', now)
             .eq('author_id', user.id)
@@ -420,23 +435,36 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                           // Header
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Colors.blue,
-                                backgroundImage: authorAvatarUrl != null
-                                    ? NetworkImage(
-                                        '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                      )
-                                    : null,
-                                child: authorAvatarUrl == null
-                                    ? Text(
-                                        authorName[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
+                              Container(
+                                padding: const EdgeInsets.all(1.6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _membershipColor(
+                                      post['user_profiles']?['membership_type']
+                                          as String?,
+                                    ),
+                                    width: 1.6,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: Colors.white12,
+                                  backgroundImage: authorAvatarUrl != null
+                                      ? NetworkImage(
+                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                        )
+                                      : null,
+                                  child: authorAvatarUrl == null
+                                      ? Text(
+                                          authorName[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -863,26 +891,44 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              CircleAvatar(
-                                                radius: 12,
-                                                backgroundColor:
-                                                    Colors.grey[700],
-                                                backgroundImage:
-                                                    commentAvatarUrl != null
-                                                    ? NetworkImage(
-                                                        '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                                      )
-                                                    : null,
-                                                child: commentAvatarUrl == null
-                                                    ? Text(
-                                                        commentAuthor[0]
-                                                            .toUpperCase(),
-                                                        style: const TextStyle(
-                                                          fontSize: 8,
-                                                          color: Colors.white,
-                                                        ),
-                                                      )
-                                                    : null,
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  1.2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: _membershipColor(
+                                                      c['user_profiles']?['membership_type']
+                                                          as String?,
+                                                    ),
+                                                    width: 1.2,
+                                                  ),
+                                                ),
+                                                child: CircleAvatar(
+                                                  radius: 12,
+                                                  backgroundColor:
+                                                      Colors.white12,
+                                                  backgroundImage:
+                                                      commentAvatarUrl != null
+                                                      ? NetworkImage(
+                                                          '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                                        )
+                                                      : null,
+                                                  child:
+                                                      commentAvatarUrl == null
+                                                      ? Text(
+                                                          commentAuthor[0]
+                                                              .toUpperCase(),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 8,
+                                                                color: Colors
+                                                                    .white,
+                                                              ),
+                                                        )
+                                                      : null,
+                                                ),
                                               ),
                                               const SizedBox(width: 6),
                                               Expanded(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/club_records_service.dart';
+import 'package:runrank/menu/club_records_page.dart';
 
 class RaceRecord {
   final String raceName;
@@ -279,55 +280,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
           // Club Record Holder - prominently displayed
           if (clubRecord != null) ...[
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.emoji_events,
-                    color: Color(0xFFFFD700),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'CLUB RECORD',
-                          style: TextStyle(
-                            color: Color(0xFFFFD700),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          clubRecord.runnerName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ClubRecordsPage(initialDistance: distance),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1.5,
                     ),
                   ),
-                  Text(
-                    clubRecord.formattedTime,
-                    style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.emoji_events,
+                        color: Color(0xFFFFD700),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'CLUB RECORD',
+                              style: TextStyle(
+                                color: Color(0xFFFFD700),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              clubRecord.runnerName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        clubRecord.formattedTime,
+                        style: const TextStyle(
+                          color: Color(0xFFFFD700),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 12),

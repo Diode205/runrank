@@ -39,6 +39,21 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     '😡',
   ];
 
+  Color _membershipColor(String? membershipType) {
+    switch (membershipType) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -138,7 +153,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -155,7 +170,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -173,7 +188,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               created_at,
               is_approved,
               expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url),
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
@@ -322,7 +337,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           .from('club_post_comments')
           .select('''
             id, user_id, comment, created_at,
-            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url)
+        user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
           ''')
           .eq('post_id', postId)
           .order('created_at', ascending: true);
@@ -336,7 +351,6 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 
   Future<void> _addComment(String postId, String text) async {
     final user = supabase.auth.currentUser;
-    final messenger = ScaffoldMessenger.of(context);
     if (user == null) return;
     if (await UserService.isBlocked(context: context)) {
       return;
@@ -494,25 +508,38 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Colors.blue,
-                                backgroundImage: authorAvatarUrl != null
-                                    ? NetworkImage(
-                                        '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                      )
-                                    : null,
-                                child: authorAvatarUrl == null
-                                    ? Text(
-                                        authorName.isNotEmpty
-                                            ? authorName[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
+                              Container(
+                                padding: const EdgeInsets.all(1.6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _membershipColor(
+                                      post['user_profiles']?['membership_type']
+                                          as String?,
+                                    ),
+                                    width: 1.6,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: Colors.white12,
+                                  backgroundImage: authorAvatarUrl != null
+                                      ? NetworkImage(
+                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                        )
+                                      : null,
+                                  child: authorAvatarUrl == null
+                                      ? Text(
+                                          authorName.isNotEmpty
+                                              ? authorName[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -959,22 +986,35 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: Colors.blue,
-                                        backgroundImage:
-                                            commentAvatarUrl != null
-                                            ? NetworkImage(
-                                                '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                              )
-                                            : null,
-                                        child: commentAvatarUrl == null
-                                            ? const Icon(
-                                                Icons.person,
-                                                size: 16,
-                                                color: Colors.white,
-                                              )
-                                            : null,
+                                      Container(
+                                        padding: const EdgeInsets.all(1.2),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: _membershipColor(
+                                              c['user_profiles']?['membership_type']
+                                                  as String?,
+                                            ),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: Colors.white12,
+                                          backgroundImage:
+                                              commentAvatarUrl != null
+                                              ? NetworkImage(
+                                                  '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                                )
+                                              : null,
+                                          child: commentAvatarUrl == null
+                                              ? const Icon(
+                                                  Icons.person,
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                )
+                                              : null,
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(

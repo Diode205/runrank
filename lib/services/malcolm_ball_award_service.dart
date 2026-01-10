@@ -44,6 +44,7 @@ class AwardChatMessage {
   final String userId;
   final String userName;
   final String? avatarUrl;
+  final String? membershipType;
   final String content;
   final DateTime createdAt;
 
@@ -52,6 +53,7 @@ class AwardChatMessage {
     required this.userId,
     required this.userName,
     required this.avatarUrl,
+    required this.membershipType,
     required this.content,
     required this.createdAt,
   });
@@ -296,7 +298,7 @@ class MalcolmBallAwardService {
     if (userIds.isNotEmpty) {
       final profiles = await _supabase
           .from('user_profiles')
-          .select('id, full_name, avatar_url');
+          .select('id, full_name, avatar_url, membership_type');
       for (final p in profiles as List) {
         if (!userIds.contains(p['id'])) continue;
         profileById[p['id'] as String] = p as Map<String, dynamic>;
@@ -311,6 +313,7 @@ class MalcolmBallAwardService {
         userId: uid,
         userName: (prof['full_name'] as String?) ?? 'Unknown',
         avatarUrl: prof['avatar_url'] as String?,
+        membershipType: prof['membership_type'] as String?,
         content: r['content'] as String,
         createdAt: DateTime.parse(r['created_at'] as String),
       );

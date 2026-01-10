@@ -59,12 +59,12 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     super.dispose();
   }
 
-  // Called when returning to this page (e.g., after closing membership page)
   @override
   void didPopNext() {
     _loadProfile();
   }
 
+  // Quick edit bottom sheet
   Future<void> _showQuickEditSheet() async {
     final nameController = TextEditingController(text: _fullName ?? '');
     final emailController = TextEditingController(text: _email ?? '');
@@ -155,9 +155,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       ),
                     ],
                     onChanged: (val) {
-                      setModalState(() {
-                        selectedMembershipType = val;
-                      });
+                      setModalState(() => selectedMembershipType = val);
                     },
                     decoration: _inputDecoration('Select membership'),
                     dropdownColor: const Color(0xFF0F111A),
@@ -178,13 +176,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       onPressed: () async {
                         final user = _supabase.auth.currentUser;
                         if (user == null) return;
-
                         final newName = nameController.text.trim();
                         final newEmail = emailController.text.trim();
                         final newUka = ukaController.text.trim();
-
                         try {
-                          final updated = await _supabase
+                          await _supabase
                               .from('user_profiles')
                               .update({
                                 'full_name': newName.isEmpty ? null : newName,
@@ -192,19 +188,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                 'uka_number': newUka.isEmpty ? null : newUka,
                                 'membership_type': selectedMembershipType,
                               })
-                              .eq('id', user.id)
-                              .select()
-                              .maybeSingle();
-
-                          debugPrint('Quick edit saved row: $updated');
-
+                              .eq('id', user.id);
                           setState(() {
                             _fullName = newName.isEmpty ? null : newName;
                             _email = newEmail.isEmpty ? null : newEmail;
                             _ukaNumber = newUka.isEmpty ? null : newUka;
                             _membershipType = selectedMembershipType;
                           });
-
                           if (!mounted) return;
                           Navigator.pop(sheetContext);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -217,14 +207,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                             ),
                           );
                         } catch (e) {
-                          debugPrint('Error updating quick profile: $e');
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: Colors.redAccent,
-                              content: const Text(
-                                'Update failed',
-                                style: TextStyle(color: Colors.white),
+                              content: Text(
+                                'Update failed\n$e',
+                                style: const TextStyle(color: Colors.white),
                               ),
                             ),
                           );
@@ -246,7 +235,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         );
       },
     );
-
     nameController.dispose();
     emailController.dispose();
     ukaController.dispose();
@@ -277,7 +265,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       setState(() => _loading = false);
       return;
     }
-
     try {
       final profile = await _supabase
           .from('user_profiles')
@@ -286,16 +273,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           )
           .eq('id', user.id)
           .maybeSingle();
-
-      debugPrint('Profile data loaded: $profile');
-      debugPrint('User ID: ${user.id}');
-
       final isAdmin = await UserService.isAdmin();
-
       final memberSinceRaw = profile?['member_since'];
       final adminSinceRaw = profile?['admin_since'];
       final createdAtRaw = profile?['created_at'];
-
       DateTime? parsedMemberSince = memberSinceRaw is String
           ? DateTime.tryParse(memberSinceRaw)
           : memberSinceRaw is DateTime
@@ -311,7 +292,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           : createdAtRaw is DateTime
           ? createdAtRaw
           : null;
-
       if (parsedMemberSince == null && parsedCreatedAt != null) {
         try {
           await _supabase
@@ -319,12 +299,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               .update({'member_since': parsedCreatedAt.toIso8601String()})
               .eq('id', user.id);
           parsedMemberSince = parsedCreatedAt;
-        } catch (e) {
-          debugPrint('Backfill member_since failed: $e');
-        }
+        } catch (_) {}
       }
-
-      // Ensure admin_since is set the first time a user becomes admin
       if (isAdmin && parsedAdminSince == null) {
         try {
           final now = DateTime.now();
@@ -333,11 +309,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               .update({'admin_since': now.toIso8601String()})
               .eq('id', user.id);
           parsedAdminSince = now;
-        } catch (e) {
-          debugPrint('Backfill admin_since failed: $e');
-        }
+        } catch (_) {}
       }
-
       setState(() {
         _fullName = profile?['full_name'] as String?;
         _email = profile?['email'] as String?;
@@ -351,7 +324,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         _loading = false;
       });
     } catch (e) {
-      debugPrint('Error loading profile: $e');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -361,7 +333,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
+    // Membership color not needed in the header container anymore
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu'),
@@ -375,117 +347,148 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _profileHeader(),
-          const SizedBox(height: 16),
-          _infoFieldBox(),
-          const SizedBox(height: 12),
-          _membershipButton(),
-          const SizedBox(height: 24),
-          _menuTile(
-            icon: Icons.history_edu,
-            title: 'Club History',
-            subtitle: "Records & Milestones",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ClubHistoryPage()),
-              );
-            },
-          ),
-          _menuTile(
-            icon: Icons.flag,
-            title: 'Club Races & EACCL',
-            subtitle: 'History, Directing & Participation',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RacesEacclPage()),
-              );
-            },
-          ),
-          _menuTile(
-            icon: Icons.shopping_bag,
-            title: 'Kit & Merchandise',
-            subtitle: 'Order Vests, Shorts, Hoodies & More',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const KitMerchandisePage()),
-              );
-            },
-          ),
-          _menuTile(
-            icon: Icons.people_alt,
-            title: 'Administrative Team',
-            subtitle: 'Management Committee & Contacts',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdministrativeTeamPage(),
-                ),
-              );
-            },
-          ),
-          if (_isAdmin)
-            _menuTile(
-              icon: Icons.volunteer_activism,
-              title: 'Charity of the Year',
-              subtitle: 'Community Support and Donations',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AdminCharityEditorPage(),
+      body: CustomScrollView(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _FixedHeaderDelegate(
+              extent: 320,
+              child: Container(
+                color: Colors.black,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _profileHeader(),
+                      const SizedBox(height: 16),
+                      _infoFieldBox(),
+                      const SizedBox(height: 12),
+                      _membershipButton(),
+                    ],
                   ),
-                );
-              },
-            ),
-          _menuTile(
-            icon: Icons.celebration,
-            title: 'Runners Banquette',
-            subtitle: 'Party Pass & Food Orders',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RunnersBanquetPage()),
-              );
-            },
-          ),
-          _menuTile(
-            icon: Icons.emoji_events,
-            title: 'The Malcolm Ball Inspirational Running Award 2026',
-            subtitle: 'The Nominations, Votes, Reactions & Comments',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
-              );
-            },
-          ),
-          _menuTile(
-            icon: Icons.description,
-            title: 'Policies, Forms, and Notices',
-            subtitle: 'Club policies, waivers, and key updates',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PoliciesFormsNoticesPage(),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-          const SizedBox(height: 20),
-          _logoutButton(),
-          const SizedBox(height: 12),
-          const Center(
-            child: Text(
-              '© 2025 RunRank · All rights reserved',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const SizedBox(height: 8),
+                _menuTile(
+                  icon: Icons.history_edu,
+                  title: 'Club History',
+                  subtitle: 'Records & Milestones',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ClubHistoryPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.flag,
+                  title: 'Club Races & EACCL',
+                  subtitle: 'History, Directing & Participation',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RacesEacclPage()),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.shopping_bag,
+                  title: 'Kit & Merchandise',
+                  subtitle: 'Order Vests, Shorts, Hoodies & More',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const KitMerchandisePage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.people_alt,
+                  title: 'Administrative Team',
+                  subtitle: 'Management Committee & Contacts',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdministrativeTeamPage(),
+                      ),
+                    );
+                  },
+                ),
+                if (_isAdmin)
+                  _menuTile(
+                    icon: Icons.volunteer_activism,
+                    title: 'Charity of the Year',
+                    subtitle: 'Community Support and Donations',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminCharityEditorPage(),
+                        ),
+                      );
+                    },
+                  ),
+                _menuTile(
+                  icon: Icons.celebration,
+                  title: 'Runners Banquette',
+                  subtitle: 'Party Pass & Food Orders',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RunnersBanquetPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.emoji_events,
+                  title: 'The Malcolm Ball Inspirational Running Award 2026',
+                  subtitle: 'The Nominations, Votes, Reactions & Comments',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MalcolmBallAwardPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.description,
+                  title: 'Policies, Forms, and Notices',
+                  subtitle: 'Club policies, waivers, and key updates',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PoliciesFormsNoticesPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                _logoutButton(),
+                const SizedBox(height: 12),
+                const Center(
+                  child: Text(
+                    '© 2025 RunRank · All rights reserved',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ]),
             ),
           ),
         ],
@@ -496,15 +499,15 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   Color _getMembershipColor(String? membershipType) {
     switch (membershipType) {
       case '1st Claim':
-        return const Color(0xFFFFD700); // Gold/Yellow
+        return const Color(0xFFFFD700);
       case '2nd Claim':
-        return const Color(0xFF0055FF); // Blue
+        return const Color(0xFF0055FF);
       case 'Social':
         return Colors.grey;
       case 'Full-Time Education':
-        return const Color(0xFF2E8B57); // Green
+        return const Color(0xFF2E8B57);
       default:
-        return const Color(0xFFF5C542); // Default yellow
+        return const Color(0xFFF5C542);
     }
   }
 
@@ -518,7 +521,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         ? 'Admin Since ${_formatMonthYear(_adminSince!)}'
         : 'Admin since not set';
     final sinceLabel = _isAdmin ? adminSince : memberSince;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -548,8 +550,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 width: 110,
                 height: 120,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1F3A93), Color(0xFF0F111A)],
+                  gradient: LinearGradient(
+                    colors: [
+                      membershipColor.withOpacity(0.18),
+                      membershipColor.withOpacity(0.08),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -587,7 +592,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
               ),
             ),
-            // Admin badge (emoji, no background)
             if (_isAdmin)
               const Positioned(
                 top: 2,
@@ -606,7 +610,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   ),
                 ),
               ),
-            // Remove avatar button (bottom-right), shown only if avatar exists
             if (_avatarUrl != null)
               Positioned(
                 bottom: 6,
@@ -660,9 +663,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         gradient: LinearGradient(
           colors: [
             const Color(0xFF1F3A93),
-            const Color(
-              0xFFF5C542,
-            ).withValues(alpha: 0.35), // toned-down yellow
+            const Color(0xFFF5C542).withValues(alpha: 0.35),
             const Color(0xFF0F111A),
           ],
           stops: const [0.0, 0.45, 1.0],
@@ -684,7 +685,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
           Text(
             email,
             textAlign: TextAlign.center,
@@ -705,62 +705,16 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       ).showSnackBar(const SnackBar(content: Text('User not logged in')));
       return;
     }
-
-    debugPrint('Avatar change started');
-
     try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opening gallery...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
-
       final picked = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 800,
         imageQuality: 80,
       );
-
-      if (picked == null) {
-        debugPrint('No image selected (user cancelled or permission denied)');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No image selected'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        return;
-      }
-
-      debugPrint('Image picked: ${picked.path}');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Uploading photo...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-
+      if (picked == null) return;
       final file = File(picked.path);
-
-      if (!await file.exists()) {
-        throw Exception('Selected file does not exist');
-      }
-
-      final fileSize = await file.length();
-      debugPrint('File size: ${fileSize ~/ 1024} KB');
-
-      // Store each user's avatar under their own folder for simple RLS rules
+      if (!await file.exists()) throw Exception('Selected file does not exist');
       final path = '${user.id}/avatar.jpg';
-      debugPrint('Uploading to: $path');
-
       await _supabase.storage
           .from('avatars')
           .upload(
@@ -771,48 +725,24 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
               contentType: 'image/jpeg',
             ),
           );
-
-      debugPrint('Upload successful');
-
       final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
-      debugPrint('Public URL: $publicUrl');
-
-      // Store the base URL in DB; use a cache-busted URL locally to refresh immediately
       await _supabase
           .from('user_profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
-
       final publicUrlWithTs =
           '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-      debugPrint('Profile updated with cache-bust: $publicUrlWithTs');
-
       if (!mounted) return;
       setState(() => _avatarUrl = publicUrlWithTs);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile photo updated successfully!')),
       );
-    } catch (e, stackTrace) {
-      debugPrint('Error updating avatar: $e');
-      debugPrint('Stack trace: $stackTrace');
-
+    } catch (e) {
       if (!mounted) return;
-
-      String errorMessage = 'Failed to update photo';
-      if (e.toString().contains('storage')) {
-        errorMessage = 'Storage error. Please check your connection.';
-      } else if (e.toString().contains('permission')) {
-        errorMessage = 'Permission denied. Please allow photo access.';
-      } else if (e.toString().contains('404')) {
-        errorMessage = 'Storage bucket not found. Please contact admin.';
-      }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$errorMessage\n$e'),
+          content: Text('Failed to update photo\n$e'),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -826,25 +756,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       ).showSnackBar(const SnackBar(content: Text('User not logged in')));
       return;
     }
-
     try {
-      // Delete from storage
       final path = '${user.id}/avatar.jpg';
       await _supabase.storage.from('avatars').remove([path]);
-
-      // Clear DB avatar url
       await _supabase
           .from('user_profiles')
           .update({'avatar_url': null})
           .eq('id', user.id);
-
       if (!mounted) return;
       setState(() => _avatarUrl = null);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Profile photo removed')));
     } catch (e) {
-      debugPrint('Error removing avatar: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -881,7 +805,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _infoRow('UKA number', _ukaNumber ?? 'Not set'),
+          _infoRow('UKA Membership Nos.', _ukaNumber ?? 'Not set'),
           const Divider(color: Colors.white12),
           _infoRow('Club', _club ?? 'Not set'),
         ],
@@ -930,8 +854,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       ),
     );
   }
-
-  // Removed old inline edit sheet in favor of dedicated profile page
 
   String _formatMonthYear(DateTime date) {
     const months = [
@@ -1005,5 +927,28 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         ),
       ),
     );
+  }
+}
+
+class _FixedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double extent;
+  _FixedHeaderDelegate({required this.child, required this.extent});
+  @override
+  double get minExtent => extent;
+  @override
+  double get maxExtent => extent;
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _FixedHeaderDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }

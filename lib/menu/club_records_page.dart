@@ -4,7 +4,8 @@ import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/services/user_service.dart';
 
 class ClubRecordsPage extends StatefulWidget {
-  const ClubRecordsPage({super.key});
+  final String? initialDistance;
+  const ClubRecordsPage({super.key, this.initialDistance});
 
   @override
   State<ClubRecordsPage> createState() => _ClubRecordsPageState();
@@ -17,12 +18,18 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   bool _isAdmin = false;
   Map<String, List<ClubRecord>> _recordsByDistance = {};
   final _distances = const ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
-  final PageController _pageController = PageController();
+  late final PageController _pageController;
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    // Set initial page from optional distance
+    if (widget.initialDistance != null) {
+      final i = _distances.indexOf(widget.initialDistance!);
+      _currentIndex = i >= 0 ? i : 0;
+    }
+    _pageController = PageController(initialPage: _currentIndex);
     _loadData();
   }
 

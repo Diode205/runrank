@@ -154,15 +154,32 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildStatusCard(),
-                const SizedBox(height: 24),
-                _buildNNBRInfo(),
-                const SizedBox(height: 24),
-                _buildMembershipTiers(),
-                const SizedBox(height: 32),
+          : CustomScrollView(
+              slivers: [
+                // Pinned header with the top status card
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _FixedHeaderDelegate(
+                    extent: 180,
+                    child: Container(
+                      color: Colors.black,
+                      padding: const EdgeInsets.all(16),
+                      child: _buildStatusCard(),
+                    ),
+                  ),
+                ),
+                // Scrollable page content below the sticky header
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildNNBRInfo(),
+                      const SizedBox(height: 24),
+                      _buildMembershipTiers(),
+                      const SizedBox(height: 32),
+                    ]),
+                  ),
+                ),
               ],
             ),
     );
@@ -191,7 +208,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Color.fromRGBO(230, 240, 89, 1),
             ),
           ),
           const SizedBox(height: 16),
@@ -443,7 +460,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Color.fromRGBO(57, 6, 240, 1),
                   ),
                 ),
               ),
@@ -879,5 +896,33 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
       }
     }();
+  }
+}
+
+// Simple fixed-extent header delegate to pin the top box
+class _FixedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double extent;
+
+  _FixedHeaderDelegate({required this.child, required this.extent});
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _FixedHeaderDelegate oldDelegate) {
+    return oldDelegate.child != child || oldDelegate.extent != extent;
   }
 }

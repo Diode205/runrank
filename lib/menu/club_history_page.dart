@@ -25,6 +25,7 @@ class ClubHistoryPage extends StatelessWidget {
           SliverAppBar(
             backgroundColor: Colors.black,
             elevation: 0,
+            automaticallyImplyLeading: false,
             floating: false,
             pinned: true,
             expandedHeight: 520,
