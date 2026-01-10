@@ -101,7 +101,6 @@ CREATE POLICY "runners_banquet_reservations_write_own_or_admin" ON runners_banqu
       SELECT 1 FROM user_profiles
       WHERE user_profiles.id = auth.uid()
       AND user_profiles.is_admin = true
-    )
   );
 
 DROP TRIGGER IF EXISTS runners_banquet_reservations_updated_at ON runners_banquet_reservations;

@@ -1608,11 +1608,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                   child: const FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      'Calculate your club standard!',
+                                      'Race And Admin Team On The Go',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        fontStyle: FontStyle.italic,
+                                        fontStyle: FontStyle.normal,
                                         fontWeight: FontWeight.w600,
                                         color: Color.fromARGB(221, 235, 81, 5),
                                       ),
