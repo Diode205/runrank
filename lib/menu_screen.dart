@@ -9,6 +9,7 @@ import 'package:runrank/menu/membership_page.dart';
 import 'package:runrank/menu/races_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
+import 'package:runrank/menu/app_settings_page.dart';
 import 'package:runrank/menu/runners_banquet_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
 import 'package:runrank/services/auth_service.dart';
@@ -339,6 +340,16 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         title: const Text('Menu'),
         centerTitle: true,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.settings_outlined, color: Colors.white70),
+          tooltip: 'Settings',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AppSettingsPage()),
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
@@ -352,19 +363,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           SliverPersistentHeader(
             pinned: true,
             delegate: _FixedHeaderDelegate(
-              extent: 320,
+              extent: 160,
               child: Container(
                 color: Colors.black,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
                   child: Column(
-                    children: [
-                      _profileHeader(),
-                      const SizedBox(height: 16),
-                      _infoFieldBox(),
-                      const SizedBox(height: 12),
-                      _membershipButton(),
-                    ],
+                    children: [_profileHeader(), const SizedBox(height: 4)],
                   ),
                 ),
               ),
@@ -374,6 +379,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                const SizedBox(height: 6),
+                _infoFieldBox(),
+                const SizedBox(height: 12),
+                _membershipButton(),
                 const SizedBox(height: 8),
                 _menuTile(
                   icon: Icons.history_edu,

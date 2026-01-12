@@ -460,7 +460,12 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color.fromRGBO(57, 6, 240, 1),
+                    color: Color.from(
+                      alpha: 1,
+                      red: 0.941,
+                      green: 0.925,
+                      blue: 0.024,
+                    ),
                   ),
                 ),
               ),
@@ -482,7 +487,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
           const SizedBox(height: 12),
           const Text(
             "Membership is renewed annually. Fees directly support club activities, "
-            "equipment, coaching, and community events.",
+            "equipment, coaching, and community events. \n\n"
+            "Lapsed memberships can be reactivated 30 days after expiration.  Failure to do so will result in profile removal, if not already deactivated.",
             style: TextStyle(fontSize: 13, color: Colors.white70),
           ),
           SizedBox(height: 12),
@@ -492,7 +498,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               child: OutlinedButton.icon(
                 onPressed: _showLapsedRenewalsReport,
                 icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                label: const Text('View lapsed renewals list'),
+                label: const Text('View Lapsed Renewals List'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.orangeAccent,
                   side: const BorderSide(color: Colors.orangeAccent, width: 1),

@@ -146,7 +146,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     // The header should change when the last event of the current month
     // is about to scroll off the screen (accounting for header height)
     const headerHeight = 48.0;
-    const eventHeight = 120.0; // Approximate event card height
+    const eventHeight = 100.0; // Updated approximate event card height
 
     double currentOffset = 0.0; // Start from top
 
@@ -522,21 +522,21 @@ class _EventCard extends StatelessWidget {
     return Opacity(
       opacity: isCancelled ? 0.5 : 1.0,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
               decoration: BoxDecoration(
                 color: _background(activityType),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white24, width: 1.4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 14,
+                    color: Colors.black.withValues(alpha: 0.22),
+                    blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -550,7 +550,7 @@ class _EventCard extends StatelessWidget {
                       opacity: 0.18,
                       child: Text(
                         _icon(activityType),
-                        style: const TextStyle(fontSize: 42),
+                        style: const TextStyle(fontSize: 32),
                       ),
                     ),
                   ),
@@ -571,25 +571,29 @@ class _EventCard extends StatelessWidget {
 
                   Row(
                     children: [
-                      Column(
-                        children: [
-                          Text(
-                            weekday,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                      SizedBox(
+                        width: 64,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              weekday,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          Text(
-                            "$day",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                            Text(
+                              "$day",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(

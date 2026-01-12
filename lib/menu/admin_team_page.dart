@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AdministrativeTeamPage extends StatefulWidget {
   const AdministrativeTeamPage({super.key});
@@ -320,6 +321,135 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     }
   }
 
+  Future<void> _launchEmail({required String subject, String? body}) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      queryParameters: {'subject': subject, if (body != null) 'body': body},
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _confirmRemoveProfile(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Remove Profile',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Soft removal will immediately block access and clear optional profile details.\n\n'
+          'Member: ${user['full_name'] ?? '—'}\nEmail: ${user['email'] ?? '—'}',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _softRemoveProfile(user, setModalState);
+            },
+            child: const Text(
+              'Soft remove now',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _launchEmail(
+                subject: 'RunRank profile removal request',
+                body:
+                    'Please remove the profile for: ${user['full_name'] ?? '—'} (${user['email'] ?? '—'}).',
+              );
+            },
+            child: const Text(
+              'Request via Email',
+              style: TextStyle(color: Colors.amber),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _softRemoveProfile(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final reasonController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Confirm Soft Removal',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: reasonController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Reason (optional)',
+            labelStyle: TextStyle(color: Colors.white70),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    final reason = reasonController.text.trim();
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update({
+            'is_blocked': true,
+            'block_reason':
+                (reason.isNotEmpty
+                        ? 'Removed by admin: $reason'
+                        : 'Removed by admin')
+                    .trim(),
+            'membership_type': null,
+            'avatar_url': null,
+            'is_admin': false,
+            'admin_since': null,
+          })
+          .eq('id', user['id'] as String);
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profile soft-removed and blocked')),
+      );
+      await _searchUsers(_searchController.text, setModalState);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Soft removal failed: $e')),
+      );
+    }
+  }
+
   void _openAdminControls() {
     showModalBottomSheet(
       context: context,
@@ -496,80 +626,85 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Container(
-                                      decoration: BoxDecoration(
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      tooltip: isAdmin
+                                          ? 'Remove admin'
+                                          : 'Make admin',
+                                      onPressed: () => _setAdminStatus(
+                                        user,
+                                        !isAdmin,
+                                        setModalState,
+                                      ),
+                                      icon: Icon(
+                                        isAdmin
+                                            ? Icons.security_update_warning
+                                            : Icons.verified_user,
                                         color: isAdmin
-                                            ? Colors.orangeAccent.withOpacity(
-                                                0.15,
-                                              )
-                                            : Colors.greenAccent.withOpacity(
-                                                0.15,
-                                              ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        tooltip: isAdmin
-                                            ? 'Remove admin'
-                                            : 'Make admin',
-                                        onPressed: () => _setAdminStatus(
-                                          user,
-                                          !isAdmin,
-                                          setModalState,
-                                        ),
-                                        icon: Icon(
-                                          isAdmin
-                                              ? Icons.security_update_warning
-                                              : Icons.verified_user,
-                                          color: isAdmin
-                                              ? Colors.orangeAccent
-                                              : Colors.greenAccent,
-                                        ),
+                                            ? Colors.orangeAccent
+                                            : Colors.greenAccent,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
                                       ),
-                                      child: IconButton(
-                                        tooltip: 'Warn user',
-                                        onPressed: () =>
-                                            _warnUser(user, setModalState),
-                                        icon: const Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Colors.amber,
-                                        ),
+                                      tooltip: 'Warn user',
+                                      onPressed: () =>
+                                          _warnUser(user, setModalState),
+                                      icon: const Icon(
+                                        Icons.warning_amber_rounded,
+                                        color: Colors.amber,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      decoration: BoxDecoration(
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      tooltip: isBlocked ? 'Unblock' : 'Block',
+                                      onPressed: () => _blockUser(
+                                        user,
+                                        !isBlocked,
+                                        setModalState,
+                                      ),
+                                      icon: Icon(
+                                        isBlocked
+                                            ? Icons.lock_open
+                                            : Icons.block,
                                         color: isBlocked
                                             ? Colors.lightGreenAccent
-                                                  .withOpacity(0.15)
-                                            : Colors.redAccent.withOpacity(
-                                                0.15,
-                                              ),
-                                        borderRadius: BorderRadius.circular(8),
+                                            : Colors.redAccent,
                                       ),
-                                      child: IconButton(
-                                        tooltip: isBlocked
-                                            ? 'Unblock'
-                                            : 'Block',
-                                        onPressed: () => _blockUser(
-                                          user,
-                                          !isBlocked,
-                                          setModalState,
-                                        ),
-                                        icon: Icon(
-                                          isBlocked
-                                              ? Icons.lock_open
-                                              : Icons.block,
-                                          color: isBlocked
-                                              ? Colors.lightGreenAccent
-                                              : Colors.redAccent,
-                                        ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      tooltip: 'Remove profile',
+                                      onPressed: () => _confirmRemoveProfile(
+                                        user,
+                                        setModalState,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.delete_forever_outlined,
+                                        color: Colors.redAccent,
                                       ),
                                     ),
                                   ],
