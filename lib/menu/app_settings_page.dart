@@ -132,27 +132,19 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, color: Color(0xFFF5C542)),
+                  // App logo aligned to the left of About/Version
+                  Image.asset(
+                    'assets/images/screenrank_logo.png',
+                    width: 44,
+                    height: 44,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // App logo displayed above About + Version, aligned to text column width
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            return SizedBox(
-                              width: constraints.maxWidth,
-                              child: Image.asset(
-                                'assets/images/app_icon_round.png',
-                                fit: BoxFit.fitWidth,
-                                alignment: Alignment.centerLeft,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
                         const Text(
                           'About RunRank',
                           style: TextStyle(
