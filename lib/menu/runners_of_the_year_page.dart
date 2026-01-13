@@ -19,19 +19,10 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   bool _loading = true;
 
   final List<Map<String, String>> _awards = const [
-    {
-      'key': 'short_performance',
-      'title': 'Short Distance',
-    },
+    {'key': 'short_performance', 'title': 'Short Distance'},
     {'key': 'mid_performance', 'title': 'Mid-Distance'},
-    {
-      'key': 'long_performance',
-      'title': 'Long Distance',
-    },
-    {
-      'key': 'ultra_performance',
-      'title': 'Ultra Distance',
-    },
+    {'key': 'long_performance', 'title': 'Long Distance'},
+    {'key': 'ultra_performance', 'title': 'Ultra Distance'},
     {'key': 'overall_performance', 'title': 'Overall Performance'},
     {'key': 'newcomer', 'title': 'Newcomer Of The Year'},
     {'key': 'most_improved', 'title': 'Most Improved Runner'},
@@ -186,7 +177,9 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DefaultTabController(
+      length: _awards.length,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Runners Of The Year'),
         centerTitle: true,
@@ -210,88 +203,100 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
           : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : DefaultTabController(
-              length: _awards.length,
-              child: Column(
-                children: [
-                  // Header image (use full image, slightly faded)
-                  SizedBox(
-                    height: 220,
-                    width: double.infinity,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Container(color: blue.withOpacity(0.08)),
-                        Opacity(
-                          opacity: 0.82,
-                          child: Image.asset(
-                            'assets/images/awards.png',
-                            fit: BoxFit.contain,
-                            alignment: Alignment.center,
+          : Column(
+              children: [
+                // Header image (use full image, slightly faded)
+                SizedBox(
+                  height: 220,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(color: blue.withOpacity(0.06)),
+                      Opacity(
+                        opacity: 0.86,
+                        child: Image.asset(
+                          'assets/images/awards.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                        ),
+                      ),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.transparent, Colors.black54],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           ),
                         ),
-                        Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.transparent, Colors.black54],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
+                      ),
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: const LinearGradient(
+                                colors: [yellow, blue],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
                             ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 16,
-                          right: 16,
-                          bottom: 12,
-                          child: const Center(
-                            child: Text(
-                              'The Winners\' List',
+                            child: const Text(
+                              "The Winners' List",
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Compact dot indicator instead of tab titles
+                Container(
+                  color: const Color(0xFF0F111A),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Builder(
+                    builder: (ctx) => TabPageSelector(
+                      selectedColor: yellow,
+                      color: Colors.white24,
+                      controller: DefaultTabController.of(ctx),
                     ),
                   ),
-                  // Compact TabBar
-                  Container(
-                    color: const Color(0xFF0F111A),
-                    child: TabBar(
-                      isScrollable: true,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      indicatorColor: yellow,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white70,
-                      tabs: [
-                        for (final a in _awards) Tab(text: a['title']!),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Swipeable pages via TabBarView
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        for (final a in _awards)
-                          Builder(builder: (ctx) {
+                ),
+                const SizedBox(height: 8),
+                // Swipeable pages via TabBarView
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      for (final a in _awards)
+                        Builder(
+                          builder: (ctx) {
                             final rows = _winnersByAward[a['key']!] ?? const [];
                             final isNewcomer = a['key'] == 'newcomer';
-                            return _awardPage(a['title']!, rows, isNewcomer: isNewcomer);
-                          }),
-                      ],
-                    ),
+                            return _awardPage(
+                              a['title']!,
+                              rows,
+                              isNewcomer: isNewcomer,
+                            );
+                          },
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+    ),
     );
   }
-
-  
 
   Widget _awardPage(
     String title,
@@ -358,12 +363,22 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     return Row(
       children: [
         if (!isNewcomer) ...[
-          Expanded(child: Text('Female', style: style, textAlign: TextAlign.center)),
-          Expanded(child: Text('Year', style: style, textAlign: TextAlign.center)),
-          Expanded(child: Text('Male', style: style, textAlign: TextAlign.center)),
+          Expanded(
+            child: Text('Female', style: style, textAlign: TextAlign.center),
+          ),
+          Expanded(
+            child: Text('Year', style: style, textAlign: TextAlign.center),
+          ),
+          Expanded(
+            child: Text('Male', style: style, textAlign: TextAlign.center),
+          ),
         ] else ...[
-          Expanded(child: Text('Year', style: style, textAlign: TextAlign.center)),
-          Expanded(child: Text('Winner', style: style, textAlign: TextAlign.center)),
+          Expanded(
+            child: Text('Year', style: style, textAlign: TextAlign.center),
+          ),
+          Expanded(
+            child: Text('Winner', style: style, textAlign: TextAlign.center),
+          ),
         ],
       ],
     );
@@ -372,9 +387,27 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   Widget _rowStandard(AwardWinnerRow r) {
     return Row(
       children: [
-        Expanded(child: Text(r.femaleName ?? '—', style: const TextStyle(color: Colors.white), textAlign: TextAlign.center)),
-        Expanded(child: Text(r.year.toString(), style: const TextStyle(color: Colors.white), textAlign: TextAlign.center)),
-        Expanded(child: Text(r.maleName ?? '—', style: const TextStyle(color: Colors.white), textAlign: TextAlign.center)),
+        Expanded(
+          child: Text(
+            r.femaleName ?? '—',
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            r.year.toString(),
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            r.maleName ?? '—',
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ],
     );
   }
@@ -383,8 +416,20 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     final winner = r.femaleName ?? r.maleName ?? '—';
     return Row(
       children: [
-        Expanded(child: Text(r.year.toString(), style: const TextStyle(color: Colors.white), textAlign: TextAlign.center)),
-        Expanded(child: Text(winner, style: const TextStyle(color: Colors.white), textAlign: TextAlign.center)),
+        Expanded(
+          child: Text(
+            r.year.toString(),
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            winner,
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ],
     );
   }
