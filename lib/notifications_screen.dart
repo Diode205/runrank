@@ -3,6 +3,7 @@ import 'package:runrank/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
+import 'package:runrank/menu/malcolm_ball_award_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -64,6 +65,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markAsReadAndNavigate(Map<String, dynamic> notification) async {
     final eventId = notification['event_id'] as String?;
     final notificationId = notification['id'] as String?;
+    final title = (notification['title'] ?? '').toString();
+    final body = (notification['body'] ?? '').toString();
 
     // Mark as read
     if (notificationId != null && !(notification['is_read'] ?? false)) {
@@ -84,6 +87,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // Navigate to event if eventId exists
     if (eventId != null && eventId.isNotEmpty) {
       await _navigateToEvent(eventId);
+      return;
+    }
+
+    // Navigate to Malcolm Ball Award page if notification relates to it
+    final text = '${title.toLowerCase()} ${body.toLowerCase()}';
+    if (text.contains('malcolm ball')) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+      ).then((_) {
+        // Refresh when coming back
+        loadData();
+      });
+      return;
     }
   }
 
