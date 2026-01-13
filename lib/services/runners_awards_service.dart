@@ -55,4 +55,28 @@ class RunnersAwardsService {
       'male_name': maleName,
     });
   }
+
+  Future<void> updateWinner({
+    required String awardKey,
+    required int year,
+    String? femaleName,
+    String? maleName,
+  }) async {
+    await _supabase
+        .from('club_awards_winners')
+        .update({'female_name': femaleName, 'male_name': maleName})
+        .eq('award_key', awardKey)
+        .eq('year', year);
+  }
+
+  Future<void> deleteWinner({
+    required String awardKey,
+    required int year,
+  }) async {
+    await _supabase
+        .from('club_awards_winners')
+        .delete()
+        .eq('award_key', awardKey)
+        .eq('year', year);
+  }
 }
