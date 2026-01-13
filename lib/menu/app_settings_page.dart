@@ -139,6 +139,16 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // App logo displayed above About + Version
+                        Row(
+                          children: [
+                            Image.asset(
+                              'assets/images/rank_logo.png',
+                              height: 44,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
                         const Text(
                           'About RunRank',
                           style: TextStyle(
