@@ -113,6 +113,8 @@ flutter:
     - assets/images/malcolmball.png
     - assets/images/app_icon_round.png
     - assets/images/screenrank_logo.png
+    - assets/images/awards.png
+    - assets/images/awards.png 
 
   # To add assets to your application, add an assets section, like this:
   # assets:

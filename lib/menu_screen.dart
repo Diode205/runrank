@@ -12,6 +12,7 @@ import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/app_settings_page.dart';
 import 'package:runrank/menu/runners_banquet_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
+import 'package:runrank/menu/runners_of_the_year_page.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -470,6 +471,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const MalcolmBallAwardPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.workspace_premium,
+                  title: 'Runners Of The Year',
+                  subtitle: "The Winners' List",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RunnersOfTheYearPage(),
                       ),
                     );
                   },
