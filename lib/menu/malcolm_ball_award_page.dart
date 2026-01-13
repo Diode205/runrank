@@ -125,6 +125,20 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Future<void> _vote(String nomineeId) async {
     try {
       await _service.voteNominee(nomineeId);
+      // Notify all users about the vote with route tag for deep link
+      try {
+        final nomineeName = _nominees
+            .firstWhere(
+              (n) => n.id == nomineeId,
+              orElse: () => AwardNominee(id: '', name: 'a nominee', votes: 0),
+            )
+            .name;
+        await NotificationService.notifyAllUsers(
+          title: 'New vote',
+          body: 'A vote was cast for ' + nomineeName,
+          route: 'malcolm_ball_award',
+        );
+      } catch (_) {}
       await _load();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
