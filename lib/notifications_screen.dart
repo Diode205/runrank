@@ -16,6 +16,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool loading = true;
   List<Map<String, dynamic>> notifications = [];
 
+  // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
+  String? _extractRoute(String text) {
+    final match = RegExp(r"\[route:([\w\-/]+)\]").firstMatch(text);
+    return match != null ? match.group(1) : null;
+  }
+
+  // Remove the route tag from the display text
+  String _stripRouteTag(String text) {
+    return text.replaceAll(RegExp(r"\[route:[^\]]+\]\s*"), "");
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +77,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final eventId = notification['event_id'] as String?;
     final notificationId = notification['id'] as String?;
     final title = (notification['title'] ?? '').toString();
-    final body = (notification['body'] ?? '').toString();
+    final rawBody = (notification['body'] ?? '').toString();
+    final body = _stripRouteTag(rawBody);
 
     // Mark as read
     if (notificationId != null && !(notification['is_read'] ?? false)) {
@@ -84,6 +96,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     }
 
+    // First, if route tag is present, use it
+    final route = _extractRoute(rawBody);
+    if (route != null) {
+      if (!mounted) return;
+      switch (route) {
+        case 'malcolm_ball_award':
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+          ).then((_) => loadData());
+          return;
+      }
+    }
+
     // Navigate to event if eventId exists
     if (eventId != null && eventId.isNotEmpty) {
       await _navigateToEvent(eventId);
@@ -91,7 +117,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     // Malcolm Ball Award: comment notifications have title 'New Comment' and no event_id
-    if (title.toLowerCase() == 'new comment' && (eventId == null || eventId.isEmpty)) {
+    if (title.toLowerCase() == 'new comment' &&
+        (eventId == null || eventId.isEmpty)) {
       if (!mounted) return;
       Navigator.push(
         context,
@@ -352,7 +379,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    body,
+                                    _stripRouteTag(body),
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.white.withOpacity(0.7),

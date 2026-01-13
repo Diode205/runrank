@@ -14,6 +14,7 @@ class NotificationService {
     required String title,
     required String body,
     String? eventId,
+    String? route, // e.g., 'malcolm_ball_award'
   }) async {
     print(
       "DEBUG: notifyAllUsers called - title: $title, body: $body, eventId: $eventId",
@@ -23,10 +24,15 @@ class NotificationService {
 
       for (final u in users) {
         try {
+          // Embed a route tag into body to support client-side deep linking
+          final bodyWithRoute = route != null && route.isNotEmpty
+              ? '[route:' + route + '] ' + body
+              : body;
+
           await _supabase.from('notifications').insert({
             'user_id': u['id'],
             'title': title,
-            'body': body,
+            'body': bodyWithRoute,
             'event_id': eventId,
             'is_read': false,
           });
@@ -48,14 +54,19 @@ class NotificationService {
     required String title,
     required String body,
     String? eventId,
+    String? route, // e.g., 'malcolm_ball_award'
   }) async {
     print(
       "DEBUG: notifyUser called - userId: $userId, title: $title, body: $body, eventId: $eventId",
     );
+    final bodyWithRoute = route != null && route.isNotEmpty
+        ? '[route:' + route + '] ' + body
+        : body;
+
     await _supabase.from('notifications').insert({
       'user_id': userId,
       'title': title,
-      'body': body,
+      'body': bodyWithRoute,
       'event_id': eventId,
       'is_read': false,
     });

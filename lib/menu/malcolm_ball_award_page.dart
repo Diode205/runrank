@@ -107,6 +107,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         await NotificationService.notifyAllUsers(
           title: 'New nomination',
           body: '$name was nominated for the Malcolm Ball Award',
+          route: 'malcolm_ball_award',
         );
       } catch (_) {}
       await _load();
@@ -139,6 +140,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         await NotificationService.notifyAllUsers(
           title: 'New reaction',
           body: 'Someone reacted $emoji in Malcolm Ball chat',
+          route: 'malcolm_ball_award',
         );
       } catch (_) {}
       final counts = await _service.fetchMessageEmojiCounts({messageId});
@@ -921,6 +923,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         await NotificationService.notifyAllUsers(
           title: 'New Comment',
           body: text.length > 80 ? text.substring(0, 80) + '…' : text,
+          route: 'malcolm_ball_award',
         );
       } catch (_) {}
       _commentController.clear();
