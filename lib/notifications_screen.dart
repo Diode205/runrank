@@ -90,6 +90,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    // Malcolm Ball Award: comment notifications have title 'New Comment' and no event_id
+    if (title.toLowerCase() == 'new comment' && (eventId == null || eventId.isEmpty)) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+      ).then((_) => loadData());
+      return;
+    }
+
     // Navigate to Malcolm Ball Award page if notification relates to it
     final text = '${title.toLowerCase()} ${body.toLowerCase()}';
     if (text.contains('malcolm ball')) {
