@@ -43,7 +43,10 @@ class PoliciesFormsNoticesPage extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Policies & Notices',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color.fromRGBO(235, 246, 26, 1),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
       ),
@@ -109,7 +112,7 @@ class PoliciesFormsNoticesPage extends StatelessWidget {
                   Text(
                     'Club Policies & Forms',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Color.fromRGBO(39, 203, 236, 1),
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                     ),

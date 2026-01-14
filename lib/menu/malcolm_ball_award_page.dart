@@ -215,7 +215,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                             Text(
                               'The Malcolm Ball Inspirational\nRunner Award 2026',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Color.fromARGB(255, 11, 155, 239),
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -284,7 +284,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                   '🏆 Hall Of Fame 🏆',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color.from(
+                      alpha: 1,
+                      red: 0.851,
+                      green: 0.91,
+                      blue: 0.02,
+                    ),
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),

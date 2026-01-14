@@ -760,7 +760,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
 
   Widget _columnsHeader({required bool isNewcomer}) {
     final style = const TextStyle(
-      color: Colors.white70,
+      color: Color.fromRGBO(30, 145, 233, 0.702),
       fontWeight: FontWeight.w600,
     );
     return Row(
