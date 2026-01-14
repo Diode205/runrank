@@ -21,14 +21,14 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   List<String> _memberNames = [];
 
   final List<Map<String, String>> _awards = const [
-    {'key': 'short_performance', 'title': 'Short Distance'},
-    {'key': 'mid_performance', 'title': 'Mid-Distance'},
-    {'key': 'long_performance', 'title': 'Long Distance'},
-    {'key': 'ultra_performance', 'title': 'Ultra Distance'},
-    {'key': 'overall_performance', 'title': 'Overall Performance'},
-    {'key': 'newcomer', 'title': 'Newcomer Of The Year'},
-    {'key': 'most_improved', 'title': 'Most Improved Runner'},
-    {'key': 'runner_of_the_year', 'title': 'Runner Of The Year'},
+    {'key': 'short_performance', 'title': '🏃‍♀️Short Distance🏃‍➡️'},
+    {'key': 'mid_performance', 'title': '🏃‍♀️Mid-Distance🏃‍➡️'},
+    {'key': 'long_performance', 'title': '🏃‍♀️Long Distance🏃‍➡️'},
+    {'key': 'ultra_performance', 'title': '🏃‍♀️Ultra Distance🏃‍➡️'},
+    {'key': 'overall_performance', 'title': '🏃‍♀️Overall Performance🏃‍➡️'},
+    {'key': 'newcomer', 'title': '🏃‍♀️Newcomer Of The Year🏃‍➡️'},
+    {'key': 'most_improved', 'title': '🏃‍♀️Most Improved Runner🏃‍➡️'},
+    {'key': 'runner_of_the_year', 'title': '🏃‍♀️Runner Of The Year🏃‍➡️'},
   ];
 
   @override
@@ -128,21 +128,21 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                               onSubmitted: (_) => onFieldSubmitted(),
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
-                                labelText: 'Search Member (Female)',
+                                labelText: 'Female Winner (Type Or Pick)',
                                 labelStyle: TextStyle(color: Colors.white70),
                               ),
                             );
                           },
                     ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: femaleController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Female Winner',
-                      labelStyle: TextStyle(color: Colors.white70),
+                  if (_memberNames.isEmpty)
+                    TextField(
+                      controller: femaleController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Female Winner',
+                        labelStyle: TextStyle(color: Colors.white70),
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 10),
                   if (_memberNames.isNotEmpty)
                     Autocomplete<String>(
@@ -168,21 +168,21 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                               onSubmitted: (_) => onFieldSubmitted(),
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
-                                labelText: 'Search Member (Male)',
+                                labelText: 'Male Winner (Type Or Pick)',
                                 labelStyle: TextStyle(color: Colors.white70),
                               ),
                             );
                           },
                     ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: maleController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Male Winner',
-                      labelStyle: TextStyle(color: Colors.white70),
+                  if (_memberNames.isEmpty)
+                    TextField(
+                      controller: maleController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Male Winner',
+                        labelStyle: TextStyle(color: Colors.white70),
+                      ),
                     ),
-                  ),
                 ] else ...[
                   if (_memberNames.isNotEmpty)
                     Autocomplete<String>(
@@ -208,21 +208,21 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                               onSubmitted: (_) => onFieldSubmitted(),
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
-                                labelText: 'Search Member (Winner)',
+                                labelText: 'Winner Name (Type Or Pick)',
                                 labelStyle: TextStyle(color: Colors.white70),
                               ),
                             );
                           },
                     ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: newcomerController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Winner Name',
-                      labelStyle: TextStyle(color: Colors.white70),
+                  if (_memberNames.isEmpty)
+                    TextField(
+                      controller: newcomerController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Winner Name',
+                        labelStyle: TextStyle(color: Colors.white70),
+                      ),
                     ),
-                  ),
                 ],
               ],
             ),
@@ -413,17 +413,17 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                             onSubmitted: (_) => onFieldSubmitted(),
                             style: const TextStyle(color: Colors.white),
                             decoration: const InputDecoration(
-                              labelText: 'Winner Name',
+                              labelText: 'Winner Name (Type Or Pick)',
                             ),
                           );
                         },
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: newcomerController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Winner Name'),
-                ),
+                if (_memberNames.isEmpty)
+                  TextField(
+                    controller: newcomerController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Winner Name'),
+                  ),
               ] else ...[
                 if (_memberNames.isNotEmpty)
                   Autocomplete<String>(
@@ -447,17 +447,19 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                             onSubmitted: (_) => onFieldSubmitted(),
                             style: const TextStyle(color: Colors.white),
                             decoration: const InputDecoration(
-                              labelText: 'Female Winner',
+                              labelText: 'Female Winner (Type Or Pick)',
                             ),
                           );
                         },
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: femaleController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Female Winner'),
-                ),
+                if (_memberNames.isEmpty)
+                  TextField(
+                    controller: femaleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Female Winner',
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 if (_memberNames.isNotEmpty)
                   Autocomplete<String>(
@@ -481,17 +483,17 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                             onSubmitted: (_) => onFieldSubmitted(),
                             style: const TextStyle(color: Colors.white),
                             decoration: const InputDecoration(
-                              labelText: 'Male Winner',
+                              labelText: 'Male Winner (Type Or Pick)',
                             ),
                           );
                         },
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: maleController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Male Winner'),
-                ),
+                if (_memberNames.isEmpty)
+                  TextField(
+                    controller: maleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Male Winner'),
+                  ),
               ],
             ],
           ),
@@ -592,14 +594,17 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFF0057B7), Color(0xFFFFD300)],
+                                  colors: [
+                                    Color(0xFF0057B7),
+                                    Color(0xFFFFD300),
+                                  ],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
                               ),
                               child: const Center(
                                 child: Text(
-                                  "The Winners' List",
+                                  "🏆The Winners' List🏆",
                                   style: TextStyle(
                                     color: Colors.black,
                                     fontSize: 16,
@@ -613,10 +618,11 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                         ],
                       ),
                     ),
-                    // Dots indicator
+                    // Tight, even spacing around dots indicator
+                    const SizedBox(height: 2),
                     Container(
                       color: const Color(0xFF0F111A),
-                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Builder(
                         builder: (ctx) => TabPageSelector(
                           selectedColor: yellow,
@@ -670,74 +676,82 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 28,
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (_isAdmin) ...[
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          color: Colors.redAccent,
-                          tooltip: 'Manage entries',
-                          onPressed: () =>
-                              _manageAwardEntries(awardKey, rows, isNewcomer),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: IconButton(
-                          icon: const Icon(Icons.add_circle_outline),
-                          color: yellow,
-                          tooltip: 'Add winner',
-                          onPressed: () => _addWinnerDialogForAward(
-                            awardKey: awardKey,
-                            title: title,
-                            isNewcomer: isNewcomer,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
+            child: Column(
+              key: ValueKey<String>(awardKey),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 28,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              _columnsHeader(isNewcomer: isNewcomer),
-              const Divider(color: Colors.white12),
-              Expanded(
-                child: rows.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No winners recorded yet',
-                          style: TextStyle(color: Colors.white54),
+                      if (_isAdmin) ...[
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            color: Colors.redAccent,
+                            tooltip: 'Manage entries',
+                            onPressed: () =>
+                                _manageAwardEntries(awardKey, rows, isNewcomer),
+                          ),
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: rows.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(color: Colors.white10),
-                        itemBuilder: (ctx, i) {
-                          final r = rows[i];
-                          return isNewcomer ? _rowNewcomer(r) : _rowStandard(r);
-                        },
-                      ),
-              ),
-            ],
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            color: yellow,
+                            tooltip: 'Add winner',
+                            onPressed: () => _addWinnerDialogForAward(
+                              awardKey: awardKey,
+                              title: title,
+                              isNewcomer: isNewcomer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _columnsHeader(isNewcomer: isNewcomer),
+                const Divider(color: Colors.white12),
+                Expanded(
+                  child: rows.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No winners recorded yet',
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: rows.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(color: Colors.white10),
+                          itemBuilder: (ctx, i) {
+                            final r = rows[i];
+                            return isNewcomer
+                                ? _rowNewcomer(r)
+                                : _rowStandard(r);
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
