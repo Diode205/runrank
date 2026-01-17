@@ -230,6 +230,21 @@ class MalcolmBallAwardService {
     });
   }
 
+  Future<void> updateWinner({
+    required String id,
+    required int year,
+    required String name,
+  }) async {
+    await _supabase
+        .from('award_winners')
+        .update({'year': year, 'name': name.trim()})
+        .eq('id', id);
+  }
+
+  Future<void> deleteWinner({required String id}) async {
+    await _supabase.from('award_winners').delete().eq('id', id);
+  }
+
   RealtimeChannel subscribeToChanges({required void Function() onAnyChange}) {
     // Unsubscribe any previous channel first
     _channel?.unsubscribe();

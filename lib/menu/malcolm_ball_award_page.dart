@@ -360,19 +360,33 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 },
               ),
             if (_isAdmin)
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: IconButton(
-                    tooltip: 'Add previous winner',
-                    onPressed: _showAddWinnerDialog,
-                    icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
-                    iconSize: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    visualDensity: VisualDensity.compact,
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Manage winners (edit/delete)',
+                      onPressed: _showManageWinnersDialog,
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: Color(0xFFFFD700),
+                      ),
+                      iconSize: 22,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Add previous winner',
+                      onPressed: _showAddWinnerDialog,
+                      icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
+                      iconSize: 22,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -486,6 +500,212 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to add winner: $e')));
+    }
+  }
+
+  Future<void> _showManageWinnersDialog() async {
+    if (!_isAdmin) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Admins only')));
+      return;
+    }
+    final items = [..._winners]..sort((a, b) => b.year.compareTo(a.year));
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Manage Hall Of Fame',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              children: items.map((w) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Colors.white12)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${w.year} — ${w.name}',
+                          style: const TextStyle(color: Colors.white70),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Edit entry',
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Color(0xFFFFD700),
+                          size: 20,
+                        ),
+                        onPressed: () async {
+                          await _editWinnerDialog(w);
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'Delete entry',
+                        icon: const Icon(
+                          Icons.delete_forever,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
+                        onPressed: () async {
+                          await _deleteWinner(w);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editWinnerDialog(AwardWinnerItem w) async {
+    final yearController = TextEditingController(text: w.year.toString());
+    final nameController = TextEditingController(text: w.name);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text('Edit Winner', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: yearController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'Year'),
+            ),
+            const SizedBox(height: 8),
+            if (_memberNames.isNotEmpty)
+              Autocomplete<String>(
+                optionsBuilder: (tv) {
+                  final q = tv.text.trim().toLowerCase();
+                  if (q.isEmpty) return const Iterable<String>.empty();
+                  return _memberNames.where((n) => n.toLowerCase().contains(q));
+                },
+                onSelected: (sel) => nameController.text = sel,
+                fieldViewBuilder:
+                    (ctx2, controller, focusNode, onFieldSubmitted) {
+                      controller.text = nameController.text;
+                      controller.addListener(
+                        () => nameController.text = controller.text,
+                      );
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        onSubmitted: (_) => onFieldSubmitted(),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Winner Name (Type Or Pick)',
+                        ),
+                      );
+                    },
+              )
+            else
+              TextField(
+                controller: nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Winner Name'),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final newYear = int.tryParse(yearController.text.trim());
+    final newName = nameController.text.trim();
+    if (newYear == null || newName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid year and name')),
+      );
+      return;
+    }
+    try {
+      await _service.updateWinner(id: w.id, year: newYear, name: newName);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Winner updated')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+    }
+  }
+
+  Future<void> _deleteWinner(AwardWinnerItem w) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Delete Winner',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Delete ${w.year} — ${w.name}?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _service.deleteWinner(id: w.id);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Winner deleted')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
     }
   }
 

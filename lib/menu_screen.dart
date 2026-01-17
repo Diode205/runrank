@@ -364,11 +364,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           SliverPersistentHeader(
             pinned: true,
             delegate: _FixedHeaderDelegate(
-              extent: 160,
+              extent: _headerExtent(context),
               child: Container(
                 color: Colors.black,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                   child: Column(
                     children: [_profileHeader(), const SizedBox(height: 4)],
                   ),
@@ -506,7 +506,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 const SizedBox(height: 12),
                 const Center(
                   child: Text(
-                    '© 2025 RunRank · All rights reserved',
+                    '© 2025 RunRank · All Rights Reserved',
                     style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ),
@@ -974,4 +974,13 @@ class _FixedHeaderDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _FixedHeaderDelegate oldDelegate) {
     return oldDelegate.extent != extent || oldDelegate.child != child;
   }
+}
+
+double _headerExtent(BuildContext context) {
+  // Base required height to fit avatar + details comfortably
+  const base = 168.0; // accounts for image, labels, and padding
+  final scale = MediaQuery.of(context).textScaleFactor;
+  // Allow a little extra for larger accessibility text sizes
+  final extra = (scale > 1.0) ? (base * ((scale - 1.0).clamp(0.0, 0.2))) : 0.0;
+  return base + extra;
 }
