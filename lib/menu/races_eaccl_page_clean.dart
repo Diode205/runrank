@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class RacesEacclPage extends StatefulWidget {
@@ -477,8 +478,16 @@ class _HandicapCard extends StatefulWidget {
   State<_HandicapCard> createState() => _HandicapCardState();
 }
 
+class _MedalWinner {
+  final String name;
+  final String? userId;
+  const _MedalWinner({required this.name, this.userId});
+}
+
 class _HandicapCardState extends State<_HandicapCard> {
   bool _expanded = false;
+  final Map<String, List<_MedalWinner>> _top3 =
+      {}; // raceId -> [gold, silver, bronze]
 
   // Visible intro: single paragraph
   static const String _visiblePara =
@@ -611,7 +620,7 @@ class _HandicapCardState extends State<_HandicapCard> {
 
   Widget _handicapRow(_HandicapRace r) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
@@ -620,123 +629,538 @@ class _HandicapCardState extends State<_HandicapCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top header: flag (left), centered title, plus (right)
           Row(
             children: [
+              SizedBox(
+                width: 36,
+                child: widget.isAdmin
+                    ? IconButton(
+                        tooltip: 'Top 3 Finishers',
+                        onPressed: () => _openTop3Dialog(r),
+                        icon: const Icon(
+                          Icons.flag_circle_outlined,
+                          color: Color(0xFFFFD700),
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
               Expanded(
-                child: Text(
-                  r.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                child: Center(
+                  child: Text(
+                    r.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
-              if (widget.isAdmin)
-                IconButton(
-                  tooltip: 'Create Event',
-                  onPressed: () => widget.onCreateEvent(r),
-                  icon: const Icon(
-                    Icons.add_box_outlined,
-                    color: Color(0xFFFFD700),
-                  ),
+              SizedBox(
+                width: 36,
+                child: widget.isAdmin
+                    ? IconButton(
+                        tooltip: 'Create Event',
+                        onPressed: () => widget.onCreateEvent(r),
+                        icon: const Icon(
+                          Icons.add_box_outlined,
+                          color: Color(0xFFFFD700),
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          // Combined row: Date (left half) and Venue (right half)
+          Row(
+            children: [
+              // Left: Date section
+              Expanded(
+                child: Row(
+                  children: [
+                    if (widget.isAdmin)
+                      IconButton(
+                        tooltip: 'Pick date',
+                        onPressed: () => widget.onEditDate(r),
+                        icon: const Icon(
+                          Icons.calendar_month,
+                          color: Color(0xFFFFD700),
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      )
+                    else
+                      const Icon(
+                        Icons.event,
+                        color: Color(0xFFFFD700),
+                        size: 20,
+                      ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child:
+                          (r.date.trim().isEmpty ||
+                              r.date.toLowerCase() == 'tbd')
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Color(0xFF4A90E2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Text(
+                                'Date',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : Text(
+                              r.date,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                    ),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              // Calendar picker on the left
-              if (widget.isAdmin)
-                IconButton(
-                  tooltip: 'Pick date',
-                  onPressed: () => widget.onEditDate(r),
-                  icon: const Icon(
-                    Icons.calendar_month,
-                    color: Color(0xFFFFD700),
-                  ),
-                )
-              else
-                const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
-              const SizedBox(width: 8),
+              ),
+              const SizedBox(width: 10),
+              // Right: Venue section
               Expanded(
-                child: (r.date.trim().isEmpty || r.date.toLowerCase() == 'tbd')
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                child: Row(
+                  children: [
+                    if (widget.isAdmin)
+                      IconButton(
+                        tooltip: 'Edit venue',
+                        onPressed: () => widget.onEditVenue(r),
+                        icon: const Icon(
+                          Icons.edit_location_alt,
+                          color: Color(0xFFFFD700),
                         ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Color(0xFF4A90E2),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          'Date',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       )
-                    : Text(
-                        r.date,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    else
+                      const Icon(
+                        Icons.place,
+                        color: Color(0xFFFFD700),
+                        size: 20,
                       ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child:
+                          (r.venue.trim().isEmpty ||
+                              r.venue.toLowerCase() == 'tbd')
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Color(0xFF4A90E2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Text(
+                                'Venue',
+                                style: TextStyle(color: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : Text(
+                              r.venue,
+                              style: const TextStyle(color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              // Venue icon on the left, same behavior as calendar
-              if (widget.isAdmin)
-                IconButton(
-                  tooltip: 'Edit venue',
-                  onPressed: () => widget.onEditVenue(r),
-                  icon: const Icon(
-                    Icons.edit_location_alt,
-                    color: Color(0xFFFFD700),
-                  ),
-                )
-              else
-                const Icon(Icons.place, color: Color(0xFFFFD700), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child:
-                    (r.venue.trim().isEmpty || r.venue.toLowerCase() == 'tbd')
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Color(0xFF4A90E2),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          'Venue',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      )
-                    : Text(
-                        r.venue,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 6),
+          // Top 3 finishers box below details
+          _top3Box(r),
         ],
       ),
     );
+  }
+
+  Widget _top3Box(_HandicapRace r) {
+    final winners = _top3[r.id] ?? [];
+    final nonEmpty = winners.where((w) => w.name.trim().isNotEmpty).toList();
+    if (nonEmpty.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color.fromRGBO(0, 0, 255, 1), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Text(
+            'Top 3 Finishers',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          for (int i = 0; i < 3; i++)
+            if (i < winners.length && winners[i].name.trim().isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.emoji_events,
+                    color: i == 0
+                        ? const Color(0xFFFFD700)
+                        : i == 1
+                        ? const Color(0xFFC0C0C0)
+                        : const Color(0xFFCD7F32),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      winners[i].name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (i < 2) const SizedBox(height: 6),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openTop3Dialog(_HandicapRace r) async {
+    final initial =
+        (_top3[r.id] ??
+        [
+          const _MedalWinner(name: '', userId: null),
+          const _MedalWinner(name: '', userId: null),
+          const _MedalWinner(name: '', userId: null),
+        ]);
+    final goldCtrl = TextEditingController(text: initial[0].name);
+    final silverCtrl = TextEditingController(text: initial[1].name);
+    final bronzeCtrl = TextEditingController(text: initial[2].name);
+    String? goldUserId = initial[0].userId;
+    String? silverUserId = initial[1].userId;
+    String? bronzeUserId = initial[2].userId;
+
+    List<Map<String, String>> goldSuggestions = const [];
+    List<Map<String, String>> silverSuggestions = const [];
+    List<Map<String, String>> bronzeSuggestions = const [];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F111A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(
+                  color: Color.fromRGBO(21, 0, 255, 1),
+                  width: 1,
+                ),
+              ),
+              title: const Text(
+                'Top 3 Finishers',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _medalField(
+                      label: 'Gold',
+                      controller: goldCtrl,
+                      color: const Color(0xFFFFD700),
+                      suggestions: goldSuggestions,
+                      onChanged: (q) async {
+                        goldSuggestions = await _searchUsers(q);
+                        setDState(() {});
+                      },
+                      onPick: (opt) {
+                        goldCtrl.text = opt['full_name'] ?? '';
+                        goldUserId = opt['id'];
+                        goldSuggestions = const [];
+                        setDState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _medalField(
+                      label: 'Silver',
+                      controller: silverCtrl,
+                      color: const Color(0xFFC0C0C0),
+                      suggestions: silverSuggestions,
+                      onChanged: (q) async {
+                        silverSuggestions = await _searchUsers(q);
+                        setDState(() {});
+                      },
+                      onPick: (opt) {
+                        silverCtrl.text = opt['full_name'] ?? '';
+                        silverUserId = opt['id'];
+                        silverSuggestions = const [];
+                        setDState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _medalField(
+                      label: 'Bronze',
+                      controller: bronzeCtrl,
+                      color: const Color(0xFFCD7F32),
+                      suggestions: bronzeSuggestions,
+                      onChanged: (q) async {
+                        bronzeSuggestions = await _searchUsers(q);
+                        setDState(() {});
+                      },
+                      onPick: (opt) {
+                        bronzeCtrl.text = opt['full_name'] ?? '';
+                        bronzeUserId = opt['id'];
+                        bronzeSuggestions = const [];
+                        setDState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD700),
+                    foregroundColor: Colors.black,
+                  ),
+                  onPressed: () async {
+                    final winners = [
+                      _MedalWinner(
+                        name: goldCtrl.text.trim(),
+                        userId: goldUserId,
+                      ),
+                      _MedalWinner(
+                        name: silverCtrl.text.trim(),
+                        userId: silverUserId,
+                      ),
+                      _MedalWinner(
+                        name: bronzeCtrl.text.trim(),
+                        userId: bronzeUserId,
+                      ),
+                    ];
+                    setState(() => _top3[r.id] = winners);
+                    await _saveTop3(r.id, winners);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _medalField({
+    required String label,
+    required TextEditingController controller,
+    required Color color,
+    required List<Map<String, String>> suggestions,
+    required ValueChanged<String> onChanged,
+    required ValueChanged<Map<String, String>> onPick,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.emoji_events, color: color, size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                onChanged: onChanged,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: '$label finisher',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF4A90E2), width: 1),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Color(0xFF4A90E2),
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F111A),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF4A90E2), width: 1),
+            ),
+            constraints: const BoxConstraints(maxHeight: 120),
+            child: ListView.builder(
+              itemCount: suggestions.length,
+              itemBuilder: (ctx, i) {
+                final opt = suggestions[i];
+                final name = opt['full_name'] ?? '';
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    name,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  onTap: () => onPick(opt),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<List<Map<String, String>>> _searchUsers(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+    try {
+      final rows = await Supabase.instance.client
+          .from('user_profiles')
+          .select('id, full_name')
+          .ilike('full_name', '%$q%')
+          .limit(6);
+      return rows
+          .map<Map<String, String>>(
+            (r) => {
+              'id': (r['id'] as String?) ?? '',
+              'full_name': ((r['full_name'] as String?) ?? '').trim(),
+            },
+          )
+          .where((opt) => (opt['full_name'] ?? '').isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _saveTop3(String raceId, List<_MedalWinner> winners) async {
+    // Try Supabase first (table: handicap_top3 with columns: race_id, gold, silver, bronze)
+    try {
+      await Supabase.instance.client.from('handicap_top3').upsert({
+        'race_id': raceId,
+        'gold': winners.isNotEmpty ? winners[0].name : null,
+        'silver': winners.length > 1 ? winners[1].name : null,
+        'bronze': winners.length > 2 ? winners[2].name : null,
+        'gold_user_id': winners.isNotEmpty ? winners[0].userId : null,
+        'silver_user_id': winners.length > 1 ? winners[1].userId : null,
+        'bronze_user_id': winners.length > 2 ? winners[2].userId : null,
+      });
+    } catch (_) {
+      // Fallback to local persistence
+      final prefs = await SharedPreferences.getInstance();
+      final lines = winners
+          .map((w) => '${w.name}|${w.userId ?? ''}')
+          .join('\n');
+      await prefs.setString('handicap_' + raceId + '_top3', lines);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTop3FromStorage();
+  }
+
+  Future<void> _loadTop3FromStorage() async {
+    // Try loading from Supabase; if not available, use SharedPreferences
+    try {
+      final rows = await Supabase.instance.client
+          .from('handicap_top3')
+          .select(
+            'race_id, gold, silver, bronze, gold_user_id, silver_user_id, bronze_user_id',
+          );
+      for (final r in rows) {
+        final id = (r['race_id'] as String?) ?? '';
+        if (id.isEmpty) continue;
+        _top3[id] = [
+          _MedalWinner(
+            name: (r['gold'] as String?) ?? '',
+            userId: r['gold_user_id'] as String?,
+          ),
+          _MedalWinner(
+            name: (r['silver'] as String?) ?? '',
+            userId: r['silver_user_id'] as String?,
+          ),
+          _MedalWinner(
+            name: (r['bronze'] as String?) ?? '',
+            userId: r['bronze_user_id'] as String?,
+          ),
+        ];
+      }
+      if (mounted) setState(() {});
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      for (final r in widget.races) {
+        final s = prefs.getString('handicap_' + r.id + '_top3');
+        if (s != null && s.isNotEmpty) {
+          final lines = s.split('\n');
+          _top3[r.id] = lines.map((line) {
+            final parts = line.split('|');
+            return _MedalWinner(
+              name: parts.isNotEmpty ? parts[0] : '',
+              userId: parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null,
+            );
+          }).toList();
+        }
+      }
+      if (mounted) setState(() {});
+    }
   }
 }
 
