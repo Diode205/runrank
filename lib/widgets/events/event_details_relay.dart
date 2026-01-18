@@ -962,6 +962,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     );
   }
 
+  // ignore: unused_element
   Future<void> _openRelayDebugView() async {
     try {
       final rows = await supabase

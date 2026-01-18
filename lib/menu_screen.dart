@@ -6,7 +6,8 @@ import 'package:runrank/auth/login_screen.dart';
 import 'package:runrank/menu/club_history_page.dart';
 import 'package:runrank/menu/kit_merchandise_page.dart';
 import 'package:runrank/menu/membership_page.dart';
-import 'package:runrank/menu/races_eaccl_page.dart';
+import 'package:runrank/menu/races_eaccl_page_clean.dart';
+import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/app_settings_page.dart';
@@ -26,11 +27,11 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> with RouteAware {
-  final _supabase = Supabase.instance.client;
-  bool _loading = true;
-  bool _isAdmin = false;
+  final SupabaseClient _supabase = Supabase.instance.client;
   final ImagePicker _picker = ImagePicker();
 
+  bool _loading = false;
+  bool _isAdmin = false;
   String? _fullName;
   String? _email;
   String? _ukaNumber;
@@ -400,8 +401,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.flag,
-                  title: 'Club Races & EACCL',
-                  subtitle: 'History, Directing & Participation',
+                  title: 'Signature and Handicap Races',
+                  subtitle: 'Management & Participations',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -409,6 +410,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     );
                   },
                 ),
+                // Handicap Series is integrated into Signature & Handicap page
                 _menuTile(
                   icon: Icons.shopping_bag,
                   title: 'Kit & Merchandise',
@@ -484,6 +486,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const RunnersOfTheYearPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.groups,
+                  title: 'RNR, Ekiden & EACCL',
+                  subtitle: 'Managing Team and Relay Participations',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RnrEkidenEacclPage(),
                       ),
                     );
                   },

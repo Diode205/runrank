@@ -433,7 +433,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 final rawType = (myResponse!["response_type"] as String?) ?? "";
                 var displayType = rawType;
 
-                final eventType = widget.event.eventType?.toLowerCase() ?? "";
+                final eventType = widget.event.eventType.toLowerCase();
                 if (eventType == "special_event" && rawType == "running") {
                   displayType = "Attending";
                 }

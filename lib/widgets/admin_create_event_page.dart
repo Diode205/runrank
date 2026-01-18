@@ -4,8 +4,19 @@ import 'package:runrank/services/notification_service.dart';
 
 class AdminCreateEventPage extends StatefulWidget {
   final String userRole;
+  final String? initialEventType;
+  final String? initialHandicapDistance;
+  final DateTime? initialDate;
+  final String? initialVenue;
 
-  const AdminCreateEventPage({super.key, required this.userRole});
+  const AdminCreateEventPage({
+    super.key,
+    required this.userRole,
+    this.initialEventType,
+    this.initialHandicapDistance,
+    this.initialDate,
+    this.initialVenue,
+  });
 
   @override
   State<AdminCreateEventPage> createState() => _AdminCreateEventPageState();
@@ -42,6 +53,21 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     selectedEventType = selectedCategory == "admin"
         ? adminTypes.first
         : socialTypes.first;
+
+    // Apply any provided initial values for prefilled navigation
+    if (widget.initialEventType != null) {
+      selectedCategory = "admin"; // only admin creates events here
+      selectedEventType = widget.initialEventType!;
+    }
+    if (widget.initialHandicapDistance != null) {
+      selectedHandicapDistance = widget.initialHandicapDistance;
+    }
+    if (widget.initialDate != null) {
+      selectedDate = widget.initialDate;
+    }
+    if (widget.initialVenue != null) {
+      venueCtrl.text = widget.initialVenue!;
+    }
 
     _loadHosts();
   }
