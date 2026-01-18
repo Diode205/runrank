@@ -312,7 +312,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   Widget _section(String title, Widget child) {
     return Card(
       elevation: 1,
-      color: const Color.fromARGB(226, 101, 105, 101),
+      color: const Color(0xFF0F111A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -320,7 +324,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 8),
             child,
@@ -343,7 +351,18 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Color(0xFF4A90E2),
+                          width: 1,
+                        ),
+                        foregroundColor: const Color(0xFFF5C542),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                       onPressed: widget.userRole == "admin"
                           ? () => setState(() {
                               selectedCategory = "admin";
@@ -355,7 +374,18 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: ElevatedButton(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Color(0xFF4A90E2),
+                          width: 1,
+                        ),
+                        foregroundColor: const Color(0xFFF5C542),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                       onPressed: () => setState(() {
                         selectedCategory = "social";
                         selectedEventType = socialTypes.first;
@@ -540,7 +570,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               /// DATE & TIME
               Card(
                 elevation: 1,
-                color: const Color.fromARGB(255, 74, 75, 76),
+                color: const Color(0xFF0F111A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF4A90E2), width: 1),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -559,6 +593,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0xFF4A90E2),
+                                  width: 1,
+                                ),
+                                foregroundColor: Colors.white,
+                              ),
                               onPressed: pickDate,
                               child: Text(
                                 selectedDate == null
@@ -571,6 +612,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                    color: Color(0xFF4A90E2),
+                                    width: 1,
+                                  ),
+                                  foregroundColor: Colors.white,
+                                ),
                                 onPressed: () async {
                                   final t = await showTimePicker(
                                     context: context,
@@ -615,7 +663,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                   onPressed: saveEvent,
                   icon: const Icon(Icons.save),
                   label: const Text("Save Event"),

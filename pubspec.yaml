@@ -30,6 +30,7 @@ dependencies:
   firebase_crashlytics: ^4.3.0
   flutter_stripe: ^12.0.0
   http: ^1.2.1
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:
@@ -77,3 +78,5 @@ flutter:
     - assets/images/screenrank_logo.png
     - assets/images/awards.png
     - assets/images/handicappic.png
+    - assets/images/RNR26.png
+    - assets/images/rnr.png

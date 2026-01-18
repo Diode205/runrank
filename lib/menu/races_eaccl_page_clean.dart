@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RacesEacclPage extends StatefulWidget {
   const RacesEacclPage({super.key});
@@ -20,11 +21,11 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
   };
 
   final List<_HandicapRace> _handicapRaces = [
-    _HandicapRace(id: 'h1', title: '5K Handicap', date: '', venue: ''),
-    _HandicapRace(id: 'h2', title: '8.8 Mile Beach', date: '', venue: ''),
-    _HandicapRace(id: 'h3', title: '10 Mile', date: '', venue: ''),
-    _HandicapRace(id: 'h4', title: '5 Mile', date: '', venue: ''),
-    _HandicapRace(id: 'h5', title: '10K', date: '', venue: ''),
+    _HandicapRace(id: 'h1', title: '5 Km Race', date: '', venue: ''),
+    _HandicapRace(id: 'h2', title: '8.8 Mile Beach Run', date: '', venue: ''),
+    _HandicapRace(id: 'h3', title: '10 Mile Race', date: '', venue: ''),
+    _HandicapRace(id: 'h4', title: '5 Mile Race', date: '', venue: ''),
+    _HandicapRace(id: 'h5', title: '10 Km Race', date: '', venue: ''),
     _HandicapRace(id: 'h6', title: '7 Mile', date: '', venue: ''),
   ];
 
@@ -32,11 +33,55 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
   void initState() {
     super.initState();
     _loadAdmin();
+    _loadSavedRaceData();
+    _loadSavedHandicapData();
   }
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadSavedRaceData() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool changed = false;
+    for (final key in ['holt', 'worstead', 'chase']) {
+      final saved = prefs.getString('signature_date_' + key);
+      if (saved != null && saved.isNotEmpty) {
+        _raceDates[key] = saved;
+        changed = true;
+      }
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  Future<void> _saveSignatureDate(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('signature_date_' + key, _raceDates[key] ?? '');
+  }
+
+  Future<void> _loadSavedHandicapData() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool changed = false;
+    for (final r in _handicapRaces) {
+      final d = prefs.getString('handicap_' + r.id + '_date');
+      final v = prefs.getString('handicap_' + r.id + '_venue');
+      if (d != null) {
+        r.date = d;
+        changed = true;
+      }
+      if (v != null) {
+        r.venue = v;
+        changed = true;
+      }
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  Future<void> _saveHandicap(_HandicapRace r) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('handicap_' + r.id + '_date', r.date);
+    await prefs.setString('handicap_' + r.id + '_venue', r.venue);
   }
 
   Future<void> _openLink(String url) async {
@@ -79,6 +124,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           ElevatedButton(
             onPressed: () {
               setState(() => _raceDates[key] = controller.text.trim());
+              _saveSignatureDate(key);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -92,6 +138,22 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     );
   }
 
+  void _pickDateForRace(String key) {
+    final now = DateTime.now();
+    final current = _parseDateLabel(_raceDates[key] ?? '') ?? now;
+    showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 3)),
+    ).then((picked) {
+      if (picked != null) {
+        setState(() => _raceDates[key] = _formatDate(picked));
+        _saveSignatureDate(key);
+      }
+    });
+  }
+
   void _editHandicapDate(_HandicapRace r) {
     final now = DateTime.now();
     showDatePicker(
@@ -102,12 +164,13 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     ).then((picked) {
       if (picked != null) {
         setState(() => r.date = _formatDate(picked));
+        _saveHandicap(r);
       }
     });
   }
 
   void _editHandicapVenue(_HandicapRace r) {
-    final controller = TextEditingController(text: '');
+    final controller = TextEditingController(text: r.venue);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -135,6 +198,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           ElevatedButton(
             onPressed: () {
               setState(() => r.venue = controller.text.trim());
+              _saveHandicap(r);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -230,6 +294,20 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     );
   }
 
+  void _createSignatureEvent(_RaceInfo info) {
+    final initialDate = _parseDateLabel(info.date);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminCreateEventPage(
+          userRole: _isAdmin ? 'admin' : 'social',
+          initialEventType: 'Race',
+          initialDate: initialDate,
+          initialVenue: info.location,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,6 +388,8 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
             info: r,
             isAdmin: _isAdmin,
             onEditDate: () => _editDate(r.keyId, r.title),
+            onPickDate: () => _pickDateForRace(r.keyId),
+            onCreateEvent: () => _createSignatureEvent(r),
             onOpen: _openLink,
           ),
         ),
@@ -535,7 +615,7 @@ class _HandicapCardState extends State<_HandicapCard> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: const Color(0xFFFFD700), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,19 +633,32 @@ class _HandicapCardState extends State<_HandicapCard> {
                 ),
               ),
               if (widget.isAdmin)
-                TextButton.icon(
+                IconButton(
+                  tooltip: 'Create Event',
                   onPressed: () => widget.onCreateEvent(r),
                   icon: const Icon(
                     Icons.add_box_outlined,
                     color: Color(0xFFFFD700),
                   ),
-                  label: const Text('Create Event'),
                 ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             children: [
+              // Calendar picker on the left
+              if (widget.isAdmin)
+                IconButton(
+                  tooltip: 'Pick date',
+                  onPressed: () => widget.onEditDate(r),
+                  icon: const Icon(
+                    Icons.calendar_month,
+                    color: Color(0xFFFFD700),
+                  ),
+                )
+              else
+                const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
+              const SizedBox(width: 8),
               Expanded(
                 child: (r.date.trim().isEmpty || r.date.toLowerCase() == 'tbd')
                     ? Container(
@@ -596,20 +689,24 @@ class _HandicapCardState extends State<_HandicapCard> {
                         ),
                       ),
               ),
-              if (widget.isAdmin)
-                IconButton(
-                  tooltip: 'Edit date',
-                  onPressed: () => widget.onEditDate(r),
-                  icon: const Icon(
-                    Icons.edit_calendar,
-                    color: Color(0xFFFFD700),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             children: [
+              // Venue icon on the left, same behavior as calendar
+              if (widget.isAdmin)
+                IconButton(
+                  tooltip: 'Edit venue',
+                  onPressed: () => widget.onEditVenue(r),
+                  icon: const Icon(
+                    Icons.edit_location_alt,
+                    color: Color(0xFFFFD700),
+                  ),
+                )
+              else
+                const Icon(Icons.place, color: Color(0xFFFFD700), size: 20),
+              const SizedBox(width: 8),
               Expanded(
                 child:
                     (r.venue.trim().isEmpty || r.venue.toLowerCase() == 'tbd')
@@ -635,15 +732,6 @@ class _HandicapCardState extends State<_HandicapCard> {
                         style: const TextStyle(color: Colors.white),
                       ),
               ),
-              if (widget.isAdmin)
-                IconButton(
-                  tooltip: 'Edit venue',
-                  onPressed: () => widget.onEditVenue(r),
-                  icon: const Icon(
-                    Icons.edit_location_alt,
-                    color: Color(0xFFFFD700),
-                  ),
-                ),
             ],
           ),
         ],
@@ -656,12 +744,16 @@ class _RaceCard extends StatelessWidget {
   final _RaceInfo info;
   final bool isAdmin;
   final VoidCallback onEditDate;
+  final VoidCallback? onPickDate;
+  final VoidCallback? onCreateEvent;
   final Future<void> Function(String url) onOpen;
 
   const _RaceCard({
     required this.info,
     required this.isAdmin,
     required this.onEditDate,
+    this.onPickDate,
+    this.onCreateEvent,
     required this.onOpen,
   });
 
@@ -745,7 +837,18 @@ class _RaceCard extends StatelessWidget {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
+                  if (isAdmin && onPickDate != null) ...[
+                    IconButton(
+                      onPressed: onPickDate,
+                      icon: const Icon(
+                        Icons.calendar_month,
+                        color: Color(0xFFFFD700),
+                      ),
+                      tooltip: 'Pick race date',
+                    ),
+                  ] else ...[
+                    const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
+                  ],
                   const SizedBox(width: 8),
                   Text(
                     info.date,
@@ -755,14 +858,15 @@ class _RaceCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  if (isAdmin)
+                  // Keep Create Event on the right for admins (icon-only)
+                  if (isAdmin && onCreateEvent != null)
                     IconButton(
-                      onPressed: onEditDate,
+                      onPressed: onCreateEvent,
+                      tooltip: 'Create Event',
                       icon: const Icon(
-                        Icons.edit_calendar,
+                        Icons.add_box_outlined,
                         color: Color(0xFFFFD700),
                       ),
-                      tooltip: 'Edit race date',
                     ),
                 ],
               ),

@@ -401,7 +401,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.flag,
-                  title: 'Signature and Handicap Races',
+                  title: 'Signature & Handicap Races',
                   subtitle: 'Management & Participations',
                   onTap: () {
                     Navigator.push(
