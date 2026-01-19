@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
 
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
@@ -575,6 +575,17 @@ class _StageInfo {
   final String label;
   final String query;
   const _StageInfo({required this.label, required this.query});
+}
+
+class _MapOption {
+  final String label;
+  final IconData icon;
+  final Future<void> Function() launcher;
+  const _MapOption({
+    required this.label,
+    required this.icon,
+    required this.launcher,
+  });
 }
 
 class _EkidenPage extends StatelessWidget {
