@@ -164,10 +164,76 @@ class _RnrPage extends StatefulWidget {
 class _RnrPageState extends State<_RnrPage> {
   bool _expanded = false;
   bool _isAdmin = false;
-  late final List<String> _stageQueries = List<String>.generate(
-    17,
-    (i) => 'Round Norfolk Relay Stage ${i + 1} start',
-  );
+  final List<_StageInfo> _stages = const [
+    _StageInfo(
+      label: "Stage 1: Lynnsport, King's Lynn — PE30 2NB",
+      query: 'PE30 2NB',
+    ),
+    _StageInfo(
+      label: 'Stage 2: Hunstanton (Lighthouse) — PE36 6EL',
+      query: 'Hunstanton Lighthouse PE36 6EL',
+    ),
+    _StageInfo(
+      label: 'Stage 3: Burnham Overy Staithe — PE31 8JF',
+      query: 'PE31 8JF',
+    ),
+    _StageInfo(
+      label: 'Stage 4: Wells-next-the-Sea (Beach Road) — NR23 1DR',
+      query: 'Wells-next-the-Sea Beach Road NR23 1DR',
+    ),
+    _StageInfo(
+      label: 'Stage 5: Cley-next-the-Sea (Beach Road) — NR25 7RZ',
+      query: 'Cley-next-the-Sea Beach Road NR25 7RZ',
+    ),
+    _StageInfo(
+      label: 'Stage 6: Cromer (Runton Road Car Park) — NR27 9BA',
+      query: 'Runton Road Car Park NR27 9BA',
+    ),
+    _StageInfo(
+      label: 'Stage 7: Mundesley (Coronation Hall) — NR11 8BE',
+      query: 'Mundesley Coronation Hall NR11 8BE',
+    ),
+    _StageInfo(
+      label: 'Stage 8: Lessingham (Star Inn) — NR12 0SF',
+      query: 'Star Inn Lessingham NR12 0SF',
+    ),
+    _StageInfo(
+      label: 'Stage 9: Horsey (Horsey Mill) — NR29 4EF',
+      query: 'Horsey Mill NR29 4EF',
+    ),
+    _StageInfo(
+      label: 'Stage 10: Belton (Tavern Lane) — NR31 9LN',
+      query: 'Tavern Lane Belton NR31 9LN',
+    ),
+    _StageInfo(
+      label: 'Stage 11: Earsham (Village Hall) — NR35 2TQ',
+      query: 'Earsham Village Hall NR35 2TQ',
+    ),
+    _StageInfo(
+      label: 'Stage 12: Scole (Village Hall) — IP21 4EE',
+      query: 'Scole Village Hall IP21 4EE',
+    ),
+    _StageInfo(
+      label: 'Stage 13: Thetford (Guildhall) — IP24 2DS',
+      query: 'Thetford Guildhall IP24 2DS',
+    ),
+    _StageInfo(
+      label: "Stage 14: Feltwell (St Mary's Church) — IP26 4AB",
+      query: "St Mary's Church Feltwell IP26 4AB",
+    ),
+    _StageInfo(
+      label: 'Stage 15: Wissington (British Sugar) — PE33 9QG',
+      query: 'British Sugar Wissington PE33 9QG',
+    ),
+    _StageInfo(
+      label: 'Stage 16: Downham Market (Town Council) — PE38 9HS',
+      query: 'Downham Market Town Council PE38 9HS',
+    ),
+    _StageInfo(
+      label: 'Stage 17: Stowbridge (Village Hall) — PE34 3PW',
+      query: 'Stowbridge Village Hall PE34 3PW',
+    ),
+  ];
 
   static const String _visiblePara =
       'The course of the Round Norfolk Relay mirrors the county boundary over a distance of 198 miles, divided into 17 unequal stages. Norfolk\'s enormous skies, vast sandy beaches, open spaces and picturesque towns and villages, with their attractive cottages and medieval churches, all contribute to making the race a unique running experience. But it is likely to be the spectacular skies at sunset and sunrise which will provide the most vivid memories.';
@@ -372,8 +438,9 @@ class _RnrPageState extends State<_RnrPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFFD700),
                                 foregroundColor: Colors.black,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -384,15 +451,15 @@ class _RnrPageState extends State<_RnrPage> {
                           PopupMenuButton<int>(
                             tooltip: 'Stage starts',
                             itemBuilder: (context) => [
-                              for (int i = 0; i < 17; i++)
+                              for (int i = 0; i < _stages.length; i++)
                                 PopupMenuItem<int>(
                                   value: i,
-                                  child: Text('Stage ${i + 1} start'),
+                                  child: Text(_stages[i].label),
                                 ),
                             ],
                             onSelected: (index) {
-                              final q = _stageQueries[index];
-                              _openMapsToQuery(q);
+                              final s = _stages[index];
+                              _openMapsToQuery(s.query);
                             },
                             child: Container(
                               decoration: BoxDecoration(
@@ -422,6 +489,12 @@ class _RnrPageState extends State<_RnrPage> {
       ],
     );
   }
+}
+
+class _StageInfo {
+  final String label;
+  final String query;
+  const _StageInfo({required this.label, required this.query});
 }
 
 class _EkidenPage extends StatelessWidget {
