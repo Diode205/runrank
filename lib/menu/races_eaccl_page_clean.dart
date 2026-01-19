@@ -85,6 +85,19 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     await prefs.setString('handicap_' + r.id + '_venue', r.venue);
   }
 
+  // Save to Supabase so non-admin users see the admin-entered details
+  Future<void> _saveHandicapRemote(_HandicapRace r) async {
+    try {
+      await Supabase.instance.client.from('handicap_top3').upsert({
+        'race_id': r.id,
+        'date_label': r.date.isNotEmpty ? r.date : null,
+        'venue': r.venue.isNotEmpty ? r.venue : null,
+      });
+    } catch (_) {
+      // Ignore remote write errors; local persistence still applies
+    }
+  }
+
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -166,6 +179,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
       if (picked != null) {
         setState(() => r.date = _formatDate(picked));
         _saveHandicap(r);
+        _saveHandicapRemote(r);
       }
     });
   }
@@ -200,6 +214,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
             onPressed: () {
               setState(() => r.venue = controller.text.trim());
               _saveHandicap(r);
+              _saveHandicapRemote(r);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -1122,9 +1137,7 @@ class _HandicapCardState extends State<_HandicapCard> {
     try {
       final rows = await Supabase.instance.client
           .from('handicap_top3')
-          .select(
-            'race_id, gold, silver, bronze, gold_user_id, silver_user_id, bronze_user_id',
-          );
+          .select();
       for (final r in rows) {
         final id = (r['race_id'] as String?) ?? '';
         if (id.isEmpty) continue;
@@ -1142,6 +1155,21 @@ class _HandicapCardState extends State<_HandicapCard> {
             userId: r['bronze_user_id'] as String?,
           ),
         ];
+
+        // Hydrate date/venue for visibility to all users if provided by admin
+        final dateLabel = (r['date_label'] as String?)?.trim();
+        final venue = (r['venue'] as String?)?.trim();
+        if ((dateLabel != null && dateLabel.isNotEmpty) ||
+            (venue != null && venue.isNotEmpty)) {
+          for (final hr in widget.races) {
+            if (hr.id == id) {
+              if (dateLabel != null && dateLabel.isNotEmpty)
+                hr.date = dateLabel;
+              if (venue != null && venue.isNotEmpty) hr.venue = venue;
+              break;
+            }
+          }
+        }
       }
       if (mounted) setState(() {});
     } catch (_) {
