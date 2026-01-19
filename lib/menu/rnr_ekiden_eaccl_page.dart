@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
@@ -166,72 +168,48 @@ class _RnrPageState extends State<_RnrPage> {
   bool _isAdmin = false;
   final List<_StageInfo> _stages = const [
     _StageInfo(
-      label: "Stage 1: Lynnsport, King's Lynn — PE30 2NB",
-      query: 'PE30 2NB',
+      label: "S1: King's Lynn — PE30 2NB",
+      query: "King's Lynn PE30 2NB",
     ),
     _StageInfo(
-      label: 'Stage 2: Hunstanton (Lighthouse) — PE36 6EL',
-      query: 'Hunstanton Lighthouse PE36 6EL',
+      label: 'S2: Hunstanton — PE36 6EL',
+      query: 'Hunstanton PE36 6EL',
     ),
     _StageInfo(
-      label: 'Stage 3: Burnham Overy Staithe — PE31 8JF',
-      query: 'PE31 8JF',
+      label: 'S3: Burnham Overy Staithe — PE31 8JF',
+      query: 'Burnham Overy Staithe PE31 8JF',
     ),
     _StageInfo(
-      label: 'Stage 4: Wells-next-the-Sea (Beach Road) — NR23 1DR',
-      query: 'Wells-next-the-Sea Beach Road NR23 1DR',
+      label: 'S4: Wells-next-the-Sea — NR23 1DR',
+      query: 'Wells-next-the-Sea NR23 1DR',
     ),
     _StageInfo(
-      label: 'Stage 5: Cley-next-the-Sea (Beach Road) — NR25 7RZ',
-      query: 'Cley-next-the-Sea Beach Road NR25 7RZ',
+      label: 'S5: Cley-next-the-Sea — NR25 7RZ',
+      query: 'Cley-next-the-Sea NR25 7RZ',
+    ),
+    _StageInfo(label: 'S6: Cromer — NR27 9BA', query: 'Cromer NR27 9BA'),
+    _StageInfo(label: 'S7: Mundesley — NR11 8BE', query: 'Mundesley NR11 8BE'),
+    _StageInfo(
+      label: 'S8: Lessingham — NR12 0SF',
+      query: 'Lessingham NR12 0SF',
+    ),
+    _StageInfo(label: 'S9: Horsey — NR29 4EF', query: 'Horsey NR29 4EF'),
+    _StageInfo(label: 'S10: Belton — NR31 9LN', query: 'Belton NR31 9LN'),
+    _StageInfo(label: 'S11: Earsham — NR35 2TQ', query: 'Earsham NR35 2TQ'),
+    _StageInfo(label: 'S12: Scole — IP21 4EE', query: 'Scole IP21 4EE'),
+    _StageInfo(label: 'S13: Thetford — IP24 2DS', query: 'Thetford IP24 2DS'),
+    _StageInfo(label: 'S14: Feltwell — IP26 4AB', query: 'Feltwell IP26 4AB'),
+    _StageInfo(
+      label: 'S15: Wissington — PE33 9QG',
+      query: 'Wissington PE33 9QG',
     ),
     _StageInfo(
-      label: 'Stage 6: Cromer (Runton Road Car Park) — NR27 9BA',
-      query: 'Runton Road Car Park NR27 9BA',
+      label: 'S16: Downham Market — PE38 9HS',
+      query: 'Downham Market PE38 9HS',
     ),
     _StageInfo(
-      label: 'Stage 7: Mundesley (Coronation Hall) — NR11 8BE',
-      query: 'Mundesley Coronation Hall NR11 8BE',
-    ),
-    _StageInfo(
-      label: 'Stage 8: Lessingham (Star Inn) — NR12 0SF',
-      query: 'Star Inn Lessingham NR12 0SF',
-    ),
-    _StageInfo(
-      label: 'Stage 9: Horsey (Horsey Mill) — NR29 4EF',
-      query: 'Horsey Mill NR29 4EF',
-    ),
-    _StageInfo(
-      label: 'Stage 10: Belton (Tavern Lane) — NR31 9LN',
-      query: 'Tavern Lane Belton NR31 9LN',
-    ),
-    _StageInfo(
-      label: 'Stage 11: Earsham (Village Hall) — NR35 2TQ',
-      query: 'Earsham Village Hall NR35 2TQ',
-    ),
-    _StageInfo(
-      label: 'Stage 12: Scole (Village Hall) — IP21 4EE',
-      query: 'Scole Village Hall IP21 4EE',
-    ),
-    _StageInfo(
-      label: 'Stage 13: Thetford (Guildhall) — IP24 2DS',
-      query: 'Thetford Guildhall IP24 2DS',
-    ),
-    _StageInfo(
-      label: "Stage 14: Feltwell (St Mary's Church) — IP26 4AB",
-      query: "St Mary's Church Feltwell IP26 4AB",
-    ),
-    _StageInfo(
-      label: 'Stage 15: Wissington (British Sugar) — PE33 9QG',
-      query: 'British Sugar Wissington PE33 9QG',
-    ),
-    _StageInfo(
-      label: 'Stage 16: Downham Market (Town Council) — PE38 9HS',
-      query: 'Downham Market Town Council PE38 9HS',
-    ),
-    _StageInfo(
-      label: 'Stage 17: Stowbridge (Village Hall) — PE34 3PW',
-      query: 'Stowbridge Village Hall PE34 3PW',
+      label: 'S17: Stowbridge — PE34 3PW',
+      query: 'Stowbridge PE34 3PW',
     ),
   ];
 
@@ -246,20 +224,121 @@ class _RnrPageState extends State<_RnrPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openMapsToPostcode(String postcode) async {
-    final encoded = Uri.encodeComponent(postcode);
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$encoded',
+  Future<void> _openMaps(String query) async {
+    final options = await _availableMapOptions(query);
+    if (options.isEmpty) {
+      // Fallback to browser Google Maps
+      final encoded = Uri.encodeComponent(query);
+      final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$encoded',
+      );
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (options.length == 1) {
+      await options.first.launcher();
+      return;
+    }
+    if (!mounted) return;
+    // Show chooser for user preference
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Open with',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (final opt in options)
+              ListTile(
+                leading: Icon(opt.icon, color: Colors.white70),
+                title: Text(
+                  opt.label,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await opt.launcher();
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openMapsToQuery(String query) async {
+  Future<List<_MapOption>> _availableMapOptions(String query) async {
     final encoded = Uri.encodeComponent(query);
-    final uri = Uri.parse(
+    final List<_MapOption> opts = [];
+
+    // Apple Maps (primarily iOS)
+    if (Platform.isIOS) {
+      final uri = Uri.parse('http://maps.apple.com/?q=$encoded');
+      opts.add(
+        _MapOption(
+          label: 'Apple Maps',
+          icon: Icons.map,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    // Google Maps app
+    final googleScheme = Platform.isIOS
+        ? Uri.parse('comgooglemaps://')
+        : Uri.parse('geo:0,0?q=$encoded');
+    if (await canLaunchUrl(googleScheme)) {
+      final uri = Platform.isIOS
+          ? Uri.parse('comgooglemaps://?q=$encoded')
+          : Uri.parse('geo:0,0?q=$encoded');
+      opts.add(
+        _MapOption(
+          label: 'Google Maps',
+          icon: Icons.location_on,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    // Waze
+    final wazeScheme = Uri.parse('waze://');
+    if (await canLaunchUrl(wazeScheme)) {
+      final uri = Uri.parse('waze://?q=$encoded&navigate=yes');
+      opts.add(
+        _MapOption(
+          label: 'Waze',
+          icon: Icons.directions_car,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    // Browser fallback (always available)
+    final web = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$encoded',
     );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    opts.add(
+      _MapOption(
+        label: 'Browser',
+        icon: Icons.language,
+        launcher: () => launchUrl(web, mode: LaunchMode.externalApplication),
+      ),
+    );
+
+    return opts;
   }
 
   @override
@@ -432,7 +511,8 @@ class _RnrPageState extends State<_RnrPage> {
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () => _openMapsToPostcode('PE30 2NB'),
+                              onPressed: () =>
+                                  _openMaps("King's Lynn PE30 2NB"),
                               icon: const Icon(Icons.directions, size: 18),
                               label: const Text('Drive'),
                               style: ElevatedButton.styleFrom(
@@ -459,7 +539,7 @@ class _RnrPageState extends State<_RnrPage> {
                             ],
                             onSelected: (index) {
                               final s = _stages[index];
-                              _openMapsToQuery(s.query);
+                              _openMaps(s.query);
                             },
                             child: Container(
                               decoration: BoxDecoration(
