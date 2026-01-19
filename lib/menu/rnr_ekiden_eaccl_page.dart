@@ -507,57 +507,44 @@ class _RnrPageState extends State<_RnrPage> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  _openMaps("King's Lynn PE30 2NB"),
-                              icon: const Icon(Icons.directions, size: 18),
-                              label: const Text('Drive'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFD700),
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
+                      child: PopupMenuButton<int>(
+                        tooltip: 'Drive to stage',
+                        itemBuilder: (context) => [
+                          for (int i = 0; i < _stages.length; i++)
+                            PopupMenuItem<int>(
+                              value: i,
+                              child: Text(_stages[i].label),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          PopupMenuButton<int>(
-                            tooltip: 'Stage starts',
-                            itemBuilder: (context) => [
-                              for (int i = 0; i < _stages.length; i++)
-                                PopupMenuItem<int>(
-                                  value: i,
-                                  child: Text(_stages[i].label),
-                                ),
-                            ],
-                            onSelected: (index) {
-                              final s = _stages[index];
-                              _openMaps(s.query);
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFD700),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              child: const Icon(
-                                Icons.arrow_drop_down_circle_outlined,
-                                color: Colors.black,
-                                size: 20,
-                              ),
-                            ),
-                          ),
                         ],
+                        onSelected: (index) {
+                          final s = _stages[index];
+                          _openMaps(s.query);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.directions, size: 18, color: Colors.black),
+                              SizedBox(width: 8),
+                              Text(
+                                'Drive To',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Icon(Icons.arrow_drop_down, color: Colors.black),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
