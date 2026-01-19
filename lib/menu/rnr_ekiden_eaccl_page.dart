@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:runrank/services/user_service.dart';
+import 'package:runrank/widgets/admin_create_event_page.dart';
 
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
@@ -161,6 +163,7 @@ class _RnrPage extends StatefulWidget {
 
 class _RnrPageState extends State<_RnrPage> {
   bool _expanded = false;
+  bool _isAdmin = false;
 
   static const String _visiblePara =
       'The course of the Round Norfolk Relay mirrors the county boundary over a distance of 198 miles, divided into 17 unequal stages. Norfolk\'s enormous skies, vast sandy beaches, open spaces and picturesque towns and villages, with their attractive cottages and medieval churches, all contribute to making the race a unique running experience. But it is likely to be the spectacular skies at sunset and sunrise which will provide the most vivid memories.';
@@ -171,6 +174,35 @@ class _RnrPageState extends State<_RnrPage> {
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openMapsToPostcode(String postcode) async {
+    final encoded = Uri.encodeComponent(postcode);
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    _isAdmin = await UserService.isAdmin();
+    if (mounted) setState(() {});
+  }
+
+  void _createEvent() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminCreateEventPage(
+          userRole: _isAdmin ? 'admin' : 'social',
+          initialEventType: 'Race',
+          initialVenue: null,
+        ),
+      ),
+    );
   }
 
   @override
@@ -198,54 +230,123 @@ class _RnrPageState extends State<_RnrPage> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, heroHeight - 60, 16, 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Centered second image, overlapping the hero
-                Center(
-                  child: Image.asset(
-                    'assets/images/RNR26.png',
-                    height: 90,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _visiblePara,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, height: 1.6),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.center,
-                  child: TextButton(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    child: Text(
-                      _expanded ? 'Show less' : 'Read more…',
-                      style: const TextStyle(color: Color(0xFF56D3FF)),
+                // Main content card with border and padding
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Centered second image, overlapping the hero
+                      Center(
+                        child: Image.asset(
+                          'assets/images/RNR26.png',
+                          height: 90,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _visiblePara,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70, height: 1.6),
+                      ),
+                      const SizedBox(height: 6),
+                      // Row: Create Event (left) and Read more (right)
+                      Row(
+                        children: [
+                          if (_isAdmin)
+                            IconButton(
+                              tooltip: 'Create event',
+                              onPressed: _createEvent,
+                              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFD700)),
+                            )
+                          else
+                            const SizedBox(width: 48),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => setState(() => _expanded = !_expanded),
+                            child: Text(
+                              _expanded ? 'Show less' : 'Read more…',
+                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_expanded) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _morePara,
+                          style: const TextStyle(color: Colors.white70, height: 1.6),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      // Blue link button, centered label
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openLink('https://theroundnorfolkrelay.com/'),
+                          icon: const Icon(Icons.open_in_new, size: 18),
+                          label: const Text('Visit The RNR Site'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF56D3FF),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (_expanded) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _morePara,
-                    style: const TextStyle(color: Colors.white70, height: 1.6),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      _openLink('https://theroundnorfolkrelay.com/'),
-                  icon: const Icon(Icons.open_in_new, size: 18),
-                  label: const Text('More details on theroundnorfolkrelay.com'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF56D3FF),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 12),
+                // Bottom action buttons: Results and Drive
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openLink('https://rnr.totalracetiming.co.uk/result'),
+                        icon: const Icon(Icons.list_alt, size: 18),
+                        label: const Text('Results'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E406A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openMapsToPostcode('PE30 2NB'),
+                        icon: const Icon(Icons.directions, size: 18),
+                        label: const Text('Drive'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFD700),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
