@@ -28,11 +28,9 @@ class RnrEkidenEacclPage extends StatelessWidget {
 
 // Header removed per request
 
-
 // (Replaced by the new _EkidenPage layout)
 
 // (Replaced by the new _EacclPage layout)
-
 
 // New swipe pages
 class _RnrPage extends StatefulWidget {
@@ -642,7 +640,11 @@ class _EkidenPageState extends State<_EkidenPage> {
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     shadows: [
-                      Shadow(offset: Offset(0, 1.5), blurRadius: 3, color: Colors.black87),
+                      Shadow(
+                        offset: Offset(0, 1.5),
+                        blurRadius: 3,
+                        color: Colors.black87,
+                      ),
                     ],
                   ),
                 ),
@@ -665,7 +667,10 @@ class _EkidenPageState extends State<_EkidenPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -673,7 +678,10 @@ class _EkidenPageState extends State<_EkidenPage> {
                       Text(
                         _visiblePara,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, height: 1.6),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.6,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -682,35 +690,49 @@ class _EkidenPageState extends State<_EkidenPage> {
                             IconButton(
                               tooltip: 'Create event',
                               onPressed: _createEvent,
-                              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFD700)),
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                color: Color(0xFFFFD700),
+                              ),
                             )
                           else
                             const SizedBox(width: 48),
                           const Spacer(),
                           TextButton(
-                            onPressed: () => setState(() => _expanded = !_expanded),
-                            child: Text(_expanded ? 'Show less' : 'Read more…',
-                                style: const TextStyle(color: Color(0xFF56D3FF))),
+                            onPressed: () =>
+                                setState(() => _expanded = !_expanded),
+                            child: Text(
+                              _expanded ? 'Show less' : 'Read more…',
+                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                            ),
                           ),
                         ],
                       ),
                       if (_expanded) ...[
                         const SizedBox(height: 6),
-                        Text(_morePara,
-                            style: const TextStyle(color: Colors.white70, height: 1.6)),
+                        Text(
+                          _morePara,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.6,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _openLink('https://www.ipswichekiden.co.uk/'),
+                          onPressed: () =>
+                              _openLink('https://www.ipswichekiden.co.uk/'),
                           icon: const Icon(Icons.open_in_new, size: 18),
                           label: const Text('Visit Ipswich JAFFA Ekiden Relay'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF56D3FF),
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -718,32 +740,59 @@ class _EkidenPageState extends State<_EkidenPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "If you'd like to participate in the relay once Calendar Event is created, follow the link to register your team.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70, height: 1.4),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: () => _openLink('https://portal.ipswichekiden.co.uk/'),
+                        icon: const Icon(Icons.group_add, color: Color(0xFF56D3FF)),
+                        label: const Text('Register your team', style: TextStyle(color: Color(0xFF56D3FF))),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _openLink('https://onedrive.live.com/:x:/g/personal/56EC7C0093D7DC62/ETMLmCH7WGxNopw0rw_OZeQBnNhrEjr7s9hko8_u5tzu6A?resid=56EC7C0093D7DC62!s21980b3358fb4d6ca29c34af0fce65e4&ithint=file%2Cxlsx&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy81NmVjN2MwMDkzZDdkYzYyL0VUTUxtQ0g3V0d4Tm9wdzByd19PWmVRQm5OaHJFanI3czloa284X3U1dHp1NkE'),
+                        onPressed: () => _openLink(
+                          'https://onedrive.live.com/:x:/g/personal/56EC7C0093D7DC62/ETMLmCH7WGxNopw0rw_OZeQBnNhrEjr7s9hko8_u5tzu6A?resid=56EC7C0093D7DC62!s21980b3358fb4d6ca29c34af0fce65e4&ithint=file%2Cxlsx&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy81NmVjN2MwMDkzZDdkYzYyL0VUTUxtQ0g3V0d4Tm9wdzByd19PWmVRQm5OaHJFanI3czloa284X3U1dHp1NkE',
+                        ),
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1E406A),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _openMaps('Ipswich High School, Woolverstone, Ipswich IP9 1AZ'),
+                        onPressed: () => _openMaps(
+                          'Ipswich High School, Woolverstone, Ipswich IP9 1AZ',
+                        ),
                         icon: const Icon(Icons.directions, size: 18),
                         label: const Text('Drive To'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFD700),
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
