@@ -700,16 +700,66 @@ class _EacclPageState extends State<_EacclPage> {
       'The series consists of around ten races per season. This can vary per season depending on availability of clubs, venues and weather. Two races per season can be dropped individually to be eligible to participate in the awards for the season or as a team they have to have participation in all races.\n\nCosts are per season, as a team or individual. See the forms page for more details. All payments are required prior to participation in any event\n\nMen’s races are generally 10k and the ladies are approx 5k, these distances do vary according to location and access. We endeavour to do our best to adhere to this but some sites are working areas and we have to work within authorisations and local restrictions. All races start at 2:30pm unless stated.  The league also raises money for several local charities and projects through the hosting clubs charging for car parking and providing refreshments where possible, as all the venues are kindly used with no charge.';
 
   final List<_EacclRace> _races = const [
-    _EacclRace(no: 1, venue: 'Chilton Fields (Stowmarket) Rugby Club', postcode: 'IP14 1SZ', date: '29th October 2025'),
-    _EacclRace(no: 2, venue: 'Mousehold Heath', postcode: 'NR3 4JB', date: '12th November 2025'),
-    _EacclRace(no: 3, venue: 'Cart Gap', postcode: 'NR12 0QL', date: '26th November 2025'),
-    _EacclRace(no: 4, venue: 'Whitwell Station', postcode: 'NR10 4GA', date: '10th December 2025'),
-    _EacclRace(no: 5, venue: 'Broadland Country Park', postcode: 'NR10 3FB', date: '14th January 2026'),
-    _EacclRace(no: 6, venue: 'Woburn Farm, Corton', postcode: 'NR32 5LE', date: '28th January 2026'),
-    _EacclRace(no: 7, venue: 'Cromer', postcode: 'NR27 9AU', date: '4th February 2026'),
-    _EacclRace(no: 8, venue: 'Ladybelt Country Park', postcode: 'NR14 8HX', date: '11th February 2026'),
-    _EacclRace(no: 9, venue: 'Cawston Park', postcode: 'NR10 4JD', date: '11th March 2026'),
-    _EacclRace(no: 10, venue: 'High Lodge, Thetford Forest', postcode: 'IP27 0AF', date: '25th March 2026'),
+    _EacclRace(
+      no: 1,
+      venue: 'Chilton Fields (Stowmarket) Rugby Club',
+      postcode: 'IP14 1SZ',
+      date: '29th October 2025',
+    ),
+    _EacclRace(
+      no: 2,
+      venue: 'Mousehold Heath',
+      postcode: 'NR3 4JB',
+      date: '12th November 2025',
+    ),
+    _EacclRace(
+      no: 3,
+      venue: 'Cart Gap',
+      postcode: 'NR12 0QL',
+      date: '26th November 2025',
+    ),
+    _EacclRace(
+      no: 4,
+      venue: 'Whitwell Station',
+      postcode: 'NR10 4GA',
+      date: '10th December 2025',
+    ),
+    _EacclRace(
+      no: 5,
+      venue: 'Broadland Country Park',
+      postcode: 'NR10 3FB',
+      date: '14th January 2026',
+    ),
+    _EacclRace(
+      no: 6,
+      venue: 'Woburn Farm, Corton',
+      postcode: 'NR32 5LE',
+      date: '28th January 2026',
+    ),
+    _EacclRace(
+      no: 7,
+      venue: 'Cromer',
+      postcode: 'NR27 9AU',
+      date: '4th February 2026',
+    ),
+    _EacclRace(
+      no: 8,
+      venue: 'Ladybelt Country Park',
+      postcode: 'NR14 8HX',
+      date: '11th February 2026',
+    ),
+    _EacclRace(
+      no: 9,
+      venue: 'Cawston Park',
+      postcode: 'NR10 4JD',
+      date: '11th March 2026',
+    ),
+    _EacclRace(
+      no: 10,
+      venue: 'High Lodge, Thetford Forest',
+      postcode: 'IP27 0AF',
+      date: '25th March 2026',
+    ),
   ];
 
   @override
@@ -736,7 +786,7 @@ class _EacclPageState extends State<_EacclPage> {
               ),
               Positioned(
                 left: 16,
-                bottom: 16,
+                bottom: 56,
                 child: Text(
                   'East Anglian Cross Country League',
                   style: const TextStyle(
@@ -744,7 +794,11 @@ class _EacclPageState extends State<_EacclPage> {
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     shadows: [
-                      Shadow(offset: Offset(0, 1.5), blurRadius: 3, color: Colors.black87),
+                      Shadow(
+                        offset: Offset(0, 1.5),
+                        blurRadius: 3,
+                        color: Colors.black87,
+                      ),
                     ],
                   ),
                 ),
@@ -767,7 +821,10 @@ class _EacclPageState extends State<_EacclPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -775,23 +832,34 @@ class _EacclPageState extends State<_EacclPage> {
                       Text(
                         _visiblePara,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, height: 1.6),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.6,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
                           const Spacer(),
                           TextButton(
-                            onPressed: () => setState(() => _expanded = !_expanded),
-                            child: Text(_expanded ? 'Show less' : 'Read more…',
-                                style: const TextStyle(color: Color(0xFF56D3FF))),
+                            onPressed: () =>
+                                setState(() => _expanded = !_expanded),
+                            child: Text(
+                              _expanded ? 'Show less' : 'Read more…',
+                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                            ),
                           ),
                         ],
                       ),
                       if (_expanded) ...[
                         const SizedBox(height: 6),
-                        Text(_morePara,
-                            style: const TextStyle(color: Colors.white70, height: 1.6)),
+                        Text(
+                          _morePara,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.6,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -803,7 +871,10 @@ class _EacclPageState extends State<_EacclPage> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: const Color(0x0FFFFFFF),
-                    border: Border.all(color: const Color(0xFF1F2A3A), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFF1F2A3A),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -815,20 +886,37 @@ class _EacclPageState extends State<_EacclPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Race ${r.no}: ${r.venue}',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    'Race ${r.no}: ${r.venue}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 4),
-                                  Text('${r.postcode}  —  ${r.date}',
-                                      style: const TextStyle(color: Colors.white70)),
+                                  Text(
+                                    '${r.postcode}  —  ${r.date}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             if (_isAdmin)
                               IconButton(
                                 tooltip: 'Add event',
-                                onPressed: () => _createEventFor(r.venue, r.postcode, r.date, r.no),
-                                icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFD700)),
-                              )
+                                onPressed: () => _createEventFor(
+                                  r.venue,
+                                  r.postcode,
+                                  r.date,
+                                  r.no,
+                                ),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Color(0xFFFFD700),
+                                ),
+                              ),
                           ],
                         ),
                         const Divider(color: Colors.white12),
@@ -842,14 +930,17 @@ class _EacclPageState extends State<_EacclPage> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _openLink('https://eaccl.org.uk/winter-results/'),
+                        onPressed: () =>
+                            _openLink('https://eaccl.org.uk/winter-results/'),
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1E406A),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
@@ -861,7 +952,9 @@ class _EacclPageState extends State<_EacclPage> {
                           for (final r in _races)
                             PopupMenuItem<int>(
                               value: r.no,
-                              child: Text('R${r.no}: ${r.venue} — ${r.postcode}'),
+                              child: Text(
+                                'R${r.no}: ${r.venue} — ${r.postcode}',
+                              ),
                             ),
                         ],
                         onSelected: (no) {
@@ -877,10 +970,19 @@ class _EacclPageState extends State<_EacclPage> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: const [
-                              Icon(Icons.directions, size: 18, color: Colors.black),
+                              Icon(
+                                Icons.directions,
+                                size: 18,
+                                color: Colors.black,
+                              ),
                               SizedBox(width: 8),
-                              Text('Drive To',
-                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
+                              Text(
+                                'Drive To',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               SizedBox(width: 6),
                               Icon(Icons.arrow_drop_down, color: Colors.black),
                             ],
@@ -904,5 +1006,10 @@ class _EacclRace {
   final String venue;
   final String postcode;
   final String date;
-  const _EacclRace({required this.no, required this.venue, required this.postcode, required this.date});
+  const _EacclRace({
+    required this.no,
+    required this.venue,
+    required this.postcode,
+    required this.date,
+  });
 }
