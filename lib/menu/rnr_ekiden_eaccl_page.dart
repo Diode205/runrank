@@ -751,9 +751,16 @@ class _EkidenPageState extends State<_EkidenPage> {
                       ),
                       const SizedBox(height: 6),
                       TextButton.icon(
-                        onPressed: () => _openLink('https://portal.ipswichekiden.co.uk/'),
-                        icon: const Icon(Icons.group_add, color: Color(0xFF56D3FF)),
-                        label: const Text('Register your team', style: TextStyle(color: Color(0xFF56D3FF))),
+                        onPressed: () =>
+                            _openLink('https://portal.ipswichekiden.co.uk/'),
+                        icon: const Icon(
+                          Icons.group_add,
+                          color: Color(0xFF56D3FF),
+                        ),
+                        label: const Text(
+                          'Register your team',
+                          style: TextStyle(color: Color(0xFF56D3FF)),
+                        ),
                       ),
                     ],
                   ),
