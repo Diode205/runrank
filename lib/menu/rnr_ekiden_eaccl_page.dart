@@ -28,89 +28,11 @@ class RnrEkidenEacclPage extends StatelessWidget {
 
 // Header removed per request
 
-class _CardBase extends StatelessWidget {
-  final String title;
-  final String description;
-  final List<Widget> actions;
-  const _CardBase({
-    required this.title,
-    required this.description,
-    this.actions = const [],
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: Color(0xFF1F2A3A), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            style: const TextStyle(color: Colors.white70, height: 1.5),
-          ),
-          if (actions.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Row(children: actions),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _EkidenCard extends StatelessWidget {
-  const _EkidenCard();
-  @override
-  Widget build(BuildContext context) {
-    return _CardBase(
-      title: 'Ekiden Relays',
-      description:
-          'Club teams at Ekiden events. Manage interest, teams, and legs here. Admin tools will follow.',
-      actions: const [
-        Expanded(child: _SoonButton(label: 'Details coming soon')),
-      ],
-    );
-  }
-}
+// (Replaced by the new _EkidenPage layout)
 
 // (Replaced by the new _EacclPage layout)
 
-class _SoonButton extends StatelessWidget {
-  final String label;
-  const _SoonButton({required this.label});
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: null,
-      icon: const Icon(Icons.hourglass_empty, color: Colors.white70, size: 18),
-      label: Text(label, style: const TextStyle(color: Colors.white70)),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Colors.white24),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-}
 
 // New swipe pages
 class _RnrPage extends StatefulWidget {
@@ -533,13 +455,305 @@ class _MapOption {
   });
 }
 
-class _EkidenPage extends StatelessWidget {
+class _EkidenPage extends StatefulWidget {
   const _EkidenPage();
   @override
+  State<_EkidenPage> createState() => _EkidenPageState();
+}
+
+class _EkidenPageState extends State<_EkidenPage> {
+  bool _expanded = false;
+  bool _isAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    _isAdmin = await UserService.isAdmin();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openLink(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openMaps(String query) async {
+    final options = await _availableMapOptionsEkiden(query);
+    if (options.isEmpty) {
+      final encoded = Uri.encodeComponent(query);
+      final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$encoded',
+      );
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (options.length == 1) {
+      await options.first.launcher();
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Open with',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (final opt in options)
+              ListTile(
+                leading: Icon(opt.icon, color: Colors.white70),
+                title: Text(
+                  opt.label,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await opt.launcher();
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<List<_MapOption>> _availableMapOptionsEkiden(String query) async {
+    final encoded = Uri.encodeComponent(query);
+    final List<_MapOption> opts = [];
+
+    if (Platform.isIOS) {
+      final uri = Uri.parse('http://maps.apple.com/?q=$encoded');
+      opts.add(
+        _MapOption(
+          label: 'Apple Maps',
+          icon: Icons.map,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final googleScheme = Platform.isIOS
+        ? Uri.parse('comgooglemaps://')
+        : Uri.parse('geo:0,0?q=$encoded');
+    if (await canLaunchUrl(googleScheme)) {
+      final uri = Platform.isIOS
+          ? Uri.parse('comgooglemaps://?q=$encoded')
+          : Uri.parse('geo:0,0?q=$encoded');
+      opts.add(
+        _MapOption(
+          label: 'Google Maps',
+          icon: Icons.location_on,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final wazeScheme = Uri.parse('waze://');
+    if (await canLaunchUrl(wazeScheme)) {
+      final uri = Uri.parse('waze://?q=$encoded&navigate=yes');
+      opts.add(
+        _MapOption(
+          label: 'Waze',
+          icon: Icons.directions_car,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final web = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encoded',
+    );
+    opts.add(
+      _MapOption(
+        label: 'Browser',
+        icon: Icons.language,
+        launcher: () => launchUrl(web, mode: LaunchMode.externalApplication),
+      ),
+    );
+
+    return opts;
+  }
+
+  void _createEvent() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminCreateEventPage(
+          userRole: _isAdmin ? 'admin' : 'social',
+          initialEventType: 'Relay',
+          initialVenue: null,
+        ),
+      ),
+    );
+  }
+
+  static const String _visiblePara =
+      'Ipswich JAFFA have been staging the only Ekiden held in the UK since 1992, and it is now a well established fixture in the local racing calendar. It attracts runners from all over East Anglia, with the 2017 event having a record entry of 200 teams. There is a Junior Ekiden for those aged under 16.\n\nThe 26.2 mile race will be run by teams of six as a relay. Legs: 1 x 7.2km, 3 x 5km and 2 x 10km\n\nClub teams and social and business teams are all welcome.';
+
+  static const String _morePara =
+      'The Junior race will start at 09:30. Teams will be expected to complete the race within 45 minutes. Junior race limit – 70 teams – no limit on entries per club\n\nThe Senior race will take place after the Junior race has finished at 10.20 with an expected race limit of 250 teams. This should mean that we can accept all entries.';
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      children: const [_EkidenCard()],
+    const double heroHeight = 220;
+    return Stack(
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(0),
+                child: Image.asset(
+                  'assets/images/ekidenpic.png',
+                  height: heroHeight,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  color: Colors.black.withOpacity(0.25),
+                  colorBlendMode: BlendMode.darken,
+                ),
+              ),
+              Positioned(
+                left: 16,
+                bottom: 56,
+                child: Text(
+                  'Ipswich JAFFA Ekiden Relay',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD700),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    shadows: [
+                      Shadow(offset: Offset(0, 1.5), blurRadius: 3, color: Colors.black87),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Positioned.fill(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, heroHeight - 40, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _visiblePara,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70, height: 1.6),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (_isAdmin)
+                            IconButton(
+                              tooltip: 'Create event',
+                              onPressed: _createEvent,
+                              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFD700)),
+                            )
+                          else
+                            const SizedBox(width: 48),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => setState(() => _expanded = !_expanded),
+                            child: Text(_expanded ? 'Show less' : 'Read more…',
+                                style: const TextStyle(color: Color(0xFF56D3FF))),
+                          ),
+                        ],
+                      ),
+                      if (_expanded) ...[
+                        const SizedBox(height: 6),
+                        Text(_morePara,
+                            style: const TextStyle(color: Colors.white70, height: 1.6)),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openLink('https://www.ipswichekiden.co.uk/'),
+                          icon: const Icon(Icons.open_in_new, size: 18),
+                          label: const Text('Visit Ipswich JAFFA Ekiden Relay'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF56D3FF),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openLink('https://onedrive.live.com/:x:/g/personal/56EC7C0093D7DC62/ETMLmCH7WGxNopw0rw_OZeQBnNhrEjr7s9hko8_u5tzu6A?resid=56EC7C0093D7DC62!s21980b3358fb4d6ca29c34af0fce65e4&ithint=file%2Cxlsx&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy81NmVjN2MwMDkzZDdkYzYyL0VUTUxtQ0g3V0d4Tm9wdzByd19PWmVRQm5OaHJFanI3czloa284X3U1dHp1NkE'),
+                        icon: const Icon(Icons.list_alt, size: 18),
+                        label: const Text('Results'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E406A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openMaps('Ipswich High School, Woolverstone, Ipswich IP9 1AZ'),
+                        icon: const Icon(Icons.directions, size: 18),
+                        label: const Text('Drive To'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFD700),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
