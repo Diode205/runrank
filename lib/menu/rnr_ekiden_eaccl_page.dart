@@ -164,6 +164,10 @@ class _RnrPage extends StatefulWidget {
 class _RnrPageState extends State<_RnrPage> {
   bool _expanded = false;
   bool _isAdmin = false;
+  late final List<String> _stageQueries = List<String>.generate(
+    17,
+    (i) => 'Round Norfolk Relay Stage ${i + 1} start',
+  );
 
   static const String _visiblePara =
       'The course of the Round Norfolk Relay mirrors the county boundary over a distance of 198 miles, divided into 17 unequal stages. Norfolk\'s enormous skies, vast sandy beaches, open spaces and picturesque towns and villages, with their attractive cottages and medieval churches, all contribute to making the race a unique running experience. But it is likely to be the spectacular skies at sunset and sunrise which will provide the most vivid memories.';
@@ -178,7 +182,17 @@ class _RnrPageState extends State<_RnrPage> {
 
   Future<void> _openMapsToPostcode(String postcode) async {
     final encoded = Uri.encodeComponent(postcode);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encoded',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openMapsToQuery(String query) async {
+    final encoded = Uri.encodeComponent(query);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encoded',
+    );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -242,7 +256,10 @@ class _RnrPageState extends State<_RnrPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -259,7 +276,10 @@ class _RnrPageState extends State<_RnrPage> {
                       Text(
                         _visiblePara,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, height: 1.6),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.6,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       // Row: Create Event (left) and Read more (right)
@@ -269,13 +289,17 @@ class _RnrPageState extends State<_RnrPage> {
                             IconButton(
                               tooltip: 'Create event',
                               onPressed: _createEvent,
-                              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFD700)),
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                color: Color(0xFFFFD700),
+                              ),
                             )
                           else
                             const SizedBox(width: 48),
                           const Spacer(),
                           TextButton(
-                            onPressed: () => setState(() => _expanded = !_expanded),
+                            onPressed: () =>
+                                setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
                               style: const TextStyle(color: Color(0xFF56D3FF)),
@@ -287,7 +311,10 @@ class _RnrPageState extends State<_RnrPage> {
                         const SizedBox(height: 6),
                         Text(
                           _morePara,
-                          style: const TextStyle(color: Colors.white70, height: 1.6),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.6,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -295,7 +322,8 @@ class _RnrPageState extends State<_RnrPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _openLink('https://theroundnorfolkrelay.com/'),
+                          onPressed: () =>
+                              _openLink('https://theroundnorfolkrelay.com/'),
                           icon: const Icon(Icons.open_in_new, size: 18),
                           label: const Text('Visit The RNR Site'),
                           style: ElevatedButton.styleFrom(
@@ -312,12 +340,14 @@ class _RnrPageState extends State<_RnrPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Bottom action buttons: Results and Drive
+                // Bottom action buttons: Results and Drive (+ stages dropdown)
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _openLink('https://rnr.totalracetiming.co.uk/result'),
+                        onPressed: () => _openLink(
+                          'https://rnr.totalracetiming.co.uk/result',
+                        ),
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
@@ -332,18 +362,55 @@ class _RnrPageState extends State<_RnrPage> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openMapsToPostcode('PE30 2NB'),
-                        icon: const Icon(Icons.directions, size: 18),
-                        label: const Text('Drive'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD700),
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _openMapsToPostcode('PE30 2NB'),
+                              icon: const Icon(Icons.directions, size: 18),
+                              label: const Text('Drive'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFD700),
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          PopupMenuButton<int>(
+                            tooltip: 'Stage starts',
+                            itemBuilder: (context) => [
+                              for (int i = 0; i < 17; i++)
+                                PopupMenuItem<int>(
+                                  value: i,
+                                  child: Text('Stage ${i + 1} start'),
+                                ),
+                            ],
+                            onSelected: (index) {
+                              final q = _stageQueries[index];
+                              _openMapsToQuery(q);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFD700),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_drop_down_circle_outlined,
+                                color: Colors.black,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
