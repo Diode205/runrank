@@ -210,28 +210,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildDistanceTab(String distance) {
     final records = _byDistance[distance] ?? [];
 
-    if (records.isEmpty) {
-      return Center(
-        child: Text(
-          'No records yet for $distance.\nSubmit some results to see them here!',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: Colors.white70),
+    return Column(
+      children: [
+        // Fixed summary card at the top
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: _buildSummaryCard(distance, records),
         ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _fetchRaceHistory,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: records.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _buildSummaryCard(distance, records);
-          }
-          return _buildRecordCard(records[index - 1]);
-        },
-      ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: records.isEmpty
+              ? Center(
+                  child: Text(
+                    'No records yet for $distance.\nSubmit some results to see them here!',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchRaceHistory,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                    ),
+                    itemCount: records.length,
+                    itemBuilder: (context, index) {
+                      return _buildRecordCard(records[index]);
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -397,89 +408,87 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // ▶️ INDIVIDUAL RECORD CARD — DARK FLOATING GREY
   Widget _buildRecordCard(RaceRecord r) {
     final timeString = formatTime(r.finishSeconds);
-    final ageGradeString = '${r.ageGrade.toStringAsFixed(1)}%';
+    final ageGradeString = 'Age-Grade: ${r.ageGrade.toStringAsFixed(1)}%';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A), // lighter grey
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white24, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            r.raceName,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-
+          // First line: race name, date, distance
           Row(
             children: [
-              const Icon(Icons.event, size: 16, color: Colors.white70),
-              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  r.raceName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
                 _formatDate(r.raceDate),
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
-              const SizedBox(width: 10),
-              const Icon(Icons.straighten, size: 16, color: Colors.white70),
-              const SizedBox(width: 4),
-              Text(r.distance, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(width: 8),
+              Text(
+                r.distance,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
             ],
           ),
-
-          const SizedBox(height: 8),
-
+          const SizedBox(height: 4),
+          // Second line: time, level, age-grade (age-grade right-aligned)
           Row(
             children: [
-              const Icon(Icons.timer, size: 18, color: Colors.white),
-              const SizedBox(width: 6),
+              const Icon(Icons.timer, size: 16, color: Colors.white),
+              const SizedBox(width: 4),
               Text(
                 timeString,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 16),
-
+              const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.yellow.shade300,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   r.level,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black, // readable
+                    color: Colors.black,
                   ),
                 ),
               ),
-
               const Spacer(),
-
               Text(
                 ageGradeString,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),

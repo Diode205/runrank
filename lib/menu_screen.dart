@@ -492,8 +492,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.groups,
-                  title: 'RNR, Ekiden & EACCL',
-                  subtitle: 'Managing Team and Relay Participations',
+                  title: 'Relay & Cross Country Teams',
+                  subtitle: 'RNR, Ekiden and EACCL Participations',
                   onTap: () {
                     Navigator.push(
                       context,
