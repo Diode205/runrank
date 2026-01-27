@@ -182,6 +182,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             indicatorColor: Colors.yellow,
             labelColor: Colors.yellow,
             unselectedLabelColor: Colors.white70,
+            labelPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+            ), // reduced from default 24
             tabs: _distances.map((d) => Tab(text: d)).toList(),
           ),
         ),
@@ -217,7 +220,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: _buildSummaryCard(distance, records),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 2),
         Expanded(
           child: records.isEmpty
               ? Center(
@@ -275,6 +278,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF4A78FF),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Color(0xFFFFD700), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,7 +419,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24, width: 1),
+        border: Border.all(color: Color(0xFF4A78FF), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.18),
