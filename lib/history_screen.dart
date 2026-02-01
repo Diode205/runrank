@@ -31,7 +31,16 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final _distances = const ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
+  final _distances = const [
+    '5K',
+    '5M',
+    '10K',
+    '10M',
+    'Half M',
+    'Marathon',
+    '20M',
+    'Ultra',
+  ];
   final _clubRecordsService = ClubRecordsService();
 
   bool _loading = true;
@@ -178,13 +187,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           bottom: TabBar(
-            isScrollable: true,
+            // Show all distances without horizontal scrolling
+            isScrollable: false,
             indicatorColor: Colors.yellow,
             labelColor: Colors.yellow,
             unselectedLabelColor: Colors.white70,
-            labelPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-            ), // reduced from default 24
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             tabs: _distances.map((d) => Tab(text: d)).toList(),
           ),
         ),
@@ -252,6 +260,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // 🟦 ELECTRIC BLUE SUMMARY CARD
   Widget _buildSummaryCard(String distance, List<RaceRecord> records) {
     if (records.isEmpty) return const SizedBox.shrink();
+
+    final isSpecialDistance = distance == '20M' || distance == 'Ultra';
 
     final bestTime = records.reduce(
       (a, b) =>
@@ -374,11 +384,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
             'Best time: ${formatTime(bestTime.finishSeconds)}',
           ),
           const SizedBox(height: 6),
-
-          _summaryRow(
-            Icons.leaderboard,
-            'Best age grade: ${bestAge.ageGrade.toStringAsFixed(1)}%',
-          ),
+          if (isSpecialDistance)
+            _summaryRow(
+              Icons.leaderboard,
+              'Club Standard & Age Grade are not calculated for this distance.',
+            )
+          else
+            _summaryRow(
+              Icons.leaderboard,
+              'Best age grade: ${bestAge.ageGrade.toStringAsFixed(1)}%',
+            ),
           const SizedBox(height: 6),
 
           _summaryRow(
@@ -387,7 +402,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 8),
 
-          if (standardsText.isNotEmpty)
+          if (!isSpecialDistance && standardsText.isNotEmpty)
             _summaryRow(Icons.workspace_premium, standardsText),
         ],
       ),

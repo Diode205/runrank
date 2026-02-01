@@ -17,7 +17,16 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   bool _loading = true;
   bool _isAdmin = false;
   Map<String, List<ClubRecord>> _recordsByDistance = {};
-  final _distances = const ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
+  final _distances = const [
+    '5K',
+    '5M',
+    '10K',
+    '10M',
+    'Half M',
+    'Marathon',
+    '20M',
+    'Ultra',
+  ];
   late final PageController _pageController;
   int _currentIndex = 0;
 
@@ -331,6 +340,11 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
         ? positionColors[position - 1]
         : Colors.white38;
 
+    final isUltra = record.distance == 'Ultra';
+    final ultraDistanceLabel = isUltra
+        ? _extractUltraDisplayDistance(record)
+        : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -419,6 +433,31 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                           color: Colors.white60,
                         ),
                       ),
+                      if (isUltra && ultraDistanceLabel != null) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0055FF).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFF0055FF),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            'Ultra distance: $ultraDistanceLabel',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFB3D4FF),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 2),
                       Text(
                         _formatDate(record.raceDate),
@@ -472,6 +511,34 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
         ),
       ),
     );
+  }
+
+  /// For Ultra records, pull out a readable distance label from the race name,
+  /// such as "50K", "100 km" or "32 miles". Falls back to null if absent.
+  String? _extractUltraDisplayDistance(ClubRecord record) {
+    final text = record.raceName;
+    final lower = text.toLowerCase();
+
+    // Prefer a number followed by an explicit unit so we preserve the
+    // member's original formatting (e.g. "50K", "32 miles").
+    final unitPattern = RegExp(
+      r'(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|mile|miles|mi)\b',
+      caseSensitive: false,
+    );
+    final unitMatch = unitPattern.firstMatch(lower);
+    if (unitMatch != null) {
+      // Return the matched substring from the original text to keep casing.
+      return text.substring(unitMatch.start, unitMatch.end).trim();
+    }
+
+    // Fallback: just a bare number, treat it as the label directly.
+    final numberPattern = RegExp(r'(\d+(?:\.\d+)?)');
+    final numberMatch = numberPattern.firstMatch(lower);
+    if (numberMatch != null) {
+      return text.substring(numberMatch.start, numberMatch.end).trim();
+    }
+
+    return null;
   }
 
   void _showRecordOptions(ClubRecord record) {
@@ -552,9 +619,21 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   ),
                   dropdownColor: const Color(0xFF1A1D2E),
                   style: const TextStyle(color: Colors.white),
-                  items: ['5K', '5M', '10K', '10M', 'Half M', 'Marathon']
-                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                      .toList(),
+                  items:
+                      [
+                            '5K',
+                            '5M',
+                            '10K',
+                            '10M',
+                            'Half M',
+                            'Marathon',
+                            '20M',
+                            'Ultra',
+                          ]
+                          .map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d)),
+                          )
+                          .toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setDialogState(() => selectedDistance = val);
@@ -721,9 +800,21 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   ),
                   dropdownColor: const Color(0xFF1A1D2E),
                   style: const TextStyle(color: Colors.white),
-                  items: ['5K', '5M', '10K', '10M', 'Half M', 'Marathon']
-                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                      .toList(),
+                  items:
+                      [
+                            '5K',
+                            '5M',
+                            '10K',
+                            '10M',
+                            'Half M',
+                            'Marathon',
+                            '20M',
+                            'Ultra',
+                          ]
+                          .map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d)),
+                          )
+                          .toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setDialogState(() => selectedDistance = val);

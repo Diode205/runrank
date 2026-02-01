@@ -68,6 +68,33 @@ class ClubRecordsService {
     int limit = 5,
   }) async {
     try {
+      // Ultra records: rank by distance covered (parsed from race name),
+      // not by time. For other distances, keep fastest-time order.
+      if (distance == 'Ultra') {
+        final response = await _supabase
+            .from('club_records')
+            .select()
+            .eq('distance', distance);
+
+        final List<ClubRecord> all = (response as List)
+            .map((json) => ClubRecord.fromJson(json))
+            .toList();
+
+        all.sort((a, b) {
+          final da = _parseUltraDistanceScore(a.raceName);
+          final db = _parseUltraDistanceScore(b.raceName);
+          // Larger distance first; if equal, fall back to faster time.
+          final cmp = db.compareTo(da);
+          if (cmp != 0) return cmp;
+          return a.timeSeconds.compareTo(b.timeSeconds);
+        });
+
+        if (all.length > limit) {
+          return all.take(limit).toList();
+        }
+        return all;
+      }
+
       final response = await _supabase
           .from('club_records')
           .select()
@@ -84,11 +111,55 @@ class ClubRecordsService {
     }
   }
 
+  /// For Ultra, extract a numeric distance from the race name.
+  /// Examples handled: "Ultra 50K", "Ultra 100 km", "My Ultra — 32 miles".
+  /// Returned value is in kilometres so larger = further.
+  static double _parseUltraDistanceScore(String raceName) {
+    final text = raceName.toLowerCase();
+
+    // Look for a number followed by a unit.
+    final unitPattern = RegExp(
+      r'(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|mile|miles|mi)\b',
+    );
+    final unitMatch = unitPattern.firstMatch(text);
+    if (unitMatch != null) {
+      final value = double.tryParse(unitMatch.group(1) ?? '');
+      if (value == null) return 0;
+      final unit = unitMatch.group(2) ?? '';
+      if (unit.startsWith('k')) {
+        // Kilometres
+        return value;
+      } else {
+        // Miles -> km
+        return value * 1.60934;
+      }
+    }
+
+    // Fallback: bare number with no unit, treat as km
+    final numberPattern = RegExp(r'(\d+(?:\.\d+)?)');
+    final numberMatch = numberPattern.firstMatch(text);
+    if (numberMatch != null) {
+      final value = double.tryParse(numberMatch.group(1) ?? '');
+      return value ?? 0;
+    }
+
+    return 0;
+  }
+
   /// Fetch top records for all distances
   Future<Map<String, List<ClubRecord>>> getAllTopRecords({
     int limitPerDistance = 5,
   }) async {
-    final distances = ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
+    final distances = [
+      '5K',
+      '5M',
+      '10K',
+      '10M',
+      'Half M',
+      'Marathon',
+      '20M',
+      'Ultra',
+    ];
     final Map<String, List<ClubRecord>> results = {};
 
     for (final distance in distances) {
@@ -148,7 +219,16 @@ class ClubRecordsService {
   /// Auto-sync: Check race_results and update club records if new PRs exist
   Future<void> syncFromRaceResults() async {
     try {
-      final distances = ['5K', '5M', '10K', '10M', 'Half M', 'Marathon'];
+      final distances = [
+        '5K',
+        '5M',
+        '10K',
+        '10M',
+        'Half M',
+        'Marathon',
+        '20M',
+        'Ultra',
+      ];
 
       for (final distance in distances) {
         // Get top 5 times from race_results for this distance

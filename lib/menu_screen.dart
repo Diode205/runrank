@@ -199,6 +199,12 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                 .from('club_posts')
                                 .update({'author_name': newName})
                                 .eq('author_id', user.id);
+
+                            // And update existing club records for this runner
+                            await _supabase
+                                .from('club_records')
+                                .update({'runner_name': newName})
+                                .eq('user_id', user.id);
                           }
 
                           setState(() {

@@ -77,6 +77,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     '10M',
     'Half M',
     'Marathon',
+    '20M',
+    'Ultra',
   ];
 
   // Input controllers
@@ -84,6 +86,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _ultraDistanceController =
+      TextEditingController();
 
   DateTime? _selectedRaceDate;
   String _selectedDistance = '5K';
@@ -152,6 +156,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     _dateController.dispose();
     _timeController.dispose();
     _ageController.dispose();
+    _ultraDistanceController.dispose();
     super.dispose();
   }
 
@@ -406,7 +411,112 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final age = int.tryParse(_ageController.text.trim()) ?? 0;
     final gender = _selectedGender;
     final distance = _selectedDistance;
+    // Special handling for non-standard distances (20M, Ultra)
+    if (distance == '20M' || distance == 'Ultra') {
+      // Build a race label that can include the Ultra distance detail
+      String raceLabel = race;
+      if (distance == 'Ultra') {
+        final extra = _ultraDistanceController.text.trim();
+        if (extra.isNotEmpty) {
+          raceLabel = raceLabel.isEmpty
+              ? 'Ultra $extra'
+              : '$raceLabel — $extra';
+        }
+      }
 
+      setState(() {
+        _resultMessage =
+            '🏁 ${raceLabel.isEmpty ? '' : '$raceLabel — '}This distance is recorded for club history and records only.';
+      });
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: Colors.grey.shade900,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Special Distance',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 66, 66, 66),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color.fromARGB(60, 23, 7, 173),
+                width: 1,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Club Standard and Age Grade are not being calculated for this distance.',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'You can still submit this performance so it appears in your history and club records.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Exit',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _submitToSupabase(
+                  race: raceLabel,
+                  age: age,
+                  gender: gender,
+                  distance: distance,
+                  seconds: seconds,
+                  level: 'Not calculated',
+                  ageGrade: 0.0,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(40),
+                ),
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      );
+
+      return;
+    }
+
+    // Normal club-standard distances: compute level + age grade
     final eval = RunCalculator.evaluate(
       gender: gender,
       age: age,
@@ -534,21 +644,46 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         const SizedBox(height: 12),
 
         // --------------------------------------
-        // DISTANCE + TIME
+        // DISTANCE (+ ULTRA DETAIL) + TIME
         // --------------------------------------
         Row(
           children: [
             Expanded(
               flex: 2,
-              child: DropdownButtonFormField<String>(
-                initialValue: _selectedDistance,
-                items: distances
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedDistance = v);
-                },
-                decoration: const InputDecoration(labelText: 'Distance'),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedDistance,
+                      items: distances
+                          .map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedDistance = v;
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(labelText: 'Distance'),
+                    ),
+                  ),
+                  if (_selectedDistance == 'Ultra') ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 110,
+                      child: TextField(
+                        controller: _ultraDistanceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Ultra',
+                          hintText: 'K or M',
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             const SizedBox(width: 12),
