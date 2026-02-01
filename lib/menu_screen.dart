@@ -192,6 +192,15 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                 'membership_type': selectedMembershipType,
                               })
                               .eq('id', user.id);
+
+                          // Also propagate updated name to existing club posts
+                          if (newName.isNotEmpty) {
+                            await _supabase
+                                .from('club_posts')
+                                .update({'author_name': newName})
+                                .eq('author_id', user.id);
+                          }
+
                           setState(() {
                             _fullName = newName.isEmpty ? null : newName;
                             _email = newEmail.isEmpty ? null : newEmail;

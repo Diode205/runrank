@@ -456,8 +456,19 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                 itemBuilder: (context, index) {
                   final post = posts[index];
                   final postId = post['id'] as String;
-                  final authorName =
-                      post['author_name'] as String? ?? 'Unknown';
+                  final profileAuthorName =
+                      (post['user_profiles']?['full_name'] as String?)?.trim();
+                  final fallbackAuthorName = (post['author_name'] as String?)
+                      ?.trim();
+                  final displayAuthor =
+                      (profileAuthorName != null &&
+                          profileAuthorName.isNotEmpty)
+                      ? profileAuthorName
+                      : (fallbackAuthorName != null &&
+                            fallbackAuthorName.isNotEmpty)
+                      ? fallbackAuthorName
+                      : 'Unknown';
+
                   final authorAvatarUrl =
                       post['user_profiles']?['avatar_url'] as String?;
                   final attachments =
@@ -530,8 +541,8 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                       : null,
                                   child: authorAvatarUrl == null
                                       ? Text(
-                                          authorName.isNotEmpty
-                                              ? authorName[0].toUpperCase()
+                                          displayAuthor.isNotEmpty
+                                              ? displayAuthor[0].toUpperCase()
                                               : '?',
                                           style: const TextStyle(
                                             color: Colors.white,
@@ -547,7 +558,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      authorName,
+                                      displayAuthor,
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,

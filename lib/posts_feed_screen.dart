@@ -244,6 +244,8 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       'PostsFeed: Building posts, isAdmin=$isAdmin, count=${posts.length}',
                     );
                   }
+                  final profileAuthorName =
+                      (post['user_profiles']?['full_name'] as String?)?.trim();
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
                   final authorAvatarUrl =
@@ -251,13 +253,16 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
                   if (index == 0) {
                     print(
-                      'PostsFeed: First post data: id=$postId, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}',
+                      'PostsFeed: First post data: id=$postId, profile_full_name=$profileAuthorName, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}',
                     );
                   }
 
                   final displayAuthor =
-                      (fallbackAuthorName != null &&
-                          fallbackAuthorName.isNotEmpty)
+                      (profileAuthorName != null &&
+                          profileAuthorName.isNotEmpty)
+                      ? profileAuthorName
+                      : (fallbackAuthorName != null &&
+                            fallbackAuthorName.isNotEmpty)
                       ? fallbackAuthorName
                       : _shortId(post['author_id'] as String?);
                   final commentsCount = 0;

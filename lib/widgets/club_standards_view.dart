@@ -310,52 +310,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         (_selectedRaceDate != null && !_selectedRaceDate!.isAfter(today))
         ? _selectedRaceDate!
         : today;
-    // On iOS, use CupertinoDatePicker to avoid header arrows altogether.
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      DateTime temp = initial;
-      final picked = await showCupertinoModalPopup<DateTime>(
-        context: context,
-        builder: (_) => Container(
-          height: 300,
-          color: const Color(0xFF0F111A),
-          child: Column(
-            children: [
-              Expanded(
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
-                  initialDateTime: initial,
-                  minimumDate: DateTime(now.year - 5),
-                  maximumDate: today,
-                  onDateTimeChanged: (d) {
-                    temp = DateTime(d.year, d.month, d.day);
-                  },
-                ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: CupertinoButton(
-                  color: const Color(0xFFF5C542),
-                  onPressed: () => Navigator.of(context).pop(temp),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(color: Colors.black),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (picked != null) {
-        setState(() {
-          _selectedRaceDate = picked;
-          _dateController.text =
-              '${picked.day.toString().padLeft(2, '0')} '
-              '${_monthShort(picked.month)} ${picked.year}';
-        });
-      }
-      return;
-    }
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,

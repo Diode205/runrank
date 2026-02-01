@@ -323,54 +323,56 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: product.stock.entries.map((entry) {
-                  final size = entry.key;
-                  final qty = entry.value;
-                  final inStock = qty > 0;
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: product.stock.entries.map((entry) {
+                    final size = entry.key;
+                    final qty = entry.value;
+                    final inStock = qty > 0;
 
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: inStock
-                          ? const Color(0xFF0055FF).withValues(alpha: 0.2)
-                          : Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: inStock
-                            ? const Color(0xFF0055FF).withValues(alpha: 0.5)
-                            : Colors.red.withValues(alpha: 0.3),
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          size,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: inStock ? Colors.white : Colors.white38,
-                          ),
+                      decoration: BoxDecoration(
+                        color: inStock
+                            ? const Color(0xFF0055FF).withValues(alpha: 0.2)
+                            : Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: inStock
+                              ? const Color(0xFF0055FF).withValues(alpha: 0.5)
+                              : Colors.red.withValues(alpha: 0.3),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          inStock ? '$qty left' : 'Out',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: inStock
-                                ? const Color(0xFF0055FF)
-                                : Colors.redAccent,
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            size,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: inStock ? Colors.white : Colors.white38,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                          const SizedBox(height: 2),
+                          Text(
+                            inStock ? '$qty left' : 'Out',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: inStock
+                                  ? const Color(0xFF0055FF)
+                                  : Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
               const SizedBox(height: 16),
               SizedBox(
