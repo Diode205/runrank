@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.club_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  distance TEXT NOT NULL CHECK (distance IN ('5K', '5M', '10K', '10M', 'Half M', 'Marathon')),
+  distance TEXT NOT NULL CHECK (distance IN ('5K', '5M', '10K', '10M', 'Half M', 'Marathon', '20M', 'Ultra')),
   time_seconds INTEGER NOT NULL,
   runner_name TEXT NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,

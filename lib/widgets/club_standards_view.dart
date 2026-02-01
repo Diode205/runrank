@@ -10,6 +10,7 @@ import 'package:runrank/calculator_logic.dart';
 import 'package:runrank/widgets/result_card.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/history_screen.dart';
 
 class ClubStandardsView extends StatefulWidget {
@@ -390,6 +391,24 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       ageGrade: ageGrade,
       raceDate: raceDate,
     );
+
+    // For 20M and Ultra, also ensure there is a matching club record
+    // immediately so that the 20M/Ultra Club Records pages and summary
+    // boxes populate without needing a separate sync.
+    if (distance == '20M' || distance == 'Ultra') {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user != null) {
+        final recordsService = ClubRecordsService();
+        await recordsService.ensureRecordForResult(
+          userId: user.id,
+          distance: distance,
+          timeSeconds: seconds,
+          raceName: race,
+          raceDate: raceDate,
+        );
+      }
+    }
   }
 
   // ---------------------------------------------------------

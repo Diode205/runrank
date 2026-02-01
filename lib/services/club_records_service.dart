@@ -68,6 +68,21 @@ class ClubRecordsService {
     int limit = 5,
   }) async {
     try {
+      // 20M: accept common naming variants in the database
+      // ("20M", "20m", "20 mile", "20 Mile").
+      if (distance == '20M') {
+        final response = await _supabase
+            .from('club_records')
+            .select()
+            .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
+            .order('time_seconds', ascending: true)
+            .limit(limit);
+
+        return (response as List)
+            .map((json) => ClubRecord.fromJson(json))
+            .toList();
+      }
+
       // Ultra records: rank by distance covered (parsed from race name),
       // not by time. For other distances, keep fastest-time order.
       if (distance == 'Ultra') {
@@ -231,11 +246,24 @@ class ClubRecordsService {
       ];
 
       for (final distance in distances) {
-        // Get top 5 times from race_results for this distance
-        final raceResults = await _supabase
+        // Get top times from race_results for this distance
+        dynamic query = _supabase
             .from('race_results')
-            .select('user_id, race_name, distance, time_seconds, raceDate')
-            .eq('distance', distance)
+            .select('user_id, race_name, distance, time_seconds, raceDate');
+
+        if (distance == '20M') {
+          // Accept common legacy labels for 20 mile races
+          query = query.inFilter('distance', [
+            '20M',
+            '20m',
+            '20 mile',
+            '20 Mile',
+          ]);
+        } else {
+          query = query.eq('distance', distance);
+        }
+
+        final raceResults = await query
             .order('time_seconds', ascending: true)
             .limit(10);
 
@@ -260,7 +288,7 @@ class ClubRecordsService {
           // Check if this record already exists
           final existing = await _supabase
               .from('club_records')
-              .select('id')
+              .select('id, runner_name')
               .eq('user_id', userId)
               .eq('distance', distance)
               .eq('time_seconds', timeSeconds)
@@ -280,11 +308,79 @@ class ClubRecordsService {
             );
 
             await addRecord(record);
+          } else {
+            // Ensure existing record's name is kept in sync with profile
+            final existingId = existing['id'] as String?;
+            final existingName = existing['runner_name'] as String?;
+            if (existingId != null && existingName != runnerName) {
+              await _supabase
+                  .from('club_records')
+                  .update({'runner_name': runnerName})
+                  .eq('id', existingId);
+            }
           }
         }
       }
     } catch (e) {
       print('Error syncing club records: $e');
+    }
+  }
+
+  /// Ensure there is a club record for a just-submitted race result.
+  /// Used mainly for 20M and Ultra so their club records appear immediately
+  /// without waiting on a full sync.
+  Future<void> ensureRecordForResult({
+    required String userId,
+    required String distance,
+    required int timeSeconds,
+    required String raceName,
+    required DateTime raceDate,
+  }) async {
+    try {
+      // Look up the latest profile name for this user
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final runnerName =
+          (profile != null ? profile['full_name'] as String? : null) ??
+          'Unknown';
+
+      // Check for an existing record with same user, distance and time
+      final existing = await _supabase
+          .from('club_records')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('distance', distance)
+          .eq('time_seconds', timeSeconds)
+          .maybeSingle();
+
+      if (existing == null) {
+        final record = ClubRecord(
+          id: '',
+          distance: distance,
+          timeSeconds: timeSeconds,
+          runnerName: runnerName,
+          userId: userId,
+          raceName: raceName.isEmpty ? 'Untitled race' : raceName,
+          raceDate: raceDate,
+          isHistorical: false,
+        );
+
+        await addRecord(record);
+      } else {
+        final existingId = existing['id'] as String?;
+        if (existingId != null) {
+          await _supabase
+              .from('club_records')
+              .update({'runner_name': runnerName})
+              .eq('id', existingId);
+        }
+      }
+    } catch (e) {
+      print('Error ensuring club record for result: $e');
     }
   }
 }
