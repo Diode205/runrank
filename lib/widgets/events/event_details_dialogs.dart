@@ -52,7 +52,7 @@ class RelayRunningDialogState extends State<RelayRunningDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text("Select Relay Stage & Pace"),
+      title: const Text("Select Leg & Pace"),
       content: SizedBox(
         width: double.maxFinite,
         height: 400,
@@ -62,10 +62,17 @@ class RelayRunningDialogState extends State<RelayRunningDialog> {
               child: ListView(
                 children: widget.relayStages.map((stage) {
                   final stageNum = stage['stage'] as int;
+                  final isEkiden =
+                      (stage['details'] as String?)?.toLowerCase().contains(
+                        'leg',
+                      ) ??
+                      false;
+                  final label = isEkiden
+                      ? 'Leg $stageNum: ${stage['distance']} — ${stage['details']}'
+                      : 'Stage $stageNum: ${stage['distance']} — ${stage['details']}';
+
                   return RadioListTile<int>(
-                    title: Text(
-                      "Stage $stageNum: ${stage['distance']} - ${stage['details']}",
-                    ),
+                    title: Text(label),
                     value: stageNum,
                     groupValue: selectedStage,
                     onChanged: (v) {

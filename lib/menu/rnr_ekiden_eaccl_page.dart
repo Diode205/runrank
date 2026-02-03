@@ -233,7 +233,7 @@ class _RnrPageState extends State<_RnrPage> {
       MaterialPageRoute(
         builder: (_) => AdminCreateEventPage(
           userRole: _isAdmin ? 'admin' : 'social',
-          initialEventType: 'Race',
+          initialEventType: 'Relay',
           initialVenue: null,
         ),
       ),
@@ -597,6 +597,7 @@ class _EkidenPageState extends State<_EkidenPage> {
           userRole: _isAdmin ? 'admin' : 'social',
           initialEventType: 'Relay',
           initialVenue: null,
+          initialRelayFormat: 'Ekiden',
         ),
       ),
     );
@@ -951,13 +952,54 @@ class _EacclPageState extends State<_EacclPage> {
     return opts;
   }
 
+  DateTime? _parseEacclDate(String raw) {
+    try {
+      final parts = raw.split(' ');
+      if (parts.length < 3) return null;
+
+      final dayStr = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+      final day = int.tryParse(dayStr);
+      final monthName = parts[1];
+      final year = int.tryParse(parts[2]);
+
+      if (day == null || year == null) return null;
+
+      const monthMap = {
+        'January': 1,
+        'February': 2,
+        'March': 3,
+        'April': 4,
+        'May': 5,
+        'June': 6,
+        'July': 7,
+        'August': 8,
+        'September': 9,
+        'October': 10,
+        'November': 11,
+        'December': 12,
+      };
+
+      final month = monthMap[monthName];
+      if (month == null) return null;
+
+      return DateTime(year, month, day);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _createEventFor(String venue, String postcode, String date, int raceNo) {
+    final parsedDate = _parseEacclDate(date);
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AdminCreateEventPage(
           userRole: _isAdmin ? 'admin' : 'social',
-          initialEventType: 'Race',
-          initialVenue: 'EACCL Race $raceNo: $venue ($postcode) — $date',
+          initialEventType: 'Cross Country',
+          initialRaceName: 'EACCL Race $raceNo',
+          initialVenue: venue,
+          initialVenueAddress: postcode,
+          initialDate: parsedDate,
         ),
       ),
     );

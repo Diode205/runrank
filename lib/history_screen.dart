@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/menu/club_records_page.dart';
+import 'calculator_logic.dart';
 
 class RaceRecord {
+  final String id;
   final String raceName;
   final String distance;
   final int? finishSeconds;
@@ -11,8 +13,11 @@ class RaceRecord {
   final DateTime raceDate;
   final String level;
   final double ageGrade;
+  final String gender;
+  final int age;
 
   RaceRecord({
+    required this.id,
     required this.raceName,
     required this.distance,
     required this.finishSeconds,
@@ -20,6 +25,8 @@ class RaceRecord {
     required this.raceDate,
     required this.level,
     required this.ageGrade,
+    required this.gender,
+    required this.age,
   });
 }
 
@@ -76,12 +83,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final rows = await client
           .from('race_results')
           .select('''
+            id,
             race_name,
             distance,
             time_seconds,
             raceDate,
             level,
             age_grade,
+            gender,
+            age,
             created_at
           ''')
           .eq('user_id', user.id)
@@ -91,6 +101,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final List<RaceRecord> allRecords = [];
 
       for (final row in rows) {
+        final id = row['id'] as String? ?? '';
         final raceName =
             (row['race_name'] as String?)?.trim().isNotEmpty == true
             ? row['race_name']
@@ -105,6 +116,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final ageGradeRaw = row['age_grade'];
         final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
 
+        final gender = (row['gender'] as String?) ?? '';
+        final age = row['age'] is int ? row['age'] as int : 0;
+
         DateTime raceDate;
         if (row['raceDate'] != null) {
           raceDate = DateTime.parse(row['raceDate']);
@@ -116,6 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
         allRecords.add(
           RaceRecord(
+            id: id,
             raceName: raceName,
             distance: distance,
             finishSeconds: finishSeconds,
@@ -123,6 +138,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
             raceDate: raceDate,
             level: level,
             ageGrade: ageGrade,
+            gender: gender,
+            age: age,
           ),
         );
       }
@@ -187,13 +204,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           bottom: TabBar(
-            // Show all distances without horizontal scrolling
+            // Fixed tabs so all distances are always visible
             isScrollable: false,
             indicatorColor: Colors.yellow,
             labelColor: Colors.yellow,
             unselectedLabelColor: Colors.white70,
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-            tabs: _distances.map((d) => Tab(text: d)).toList(),
+            tabs: _distances
+                .map(
+                  (d) => Tab(
+                    child: Text(
+                      d,
+                      style: const TextStyle(fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ),
         body: _buildBody(),
@@ -514,6 +541,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          // Actions: Edit / Delete
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => _editRaceRecord(r),
+                icon: const Icon(Icons.edit, size: 16, color: Colors.white70),
+                label: const Text(
+                  'Edit',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () => _confirmDeleteRaceRecord(r),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 16,
+                  color: Colors.redAccent,
+                ),
+                label: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -551,5 +622,247 @@ class _HistoryScreenState extends State<HistoryScreen> {
       'Dec',
     ];
     return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
+
+  Future<void> _confirmDeleteRaceRecord(RaceRecord r) async {
+    final client = Supabase.instance.client;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D2E),
+        title: const Text(
+          'Delete race?',
+          style: TextStyle(color: Colors.redAccent),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${r.raceName}" on ${_formatDate(r.raceDate)}?',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) return;
+
+    try {
+      // Delete from race_results
+      await client.from('race_results').delete().eq('id', r.id);
+
+      // Also remove any matching club record for this performance
+      final user = client.auth.currentUser;
+      final timeSeconds = r.finishSeconds;
+      if (user != null && timeSeconds != null) {
+        await client
+            .from('club_records')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('distance', r.distance)
+            .eq('time_seconds', timeSeconds);
+      }
+
+      await _fetchRaceHistory();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text('Failed to delete race: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _editRaceRecord(RaceRecord r) async {
+    final client = Supabase.instance.client;
+
+    final timeController = TextEditingController(
+      text: formatTime(r.finishSeconds, fallback: ''),
+    );
+    final raceNameController = TextEditingController(text: r.raceName);
+    DateTime selectedDate = r.raceDate;
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1D2E),
+          title: const Text(
+            'Edit race',
+            style: TextStyle(color: Color(0xFFFFD700)),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: raceNameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Race name',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: timeController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Time (hh:mm:ss or mm:ss)',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Race date',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    _formatDate(selectedDate),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.calendar_today,
+                      color: Color(0xFFFFD700),
+                    ),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(1980),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setStateDialog(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (updated != true) return;
+
+    final parsedSeconds = RunCalculator.parseTimeToSeconds(
+      timeController.text.trim(),
+    );
+    if (parsedSeconds == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text('Invalid time format.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Re-evaluate level + age grade for standard distances
+      String level = r.level;
+      double ageGrade = r.ageGrade;
+      if (_distances.contains(r.distance) &&
+          r.distance != '20M' &&
+          r.distance != 'Ultra') {
+        final eval = RunCalculator.evaluate(
+          gender: r.gender,
+          age: r.age,
+          distance: r.distance,
+          finishSeconds: parsedSeconds,
+        );
+        level = eval['level'] as String;
+        ageGrade = eval['ageGrade'] as double;
+      }
+
+      final rawName = raceNameController.text.trim();
+      final safeRaceName = rawName.isEmpty ? 'Untitled race' : rawName;
+
+      // Update the underlying race_results row
+      await client
+          .from('race_results')
+          .update({
+            'race_name': safeRaceName,
+            'time_seconds': parsedSeconds,
+            'raceDate': selectedDate.toIso8601String(),
+            'level': level,
+            'age_grade': ageGrade,
+          })
+          .eq('id', r.id);
+
+      // Keep any related club_records entry in sync with the edited result
+      final user = client.auth.currentUser;
+      final oldSeconds = r.finishSeconds;
+      if (user != null && oldSeconds != null) {
+        final existing = await client
+            .from('club_records')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('distance', r.distance)
+            .eq('time_seconds', oldSeconds)
+            .maybeSingle();
+
+        if (existing != null && existing['id'] != null) {
+          await client
+              .from('club_records')
+              .update({
+                'time_seconds': parsedSeconds,
+                'race_name': safeRaceName,
+                'race_date': selectedDate.toIso8601String().split('T')[0],
+              })
+              .eq('id', existing['id'] as String);
+        }
+      }
+
+      await _fetchRaceHistory();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text('Failed to update race: $e'),
+        ),
+      );
+    }
   }
 }

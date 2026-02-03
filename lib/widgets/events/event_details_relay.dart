@@ -72,8 +72,23 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     {'stage': 17, 'distance': '11.73 miles', 'details': 'Stowbridge to Finish'},
   ];
 
+  // Ekiden relay legs (6-leg format)
+  final List<Map<String, dynamic>> ekidenLegs = const [
+    {'stage': 1, 'distance': '7.2K', 'details': 'Leg 1 – 3 laps'},
+    {'stage': 2, 'distance': '5K', 'details': 'Leg 2 – 2 laps'},
+    {'stage': 3, 'distance': '10K', 'details': 'Leg 3 – 4 laps'},
+    {'stage': 4, 'distance': '5K', 'details': 'Leg 4 – 2 laps'},
+    {'stage': 5, 'distance': '10K', 'details': 'Leg 5 – 4 laps'},
+    {'stage': 6, 'distance': '5K', 'details': 'Leg 6 – 2 laps'},
+  ];
+
   @override
   ClubEvent get event => widget.event;
+
+  bool get _isEkidenRelay {
+    final t = widget.event.relayTeam?.trim().toLowerCase() ?? '';
+    return t.startsWith('ekiden');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,6 +243,50 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                         ],
                       ),
                       const Divider(height: 32, color: Colors.white12),
+
+                      // Relay type chip (RNR vs Ekiden)
+                      if (e.relayTeam != null && e.relayTeam!.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _isEkidenRelay
+                                  ? const Color(0x3322C55E)
+                                  : const Color(0x334A90E2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _isEkidenRelay
+                                    ? const Color(0xFF22C55E)
+                                    : const Color(0xFF4A90E2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isEkidenRelay ? Icons.groups_2 : Icons.route,
+                                  size: 16,
+                                  color: _isEkidenRelay
+                                      ? const Color(0xFF22C55E)
+                                      : const Color(0xFF4A90E2),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isEkidenRelay ? 'Ekiden Relay' : 'RNR Relay',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
 
                       // Hosted By
                       Text(
@@ -473,7 +532,9 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                         ),
                         if (myRelayStages.isNotEmpty)
                           Text(
-                            "Stage ${myRelayStages.join(", ")}",
+                            _isEkidenRelay
+                                ? "Legs ${myRelayStages.join(", ")}"
+                                : "Stage ${myRelayStages.join(", ")}",
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.white70,
@@ -497,8 +558,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 ),
                 const SizedBox(height: 12),
               ],
-              // Support section
-              if (myRelayRoles.isNotEmpty) ...[
+              // Support roles (RNR relay only)
+              if (!_isEkidenRelay && myRelayRoles.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -529,8 +590,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 ),
                 const SizedBox(height: 12),
               ],
-              // Marshalling section
-              if (responseType == "marshalling") ...[
+              // Marshalling (RNR relay only)
+              if (!_isEkidenRelay && responseType == "marshalling") ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -548,21 +609,35 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                   ],
                 ),
               ],
-              const SizedBox(height: 12),
-              Center(
-                child: FilledButton.icon(
-                  onPressed: _addRoleClicked,
-                  icon: const Icon(Icons.add),
-                  label: const Text("Add Role"),
+              if (!_isEkidenRelay) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: FilledButton.icon(
+                    onPressed: _addRoleClicked,
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Role"),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
       );
     }
 
-    // Show relay buttons for new response
+    // New response options
+    if (_isEkidenRelay) {
+      // Ekiden: only allow Running responses
+      return Center(
+        child: FilledButton.icon(
+          onPressed: () => showRelayRunningDialog(),
+          icon: const Icon(Icons.directions_run),
+          label: const Text("Running"),
+        ),
+      );
+    }
+
+    // RNR relay: full set of response buttons
     final marshalDate = widget.event.marshalCallDate;
     final canMarshal =
         marshalDate == null || DateTime.now().isAfter(marshalDate);
@@ -713,6 +788,18 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   List<Widget> _getParticipantLines() {
+    // For Ekiden, only show running participants; RNR keeps full breakdown
+    if (_isEkidenRelay) {
+      return [
+        _buildParticipantLine(
+          "🏃‍♀️ Running",
+          runners.length,
+          runners,
+          onTap: () => _showRelayRunningList(),
+        ),
+      ];
+    }
+
     final roleCounts = supportRoleBreakdown();
 
     return [
@@ -848,7 +935,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => RelayRunningDialog(
-        relayStages: relayStages,
+        relayStages: _isEkidenRelay ? ekidenLegs : relayStages,
         initialSelectedStages: List<int>.from(myRelayStages),
         initialPace: myPredictedPace != null
             ? secondsToMMSS(myPredictedPace!)
@@ -1149,10 +1236,18 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
         final parts = <String>[];
         if (stages.isNotEmpty) {
-          if (stages.length == 1) {
-            parts.add("Stage ${stages.first}");
+          if (_isEkidenRelay) {
+            if (stages.length == 1) {
+              parts.add("Leg ${stages.first}");
+            } else {
+              parts.add("Legs ${stages.join(", ")}");
+            }
           } else {
-            parts.add("Stages ${stages.join(", ")}");
+            if (stages.length == 1) {
+              parts.add("Stage ${stages.first}");
+            } else {
+              parts.add("Stages ${stages.join(", ")}");
+            }
           }
         }
         if (paceSeconds != null) {
@@ -1193,10 +1288,18 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
                     final parts = <String>[];
                     if (stages.isNotEmpty) {
-                      if (stages.length == 1) {
-                        parts.add("Stage ${stages.first}");
+                      if (_isEkidenRelay) {
+                        if (stages.length == 1) {
+                          parts.add("Leg ${stages.first}");
+                        } else {
+                          parts.add("Legs ${stages.join(", ")}");
+                        }
                       } else {
-                        parts.add("Stages ${stages.join(", ")}");
+                        if (stages.length == 1) {
+                          parts.add("Stage ${stages.first}");
+                        } else {
+                          parts.add("Stages ${stages.join(", ")}");
+                        }
                       }
                     }
                     if (paceSeconds != null) {

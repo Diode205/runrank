@@ -261,13 +261,33 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                           );
                         }
 
+                        // Derive a relay label for RNR vs Ekiden
+                        String displayTitle = e.title ?? "";
+                        if (e.eventType.toLowerCase() == 'relay') {
+                          final team = e.relayTeam?.trim().toLowerCase() ?? '';
+                          final isEkiden = team.startsWith('ekiden');
+                          final relayPrefix = isEkiden
+                              ? 'Ekiden Relay'
+                              : 'RNR Relay';
+                          if (displayTitle.isEmpty || displayTitle == 'Relay') {
+                            displayTitle = relayPrefix;
+                          } else if (!displayTitle.toLowerCase().startsWith(
+                                'rnr relay',
+                              ) &&
+                              !displayTitle.toLowerCase().startsWith(
+                                'ekiden relay',
+                              )) {
+                            displayTitle = '$relayPrefix – ${displayTitle}';
+                          }
+                        }
+
                         Widget card = GestureDetector(
                           onTap: () => _openEvent(e),
                           child: _EventCard(
                             weekday: _weekday(e.dateTime),
                             day: e.dateTime.day,
                             timeLabel: _fmtTime(e.dateTime),
-                            title: e.title ?? "",
+                            title: displayTitle,
                             subtitle: e.venue,
                             activityType: e.eventType,
                             isCancelled: e.isCancelled,
@@ -476,6 +496,7 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
         return const Color(0x33FFF59D);
       case 'race':
+      case 'cross_country':
         return const Color(0x3390CAF9);
       case 'handicap_series':
         return const Color(0x33A5D6A7);
@@ -500,6 +521,7 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
         return '🏃';
       case 'race':
+      case 'cross_country':
         return '🏁';
       case 'handicap_series':
         return '🎯';

@@ -697,7 +697,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         controller: _ultraDistanceController,
                         decoration: const InputDecoration(
                           labelText: 'Ultra',
-                          hintText: 'K or M',
+                          hintText: 'KM or MI',
                         ),
                       ),
                     ),

@@ -8,6 +8,9 @@ class AdminCreateEventPage extends StatefulWidget {
   final String? initialHandicapDistance;
   final DateTime? initialDate;
   final String? initialVenue;
+  final String? initialRaceName;
+  final String? initialVenueAddress;
+  final String? initialRelayFormat;
 
   const AdminCreateEventPage({
     super.key,
@@ -16,6 +19,9 @@ class AdminCreateEventPage extends StatefulWidget {
     this.initialHandicapDistance,
     this.initialDate,
     this.initialVenue,
+    this.initialRaceName,
+    this.initialVenueAddress,
+    this.initialRelayFormat,
   });
 
   @override
@@ -42,6 +48,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "Training 1",
       "Training 2",
       "Race",
+      "Cross Country",
       "Handicap Series",
       "Relay",
       "Special Event",
@@ -68,12 +75,22 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     if (widget.initialVenue != null) {
       venueCtrl.text = widget.initialVenue!;
     }
+    if (widget.initialRaceName != null) {
+      crossCountryRaceNameCtrl.text = widget.initialRaceName!;
+    }
+    if (widget.initialVenueAddress != null) {
+      venueAddressCtrl.text = widget.initialVenueAddress!;
+    }
+    if (widget.initialRelayFormat != null) {
+      _selectedRelayFormat = widget.initialRelayFormat!;
+    }
 
     _loadHosts();
   }
 
   String selectedEventType = "";
   String selectedCategory = "";
+  String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
 
   // Controllers
   final hostCtrl = TextEditingController();
@@ -82,6 +99,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   final descriptionCtrl = TextEditingController();
   final latitudeCtrl = TextEditingController();
   final longitudeCtrl = TextEditingController();
+  final crossCountryRaceNameCtrl = TextEditingController();
 
   // Date fields
   DateTime? selectedDate;
@@ -92,8 +110,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   final handicapDistances = const ["5K", "5M", "10K", "10M", "7M", "Beach Run"];
   String? selectedHandicapDistance;
 
-  // Relay Team
-  String selectedRelayTeam = "A";
+  // Relay team name (free text, e.g. "RNR Team X")
+  final relayTeamCtrl = TextEditingController();
 
   // RACE LIST
   final raceNames = const ["Holt 10K", "Worstead 5M", "Chase The Train"];
@@ -150,6 +168,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     descriptionCtrl.dispose();
     latitudeCtrl.dispose();
     longitudeCtrl.dispose();
+    crossCountryRaceNameCtrl.dispose();
+    relayTeamCtrl.dispose();
     super.dispose();
   }
 
@@ -184,10 +204,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         return "Training 2";
       case "Race":
         return "Race: $selectedRace";
+      case "Cross Country":
+        final name = crossCountryRaceNameCtrl.text.trim();
+        return name.isEmpty ? "Cross Country" : "Cross Country: $name";
       case "Handicap Series":
         return "Handicap (${selectedHandicapDistance ?? ""})";
       case "Relay":
-        return "RNR Relay – Team $selectedRelayTeam";
+        return "Relay";
       case "Special Event":
         return "Special Event";
       default:
@@ -241,6 +264,17 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       }
     }
 
+    // Build relay_team value depending on relay format
+    String? relayTeamValue;
+    if (selectedEventType == "Relay") {
+      final teamName = relayTeamCtrl.text.trim();
+      if (_selectedRelayFormat == "Ekiden") {
+        relayTeamValue = teamName.isEmpty ? "Ekiden" : "Ekiden: $teamName";
+      } else {
+        relayTeamValue = teamName.isEmpty ? null : teamName;
+      }
+    }
+
     final map = {
       "event_type": selectedEventType.toLowerCase().replaceAll(" ", "_"),
       "training_number": selectedEventType == "Training 1"
@@ -248,11 +282,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           : selectedEventType == "Training 2"
           ? 2
           : null,
-      "race_name": selectedEventType == "Race" ? selectedRace : null,
+      "race_name": selectedEventType == "Race"
+          ? selectedRace
+          : selectedEventType == "Cross Country"
+          ? crossCountryRaceNameCtrl.text.trim()
+          : null,
       "handicap_distance": selectedEventType == "Handicap Series"
           ? selectedHandicapDistance
           : null,
-      "relay_team": selectedEventType == "Relay" ? selectedRelayTeam : null,
+      "relay_team": relayTeamValue,
       "title": buildTitle(),
       "date": selectedDate!.toIso8601String().split("T").first,
       "time": timeString,
@@ -265,6 +303,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "longitude": longitude,
       "marshal_call_date":
           (selectedEventType == "Race" ||
+              selectedEventType == "Cross Country" ||
               selectedEventType == "Handicap Series")
           ? marshalCallDate?.toIso8601String().split("T").first
           : null,
@@ -434,6 +473,18 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                   ),
                 ),
 
+              // CROSS COUNTRY UI
+              if (selectedEventType == "Cross Country")
+                _section(
+                  "Race Name",
+                  TextFormField(
+                    controller: crossCountryRaceNameCtrl,
+                    decoration: const InputDecoration(labelText: "Race Name"),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? "Required" : null,
+                  ),
+                ),
+
               // HANDICAP UI
               if (selectedEventType == "Handicap Series")
                 _section(
@@ -451,14 +502,39 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               // RELAY UI
               if (selectedEventType == "Relay")
                 _section(
-                  "Relay Team",
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedRelayTeam,
-                    items: const [
-                      DropdownMenuItem(value: "A", child: Text("Team A")),
-                      DropdownMenuItem(value: "B", child: Text("Team B")),
+                  "Relay",
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: _selectedRelayFormat,
+                        decoration: const InputDecoration(
+                          labelText: "Relay type",
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: "RNR",
+                            child: Text("RNR Relay"),
+                          ),
+                          DropdownMenuItem(
+                            value: "Ekiden",
+                            child: Text("Ekiden Relay"),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => _selectedRelayFormat = v);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: relayTeamCtrl,
+                        decoration: const InputDecoration(
+                          labelText: "Team name (optional)",
+                          hintText: "Name your team (e.g. RNR Team X)",
+                        ),
+                      ),
                     ],
-                    onChanged: (v) => setState(() => selectedRelayTeam = v!),
                   ),
                 ),
 
@@ -646,15 +722,20 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
               // MARSHAL CALL DATE
               if (selectedEventType == "Race" ||
+                  selectedEventType == "Cross Country" ||
                   selectedEventType == "Handicap Series")
                 _section(
                   "Marshal Call Date",
-                  OutlinedButton(
-                    onPressed: pickMarshalDate,
-                    child: Text(
-                      marshalCallDate == null
-                          ? "Pick Marshal Call Date"
-                          : "${marshalCallDate!.day}/${marshalCallDate!.month}/${marshalCallDate!.year}",
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: pickMarshalDate,
+                      child: Text(
+                        marshalCallDate == null
+                            ? "Tap To Set"
+                            : "${marshalCallDate!.day}/${marshalCallDate!.month}/${marshalCallDate!.year}",
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                 ),
