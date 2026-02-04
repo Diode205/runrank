@@ -31,6 +31,7 @@ class EventDetailsPage extends StatelessWidget {
       case 'others':
         return SimpleEventDetailsPage(event: event);
       case 'race':
+      case 'cross_country':
       case 'handicap_series':
         return RaceEventDetailsPage(event: event);
       case 'relay':

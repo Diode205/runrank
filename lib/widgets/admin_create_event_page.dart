@@ -85,6 +85,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       _selectedRelayFormat = widget.initialRelayFormat!;
     }
 
+    // Default time for all events (2:30 pm) unless explicitly changed
+    selectedTime ??= const TimeOfDay(hour: 14, minute: 30);
+
     _loadHosts();
   }
 

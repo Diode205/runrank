@@ -381,6 +381,9 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final hasResponse = myResponse != null;
     if (widget.event.isCancelled) return const SizedBox.shrink();
 
+    final isCrossCountry =
+        widget.event.eventType.toLowerCase() == 'cross_country';
+
     if (hasResponse) {
       return Card(
         margin: const EdgeInsets.only(top: 16),
@@ -428,6 +431,19 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         marshalDate == null || DateTime.now().isAfter(marshalDate);
     final isHandicap =
         widget.event.eventType.toLowerCase() == "handicap_series";
+
+    // Cross Country: running only, no marshal/unavailable buttons
+    if (isCrossCountry) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FilledButton(
+            onPressed: () => submitResponse(type: "run"),
+            child: const Text("🏃‍♀️", style: TextStyle(fontSize: 24)),
+          ),
+        ],
+      );
+    }
 
     return Column(
       children: [
@@ -523,6 +539,21 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   List<Widget> _getParticipantLines() {
     final isHandicap =
         widget.event.eventType.toLowerCase() == "handicap_series";
+    final isCrossCountry =
+        widget.event.eventType.toLowerCase() == 'cross_country';
+
+    // Cross Country: only show Running line
+    if (isCrossCountry) {
+      return [
+        _buildParticipantLine(
+          "🏃‍♀️ Running",
+          runners.length,
+          runners,
+          responseType: 'running',
+          showExpectedTime: false,
+        ),
+      ];
+    }
 
     return [
       _buildParticipantLine(
