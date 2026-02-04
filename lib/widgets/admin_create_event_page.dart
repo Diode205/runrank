@@ -11,6 +11,8 @@ class AdminCreateEventPage extends StatefulWidget {
   final String? initialRaceName;
   final String? initialVenueAddress;
   final String? initialRelayFormat;
+  final double? initialLatitude;
+  final double? initialLongitude;
 
   const AdminCreateEventPage({
     super.key,
@@ -22,6 +24,8 @@ class AdminCreateEventPage extends StatefulWidget {
     this.initialRaceName,
     this.initialVenueAddress,
     this.initialRelayFormat,
+    this.initialLatitude,
+    this.initialLongitude,
   });
 
   @override
@@ -83,6 +87,12 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     }
     if (widget.initialRelayFormat != null) {
       _selectedRelayFormat = widget.initialRelayFormat!;
+    }
+    if (widget.initialLatitude != null) {
+      latitudeCtrl.text = widget.initialLatitude!.toString();
+    }
+    if (widget.initialLongitude != null) {
+      longitudeCtrl.text = widget.initialLongitude!.toString();
     }
 
     // Default time for all events (2:30 pm) unless explicitly changed

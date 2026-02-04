@@ -383,6 +383,8 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
 
     final isCrossCountry =
         widget.event.eventType.toLowerCase() == 'cross_country';
+    final isCromerCrossCountry =
+        isCrossCountry && widget.event.venue.toLowerCase().contains('cromer');
 
     if (hasResponse) {
       return Card(
@@ -432,8 +434,8 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final isHandicap =
         widget.event.eventType.toLowerCase() == "handicap_series";
 
-    // Cross Country: running only, no marshal/unavailable buttons
-    if (isCrossCountry) {
+    // Cross Country (non-Cromer): running only, no marshal/unavailable buttons
+    if (isCrossCountry && !isCromerCrossCountry) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -541,9 +543,11 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         widget.event.eventType.toLowerCase() == "handicap_series";
     final isCrossCountry =
         widget.event.eventType.toLowerCase() == 'cross_country';
+    final isCromerCrossCountry =
+        isCrossCountry && widget.event.venue.toLowerCase().contains('cromer');
 
-    // Cross Country: only show Running line
-    if (isCrossCountry) {
+    // Cross Country (non-Cromer): only show Running line
+    if (isCrossCountry && !isCromerCrossCountry) {
       return [
         _buildParticipantLine(
           "🏃‍♀️ Running",

@@ -263,12 +263,15 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                         // Derive a relay label for RNR vs Ekiden
                         String displayTitle = e.title ?? "";
+                        String subtitleText = e.venue;
                         if (e.eventType.toLowerCase() == 'relay') {
-                          final team = e.relayTeam?.trim().toLowerCase() ?? '';
-                          final isEkiden = team.startsWith('ekiden');
+                          final rawTeam = e.relayTeam?.trim() ?? '';
+                          final teamLower = rawTeam.toLowerCase();
+                          final isEkiden = teamLower.startsWith('ekiden');
                           final relayPrefix = isEkiden
                               ? 'Ekiden Relay'
                               : 'RNR Relay';
+
                           if (displayTitle.isEmpty || displayTitle == 'Relay') {
                             displayTitle = relayPrefix;
                           } else if (!displayTitle.toLowerCase().startsWith(
@@ -279,6 +282,28 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                               )) {
                             displayTitle = '$relayPrefix – ${displayTitle}';
                           }
+
+                          // Show team name on card if provided
+                          if (rawTeam.isNotEmpty) {
+                            String teamLabel = rawTeam;
+                            if (isEkiden) {
+                              final parts = rawTeam.split(':');
+                              if (parts.length > 1 &&
+                                  parts[1].trim().isNotEmpty) {
+                                teamLabel = parts[1].trim();
+                              } else {
+                                teamLabel = 'Ekiden';
+                              }
+                            }
+
+                            if (teamLabel.isNotEmpty) {
+                              subtitleText = subtitleText.trim().isEmpty
+                                  ? 'Team: $teamLabel'
+                                  : '${e.venue} • Team: $teamLabel';
+                            }
+                          }
+                        } else {
+                          subtitleText = e.venue;
                         }
 
                         Widget card = GestureDetector(
@@ -288,7 +313,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                             day: e.dateTime.day,
                             timeLabel: _fmtTime(e.dateTime),
                             title: displayTitle,
-                            subtitle: e.venue,
+                            subtitle: subtitleText,
                             activityType: e.eventType,
                             isCancelled: e.isCancelled,
                           ),

@@ -1173,6 +1173,23 @@ class _EacclPageState extends State<_EacclPage> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openLink('https://eaccl.org.uk/'),
+                          icon: const Icon(Icons.open_in_new, size: 18),
+                          label: const Text('Visit EACCL Website'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF56D3FF),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
