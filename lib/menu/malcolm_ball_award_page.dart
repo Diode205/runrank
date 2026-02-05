@@ -217,8 +217,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         bottom: 16,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               'The Malcolm Ball Inspirational\nRunner Award 2026',
                               style: TextStyle(
                                 color: Color.fromARGB(255, 11, 155, 239),
@@ -226,12 +226,31 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            SizedBox(height: 4),
-                            Text(
+                            const SizedBox(height: 4),
+                            const Text(
                               'The Nominations',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _votingEndsAt != null
+                                  ? 'Nominations are now open'
+                                  : 'Nominations open date: TBD',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              _votingEndsAt != null
+                                  ? 'Voting ends on ${_formatDate(_votingEndsAt!)}'
+                                  : 'Voting end date: TBD',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
                               ),
                             ),
                           ],
@@ -880,6 +899,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   // reactions moved to chat messages
 
   Widget _nominationForm() {
+    final canNominate = _votingEndsAt != null;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Stack(
@@ -903,7 +923,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                if (_memberNames.isNotEmpty)
+                if (!_isAdmin && !canNominate)
+                  const Text(
+                    'Nominations are not open yet. Please check back once the club announces the opening date.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  )
+                else if (_memberNames.isNotEmpty)
                   Autocomplete<String>(
                     optionsBuilder: (TextEditingValue tv) {
                       final q = tv.text.trim().toLowerCase();
@@ -941,32 +966,34 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     ),
                   ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: _reasonController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Reason For Nomination',
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD700),
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                if (_isAdmin || canNominate) ...[
+                  TextField(
+                    controller: _reasonController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Reason For Nomination',
                     ),
-                    onPressed: _submitNomination,
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('Submit Nomination'),
+                    maxLines: 3,
                   ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFD700),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: _submitNomination,
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Submit Nomination'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Center(
                   child: Text(
                     _votingEndsAt != null

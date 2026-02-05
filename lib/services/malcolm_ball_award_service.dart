@@ -457,14 +457,21 @@ class MalcolmBallAwardService {
     final now = DateTime.now();
     if (!now.isAfter(endsAt)) return;
 
-    // Voting has ended: clear current-cycle data.
-    await _supabase.from('award_votes').delete();
-    await _supabase.from('award_emojis').delete();
-    await _supabase.from('award_comments').delete();
-    await _supabase.from('award_nominations').delete();
-    await _supabase.from('award_nominees').delete();
-    await _supabase.from('award_message_emojis').delete();
-    await _supabase.from('award_chat_messages').delete();
+    // Voting has ended: clear current-cycle data. Some PostgREST
+    // configurations require a WHERE clause on DELETE, so use a
+    // trivially-true filter on id and swallow any errors.
+    try {
+      await _supabase.from('award_votes').delete().neq('id', '');
+      await _supabase.from('award_emojis').delete().neq('id', '');
+      await _supabase.from('award_comments').delete().neq('id', '');
+      await _supabase.from('award_nominations').delete().neq('id', '');
+      await _supabase.from('award_nominees').delete().neq('id', '');
+      await _supabase.from('award_message_emojis').delete().neq('id', '');
+      await _supabase.from('award_chat_messages').delete().neq('id', '');
+    } on PostgrestException {
+      // If clearing fails, don't block the page; the admin can
+      // still manage data manually.
+    }
 
     // Optionally clear the voting_ends_at flag so this only happens once.
     await setVotingEndsAt(null);
@@ -492,15 +499,6 @@ class MalcolmBallAwardService {
       return;
     }
 
-    final lastSent = await _fetchVotingReminderLastSent();
-    if (lastSent != null) {
-      final last = DateTime(lastSent.year, lastSent.month, lastSent.day);
-      if (last.isAtSameMomentAs(today)) {
-        // Already sent a reminder today.
-        return;
-      }
-    }
-
     final dateLabel = _formatShortDate(endDate);
     final suffix = daysLeft == 0
         ? 'today'
@@ -514,72 +512,11 @@ class MalcolmBallAwardService {
         body: 'Voting for the Malcolm Ball Award closes on $dateLabel.',
         route: 'malcolm_ball_award',
       );
-      await _setVotingReminderLastSent(today);
     } catch (_) {
       // Fail silently; notifications are best-effort.
     }
   }
-
-  // ---------------- Voting end date (settings) ----------------
-  Future<DateTime?> fetchVotingEndDate() async {
-    try {
-      final row = await _supabase
-          .from('award_settings')
-          .select('value')
-          .eq('key', 'voting_end_date')
-          .maybeSingle();
-      if (row == null) return null;
-      final val = row['value'] as String?;
-      if (val == null || val.trim().isEmpty) return null;
-      // Expecting ISO date (YYYY-MM-DD)
-      return DateTime.tryParse(val);
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST205') return null; // table not in schema yet
-      rethrow;
-    }
-  }
-
-  Future<void> setVotingEndDate(DateTime date) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      throw Exception('Please log in as admin');
-    }
-    final iso = date.toIso8601String().split('T').first; // YYYY-MM-DD
-    await _supabase.from('award_settings').upsert({
-      'key': 'voting_end_date',
-      'value': iso,
-      'updated_by': user.id,
-    });
-  }
-
-  // --------- Internal helpers for reminder tracking & formatting ----------
-
-  Future<DateTime?> _fetchVotingReminderLastSent() async {
-    try {
-      final row = await _supabase
-          .from('award_settings')
-          .select('value')
-          .eq('key', 'voting_reminder_last_sent')
-          .maybeSingle();
-      if (row == null) return null;
-      final val = row['value'] as String?;
-      if (val == null || val.trim().isEmpty) return null;
-      return DateTime.tryParse(val);
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST205') return null;
-      rethrow;
-    }
-  }
-
-  Future<void> _setVotingReminderLastSent(DateTime date) async {
-    final iso = date.toIso8601String().split('T').first; // YYYY-MM-DD
-    final user = _supabase.auth.currentUser;
-    await _supabase.from('award_settings').upsert({
-      'key': 'voting_reminder_last_sent',
-      'value': iso,
-      if (user != null) 'updated_by': user.id,
-    });
-  }
+  // --------- Internal helpers for reminder formatting ----------
 
   String _formatShortDate(DateTime dt) {
     const months = [
