@@ -43,6 +43,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
+      // If voting has finished, reset nominations and comments/chat first
+      await _service.resetIfVotingEnded();
+
       final nominees = await _service.fetchNominees();
       final winners = await _service.fetchWinners();
       final admin = await UserService.isAdmin();
@@ -61,6 +64,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         chat.map((m) => m.id).toSet(),
       );
       final votingEndsAt = await _service.fetchVotingEndsAt();
+      // Send a daily reminder notification if voting is within a week
+      // of closing and no reminder has been sent today.
+      await _service.sendVotingReminderIfDue();
       if (!mounted) return;
       setState(() {
         _nominees = nominees;
@@ -1338,6 +1344,16 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       await _service.setVotingEndsAt(dateOnly);
       if (!mounted) return;
       setState(() => _votingEndsAt = dateOnly);
+
+      // Notify all users that nominations/voting now have a set end date.
+      try {
+        final label = _formatDate(dateOnly);
+        await NotificationService.notifyAllUsers(
+          title: 'Malcolm Ball Award nominations open',
+          body: 'You can now nominate and vote. Voting ends on $label.',
+          route: 'malcolm_ball_award',
+        );
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

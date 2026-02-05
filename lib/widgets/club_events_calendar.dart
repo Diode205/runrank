@@ -23,7 +23,6 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   List<ClubEvent> _events = [];
   bool _loading = true;
   String userRole = "reader"; // reader or admin
-  String _currentMonthLabel = "";
 
   @override
   void initState() {
@@ -82,12 +81,6 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
       setState(() {
         _events = parsed;
         _loading = false;
-        // Initialize current month label with the first month
-        if (parsed.isNotEmpty) {
-          final firstEvent = parsed.first;
-          _currentMonthLabel =
-              "${_monthName(firstEvent.dateTime.month)} ${firstEvent.dateTime.year}";
-        }
       });
     } catch (e) {
       print("ERROR loading events: $e");
@@ -142,40 +135,6 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   String _fmtTime(DateTime dt) =>
       "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
 
-  void _updateCurrentMonthLabel(double scrollOffset) {
-    // The header should change when the last event of the current month
-    // is about to scroll off the screen (accounting for header height)
-    const headerHeight = 48.0;
-    const eventHeight = 100.0; // Updated approximate event card height
-
-    double currentOffset = 0.0; // Start from top
-
-    for (final group in monthGroups) {
-      final groupHeight = group.events.length * eventHeight;
-
-      // Show this group's month until the last event of this group
-      // is about to scroll off (headerHeight from the top)
-      if (scrollOffset < currentOffset + groupHeight - headerHeight) {
-        if (_currentMonthLabel != group.monthLabel) {
-          setState(() {
-            _currentMonthLabel = group.monthLabel;
-          });
-        }
-        return;
-      }
-
-      currentOffset += groupHeight;
-    }
-
-    // If we've scrolled past all content, keep the last month
-    if (monthGroups.isNotEmpty &&
-        _currentMonthLabel != monthGroups.last.monthLabel) {
-      setState(() {
-        _currentMonthLabel = monthGroups.last.monthLabel;
-      });
-    }
-  }
-
   void _openEvent(ClubEvent e) {
     Navigator.push(
       context,
@@ -204,263 +163,224 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : NotificationListener<ScrollNotification>(
-              onNotification: (scrollNotification) {
-                if (scrollNotification is ScrollUpdateNotification) {
-                  _updateCurrentMonthLabel(scrollNotification.metrics.pixels);
-                }
-                return true;
-              },
-              child: CustomScrollView(
-                slivers: [
-                  // Single sticky header that changes content
-                  SliverAppBar(
-                    pinned: true,
-                    floating: false,
-                    backgroundColor: Colors.transparent,
-                    flexibleSpace: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0x4DFFD300),
-                            const Color(0x4D0057B7),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+          : CustomScrollView(
+              slivers: [
+                for (final group in monthGroups) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                      child: Text(
+                        group.monthLabel,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    title: Text(
-                      _currentMonthLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                      ),
-                    ),
-                    toolbarHeight: 48,
                   ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final e = group.events[index];
+                      final currentUserId = supabase.auth.currentUser?.id;
+                      final isCreator =
+                          currentUserId != null && e.createdBy == currentUserId;
 
-                  // Event sections without individual headers
-                  for (final group in monthGroups) ...[
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final e = group.events[index];
-                        final currentUserId = supabase.auth.currentUser?.id;
-                        final isCreator =
-                            currentUserId != null &&
-                            e.createdBy == currentUserId;
-
-                        if (isCreator) {
-                          debugPrint(
-                            'ClubEventsCalendar: Event ${e.id} is creator-owned. currentUserId=$currentUserId, createdBy=${e.createdBy}',
-                          );
-                        } else {
-                          debugPrint(
-                            'ClubEventsCalendar: Event ${e.id} NOT creator. currentUserId=$currentUserId, createdBy=${e.createdBy}',
-                          );
-                        }
-
-                        // Derive a relay label for RNR vs Ekiden
-                        String displayTitle = e.title ?? "";
-                        String subtitleText = e.venue;
-                        if (e.eventType.toLowerCase() == 'relay') {
-                          final rawTeam = e.relayTeam?.trim() ?? '';
-                          final teamLower = rawTeam.toLowerCase();
-                          final isEkiden = teamLower.startsWith('ekiden');
-                          final relayPrefix = isEkiden
-                              ? 'Ekiden Relay'
-                              : 'RNR Relay';
-
-                          if (displayTitle.isEmpty || displayTitle == 'Relay') {
-                            displayTitle = relayPrefix;
-                          } else if (!displayTitle.toLowerCase().startsWith(
-                                'rnr relay',
-                              ) &&
-                              !displayTitle.toLowerCase().startsWith(
-                                'ekiden relay',
-                              )) {
-                            displayTitle = '$relayPrefix – ${displayTitle}';
-                          }
-
-                          // Show team name on card if provided
-                          if (rawTeam.isNotEmpty) {
-                            String teamLabel = rawTeam;
-                            if (isEkiden) {
-                              final parts = rawTeam.split(':');
-                              if (parts.length > 1 &&
-                                  parts[1].trim().isNotEmpty) {
-                                teamLabel = parts[1].trim();
-                              } else {
-                                teamLabel = 'Ekiden';
-                              }
-                            }
-
-                            if (teamLabel.isNotEmpty) {
-                              subtitleText = subtitleText.trim().isEmpty
-                                  ? 'Team: $teamLabel'
-                                  : '${e.venue} • Team: $teamLabel';
-                            }
-                          }
-                        } else {
-                          subtitleText = e.venue;
-                        }
-
-                        Widget card = GestureDetector(
-                          onTap: () => _openEvent(e),
-                          child: _EventCard(
-                            weekday: _weekday(e.dateTime),
-                            day: e.dateTime.day,
-                            timeLabel: _fmtTime(e.dateTime),
-                            title: displayTitle,
-                            subtitle: subtitleText,
-                            activityType: e.eventType,
-                            isCancelled: e.isCancelled,
-                          ),
+                      if (isCreator) {
+                        debugPrint(
+                          'ClubEventsCalendar: Event ${e.id} is creator-owned. currentUserId=$currentUserId, createdBy=${e.createdBy}',
                         );
+                      } else {
+                        debugPrint(
+                          'ClubEventsCalendar: Event ${e.id} NOT creator. currentUserId=$currentUserId, createdBy=${e.createdBy}',
+                        );
+                      }
 
-                        if (isCreator) {
-                          // Single Dismissible handles both edit (L→R) and cancel (R→L)
-                          card = Dismissible(
-                            key: ValueKey('event-swipe-${e.id}'),
-                            direction: DismissDirection.horizontal,
-                            background: Container(
-                              color: Colors.blue,
-                              alignment: Alignment.centerLeft,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: const Icon(
-                                Icons.edit,
-                                color: Colors.white,
-                              ),
+                      // Derive a relay label for RNR vs Ekiden
+                      String displayTitle = e.title ?? "";
+                      String subtitleText = e.venue;
+                      if (e.eventType.toLowerCase() == 'relay') {
+                        final rawTeam = e.relayTeam?.trim() ?? '';
+                        final teamLower = rawTeam.toLowerCase();
+                        final isEkiden = teamLower.startsWith('ekiden');
+                        final relayPrefix = isEkiden
+                            ? 'Ekiden Relay'
+                            : 'RNR Relay';
+
+                        if (displayTitle.isEmpty || displayTitle == 'Relay') {
+                          displayTitle = relayPrefix;
+                        } else if (!displayTitle.toLowerCase().startsWith(
+                              'rnr relay',
+                            ) &&
+                            !displayTitle.toLowerCase().startsWith(
+                              'ekiden relay',
+                            )) {
+                          displayTitle = '$relayPrefix – ${displayTitle}';
+                        }
+
+                        // Show team name on card if provided
+                        if (rawTeam.isNotEmpty) {
+                          String teamLabel = rawTeam;
+                          if (isEkiden) {
+                            final parts = rawTeam.split(':');
+                            if (parts.length > 1 &&
+                                parts[1].trim().isNotEmpty) {
+                              teamLabel = parts[1].trim();
+                            } else {
+                              teamLabel = 'Ekiden';
+                            }
+                          }
+
+                          if (teamLabel.isNotEmpty) {
+                            subtitleText = subtitleText.trim().isEmpty
+                                ? 'Team: $teamLabel'
+                                : '${e.venue} • Team: $teamLabel';
+                          }
+                        }
+                      } else {
+                        subtitleText = e.venue;
+                      }
+
+                      Widget card = GestureDetector(
+                        onTap: () => _openEvent(e),
+                        child: _EventCard(
+                          weekday: _weekday(e.dateTime),
+                          day: e.dateTime.day,
+                          timeLabel: _fmtTime(e.dateTime),
+                          title: displayTitle,
+                          subtitle: subtitleText,
+                          activityType: e.eventType,
+                          isCancelled: e.isCancelled,
+                        ),
+                      );
+
+                      if (isCreator) {
+                        // Single Dismissible handles both edit (L→R) and cancel (R→L)
+                        card = Dismissible(
+                          key: ValueKey('event-swipe-${e.id}'),
+                          direction: DismissDirection.horizontal,
+                          background: Container(
+                            color: Colors.blue,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: const Icon(Icons.edit, color: Colors.white),
+                          ),
+                          secondaryBackground: Container(
+                            color: Colors.red,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: const Icon(
+                              Icons.cancel,
+                              color: Colors.white,
                             ),
-                            secondaryBackground: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: const Icon(
-                                Icons.cancel,
-                                color: Colors.white,
-                              ),
-                            ),
-                            confirmDismiss: (direction) async {
-                              if (direction == DismissDirection.startToEnd) {
-                                // Edit
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        AdminEditEventPage(event: e),
-                                  ),
-                                );
-                                if (result == true) {
-                                  await _loadEvents();
-                                }
-                                return false; // keep card
-                              } else {
-                                // Cancel
-                                final reasonController =
-                                    TextEditingController();
-                                final ok = await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Cancel Event?'),
-                                    content: TextField(
-                                      controller: reasonController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Reason (optional)',
-                                      ),
+                          ),
+                          confirmDismiss: (direction) async {
+                            if (direction == DismissDirection.startToEnd) {
+                              // Edit
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AdminEditEventPage(event: e),
+                                ),
+                              );
+                              if (result == true) {
+                                await _loadEvents();
+                              }
+                              return false; // keep card
+                            } else {
+                              // Cancel
+                              final reasonController = TextEditingController();
+                              final ok = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Cancel Event?'),
+                                  content: TextField(
+                                    controller: reasonController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Reason (optional)',
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const Text('No'),
-                                      ),
-                                      FilledButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                        ),
-                                        child: const Text('Cancel Event'),
-                                      ),
-                                    ],
                                   ),
-                                );
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('No'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                      child: const Text('Cancel Event'),
+                                    ),
+                                  ],
+                                ),
+                              );
 
-                                if (ok == true) {
+                              if (ok == true) {
+                                try {
+                                  await supabase
+                                      .from('club_events')
+                                      .update({
+                                        'is_cancelled': true,
+                                        'cancel_reason': reasonController.text
+                                            .trim(),
+                                      })
+                                      .eq('id', e.id);
+
+                                  // Notify all members about cancellation
                                   try {
-                                    await supabase
-                                        .from('club_events')
-                                        .update({
-                                          'is_cancelled': true,
-                                          'cancel_reason': reasonController.text
-                                              .trim(),
-                                        })
-                                        .eq('id', e.id);
+                                    await NotificationService.notifyAllUsers(
+                                      title: '${e.title} Cancelled',
+                                      body: reasonController.text.isNotEmpty
+                                          ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
+                                          : 'Event has been cancelled.',
+                                      eventId: e.id,
+                                    );
+                                  } catch (notifErr) {
+                                    debugPrint(
+                                      'Error notifying users: $notifErr',
+                                    );
+                                  }
 
-                                    // Notify all members about cancellation
-                                    try {
-                                      await NotificationService.notifyAllUsers(
-                                        title: '${e.title} Cancelled',
-                                        body: reasonController.text.isNotEmpty
-                                            ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
-                                            : 'Event has been cancelled.',
-                                        eventId: e.id,
-                                      );
-                                    } catch (notifErr) {
-                                      debugPrint(
-                                        'Error notifying users: $notifErr',
-                                      );
-                                    }
-
-                                    await _loadEvents();
-                                    // Refresh unread badge for current user (creator)
-                                    try {
-                                      await NotificationService.refreshUnreadCount();
-                                    } catch (e) {
-                                      debugPrint(
-                                        'Error refreshing unread count: $e',
-                                      );
-                                    }
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Event cancelled & members notified',
-                                          ),
+                                  await _loadEvents();
+                                  // Refresh unread badge for current user (creator)
+                                  try {
+                                    await NotificationService.refreshUnreadCount();
+                                  } catch (e) {
+                                    debugPrint(
+                                      'Error refreshing unread count: $e',
+                                    );
+                                  }
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Event cancelled & members notified',
                                         ),
-                                      );
-                                    }
-                                  } catch (err) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text('Error: $err')),
-                                      );
-                                    }
+                                      ),
+                                    );
+                                  }
+                                } catch (err) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $err')),
+                                    );
                                   }
                                 }
-                                return false; // keep card
                               }
-                            },
-                            child: card,
-                          );
-                        }
+                              return false; // keep card
+                            }
+                          },
+                          child: card,
+                        );
+                      }
 
-                        return card;
-                      }, childCount: group.events.length),
-                    ),
-                  ],
+                      return card;
+                    }, childCount: group.events.length),
+                  ),
                 ],
-              ),
+              ],
             ),
 
       floatingActionButton: FloatingActionButton(

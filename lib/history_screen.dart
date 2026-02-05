@@ -209,14 +209,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             indicatorColor: Colors.yellow,
             labelColor: Colors.yellow,
             unselectedLabelColor: Colors.white70,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 2),
             tabs: _distances
                 .map(
                   (d) => Tab(
-                    child: Text(
-                      d,
-                      style: const TextStyle(fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(d, style: const TextStyle(fontSize: 13)),
                     ),
                   ),
                 )

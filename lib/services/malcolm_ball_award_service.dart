@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class AwardNominee {
   final String id;
@@ -445,6 +446,80 @@ class MalcolmBallAwardService {
     });
   }
 
+  /// Reset nominations and chat/comments after voting has closed.
+  ///
+  /// This clears nominees, nominations, votes, emojis and chat-related tables,
+  /// but leaves award_winners intact.
+  Future<void> resetIfVotingEnded() async {
+    final endsAt = await fetchVotingEndsAt();
+    if (endsAt == null) return;
+
+    final now = DateTime.now();
+    if (!now.isAfter(endsAt)) return;
+
+    // Voting has ended: clear current-cycle data.
+    await _supabase.from('award_votes').delete();
+    await _supabase.from('award_emojis').delete();
+    await _supabase.from('award_comments').delete();
+    await _supabase.from('award_nominations').delete();
+    await _supabase.from('award_nominees').delete();
+    await _supabase.from('award_message_emojis').delete();
+    await _supabase.from('award_chat_messages').delete();
+
+    // Optionally clear the voting_ends_at flag so this only happens once.
+    await setVotingEndsAt(null);
+  }
+
+  // ---------------- Voting reminders & legacy key/value helpers ----------------
+
+  /// Send a daily reminder to all users when the voting end date is
+  /// within the next 7 days (inclusive). The reminder body includes the
+  /// exact date when voting ends.
+  ///
+  /// Uses award_settings row with key 'voting_reminder_last_sent' to
+  /// ensure only one reminder is sent per day across the club.
+  Future<void> sendVotingReminderIfDue() async {
+    final endsAt = await fetchVotingEndsAt();
+    if (endsAt == null) return;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final endDate = DateTime(endsAt.year, endsAt.month, endsAt.day);
+
+    final daysLeft = endDate.difference(today).inDays;
+    if (daysLeft < 0 || daysLeft > 7) {
+      // Either already past, or more than a week away – no reminder.
+      return;
+    }
+
+    final lastSent = await _fetchVotingReminderLastSent();
+    if (lastSent != null) {
+      final last = DateTime(lastSent.year, lastSent.month, lastSent.day);
+      if (last.isAtSameMomentAs(today)) {
+        // Already sent a reminder today.
+        return;
+      }
+    }
+
+    final dateLabel = _formatShortDate(endDate);
+    final suffix = daysLeft == 0
+        ? 'today'
+        : daysLeft == 1
+        ? 'tomorrow'
+        : 'in $daysLeft days';
+
+    try {
+      await NotificationService.notifyAllUsers(
+        title: 'Malcolm Ball Award voting closes $suffix',
+        body: 'Voting for the Malcolm Ball Award closes on $dateLabel.',
+        route: 'malcolm_ball_award',
+      );
+      await _setVotingReminderLastSent(today);
+    } catch (_) {
+      // Fail silently; notifications are best-effort.
+    }
+  }
+
   // ---------------- Voting end date (settings) ----------------
   Future<DateTime?> fetchVotingEndDate() async {
     try {
@@ -475,5 +550,52 @@ class MalcolmBallAwardService {
       'value': iso,
       'updated_by': user.id,
     });
+  }
+
+  // --------- Internal helpers for reminder tracking & formatting ----------
+
+  Future<DateTime?> _fetchVotingReminderLastSent() async {
+    try {
+      final row = await _supabase
+          .from('award_settings')
+          .select('value')
+          .eq('key', 'voting_reminder_last_sent')
+          .maybeSingle();
+      if (row == null) return null;
+      final val = row['value'] as String?;
+      if (val == null || val.trim().isEmpty) return null;
+      return DateTime.tryParse(val);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') return null;
+      rethrow;
+    }
+  }
+
+  Future<void> _setVotingReminderLastSent(DateTime date) async {
+    final iso = date.toIso8601String().split('T').first; // YYYY-MM-DD
+    final user = _supabase.auth.currentUser;
+    await _supabase.from('award_settings').upsert({
+      'key': 'voting_reminder_last_sent',
+      'value': iso,
+      if (user != null) 'updated_by': user.id,
+    });
+  }
+
+  String _formatShortDate(DateTime dt) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 }
