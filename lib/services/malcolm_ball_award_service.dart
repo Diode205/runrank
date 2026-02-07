@@ -446,34 +446,39 @@ class MalcolmBallAwardService {
     });
   }
 
-  /// Reset nominations and chat/comments after voting has closed.
-  ///
-  /// This clears nominees, nominations, votes, emojis and chat-related tables,
-  /// but leaves award_winners intact.
-  Future<void> resetIfVotingEnded() async {
-    final endsAt = await fetchVotingEndsAt();
-    if (endsAt == null) return;
-
-    final now = DateTime.now();
-    if (!now.isAfter(endsAt)) return;
-
-    // Voting has ended: clear current-cycle data. Some PostgREST
-    // configurations require a WHERE clause on DELETE, so use a
-    // trivially-true filter on id and swallow any errors.
-    try {
-      await _supabase.from('award_votes').delete().neq('id', '');
-      await _supabase.from('award_emojis').delete().neq('id', '');
-      await _supabase.from('award_comments').delete().neq('id', '');
-      await _supabase.from('award_nominations').delete().neq('id', '');
-      await _supabase.from('award_nominees').delete().neq('id', '');
-      await _supabase.from('award_message_emojis').delete().neq('id', '');
-      await _supabase.from('award_chat_messages').delete().neq('id', '');
-    } on PostgrestException {
-      // If clearing fails, don't block the page; the admin can
-      // still manage data manually.
+  /// Admin-triggered reset of nominations, votes, emojis and chat after
+  /// voting has ended. This leaves award_winners intact.
+  Future<void> adminResetAwardCycle() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in');
     }
 
-    // Optionally clear the voting_ends_at flag so this only happens once.
+    final endsAt = await fetchVotingEndsAt();
+    if (endsAt == null) {
+      throw Exception('Please set a voting end date first');
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final endDate = DateTime(endsAt.year, endsAt.month, endsAt.day);
+    if (!today.isAfter(endDate)) {
+      throw Exception(
+        'Voting has not ended yet. You can reset after ${_formatShortDate(endDate)}.',
+      );
+    }
+
+    // Clear current-cycle data using a trivially-true WHERE clause to
+    // satisfy PostgREST's requirement.
+    await _supabase.from('award_votes').delete().neq('id', '');
+    await _supabase.from('award_emojis').delete().neq('id', '');
+    await _supabase.from('award_comments').delete().neq('id', '');
+    await _supabase.from('award_nominations').delete().neq('id', '');
+    await _supabase.from('award_nominees').delete().neq('id', '');
+    await _supabase.from('award_message_emojis').delete().neq('id', '');
+    await _supabase.from('award_chat_messages').delete().neq('id', '');
+
+    // Start next cycle with no end date configured.
     await setVotingEndsAt(null);
   }
 

@@ -28,6 +28,18 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Map<String, Map<String, int>> _messageEmojiCounts = {};
   DateTime? _votingEndsAt;
 
+  bool get _votingHasEnded {
+    if (_votingEndsAt == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final end = DateTime(
+      _votingEndsAt!.year,
+      _votingEndsAt!.month,
+      _votingEndsAt!.day,
+    );
+    return today.isAfter(end);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,9 +55,6 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      // If voting has finished, reset nominations and comments/chat first
-      await _service.resetIfVotingEnded();
-
       final nominees = await _service.fetchNominees();
       final winners = await _service.fetchWinners();
       final admin = await UserService.isAdmin();
@@ -175,6 +184,49 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     }
   }
 
+  Future<void> _confirmAdminReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset nominees & votes?'),
+        content: const Text(
+          'This will clear all nominees, nominations, votes and award chat for the current cycle, but will keep the Hall of Fame winners. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    setState(() => _loading = true);
+    try {
+      await _service.adminResetAwardCycle();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nominees, votes and chat have been reset.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   // _addComment removed in favor of general chat
 
   @override
@@ -221,7 +273,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                             const Text(
                               'The Malcolm Ball Inspirational\nRunner Award 2026',
                               style: TextStyle(
-                                color: Color.fromARGB(255, 11, 155, 239),
+                                color: Color.from(
+                                  alpha: 1,
+                                  red: 0.043,
+                                  green: 0.608,
+                                  blue: 0.937,
+                                ),
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -236,18 +293,22 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _votingEndsAt != null
-                                  ? 'Nominations are now open'
-                                  : 'Nominations open date: TBD',
+                              _votingEndsAt == null
+                                  ? 'Nominations open date: TBD'
+                                  : _votingHasEnded
+                                  ? 'Voting has ended'
+                                  : 'Nominations are now open',
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
                               ),
                             ),
                             Text(
-                              _votingEndsAt != null
-                                  ? 'Voting ends on ${_formatDate(_votingEndsAt!)}'
-                                  : 'Voting end date: TBD',
+                              _votingEndsAt == null
+                                  ? 'Voting end date: TBD'
+                                  : _votingHasEnded
+                                  ? 'Voting ended on ${_formatDate(_votingEndsAt!)}'
+                                  : 'Voting ends on ${_formatDate(_votingEndsAt!)}',
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -846,6 +907,26 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             ],
           ),
           const SizedBox(height: 8),
+          if (_isAdmin && _votingHasEnded && _nominees.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _confirmAdminReset,
+                icon: const Icon(Icons.refresh, color: Color(0xFFFFD700)),
+                label: const Text(
+                  'Reset nominees & votes',
+                  style: TextStyle(color: Color(0xFFFFD700)),
+                ),
+              ),
+            ),
+          if (_votingHasEnded && _nominees.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Voting has ended, but you can still add comments in support of any nominees below.',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ),
           if (_nominees.isEmpty)
             const Text(
               'No nominations yet. Be the first to nominate below!',
@@ -859,6 +940,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   }
 
   Widget _nomineeRow(AwardNominee n) {
+    final votingEnded = _votingHasEnded;
+    final buttonColor = votingEnded ? Colors.grey : const Color(0xFF0057B7);
+    final buttonLabel = votingEnded ? 'Closed' : 'Vote';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -880,16 +964,16 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0057B7),
+              backgroundColor: buttonColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () => _vote(n.id),
+            onPressed: votingEnded ? null : () => _vote(n.id),
             icon: const Icon(Icons.how_to_vote, size: 18),
-            label: const Text('Vote'),
+            label: Text(buttonLabel),
           ),
         ],
       ),
@@ -899,7 +983,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   // reactions moved to chat messages
 
   Widget _nominationForm() {
-    final canNominate = _votingEndsAt != null;
+    final votingEnded = _votingHasEnded;
+    final canNominate = _votingEndsAt != null && !votingEnded;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Stack(
@@ -924,9 +1009,11 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 ),
                 const SizedBox(height: 10),
                 if (!_isAdmin && !canNominate)
-                  const Text(
-                    'Nominations are not open yet. Please check back once the club announces the opening date.',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  Text(
+                    votingEnded
+                        ? 'Voting has ended, but you can still add comments in support of any nominees below.'
+                        : 'Nominations are not open yet. Please check back once the club announces the opening date.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
                   )
                 else if (_memberNames.isNotEmpty)
                   Autocomplete<String>(
@@ -997,7 +1084,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 Center(
                   child: Text(
                     _votingEndsAt != null
-                        ? 'Voting Ends On ${_formatDate(_votingEndsAt!)}'
+                        ? (_votingHasEnded
+                              ? 'Voting Ended On ${_formatDate(_votingEndsAt!)}'
+                              : 'Voting Ends On ${_formatDate(_votingEndsAt!)}')
                         : 'Voting Ends On TBD',
                     style: const TextStyle(color: Colors.white70),
                   ),
