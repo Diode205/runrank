@@ -160,7 +160,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _FixedHeaderDelegate(
-                    extent: 180,
+                    // Give the header a little more vertical space so the
+                    // status card text doesn't overflow on smaller screens
+                    // or with larger text scales.
+                    extent: 210,
                     child: Container(
                       color: Colors.black,
                       padding: const EdgeInsets.all(16),

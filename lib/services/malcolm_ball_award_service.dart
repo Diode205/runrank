@@ -469,14 +469,16 @@ class MalcolmBallAwardService {
     }
 
     // Clear current-cycle data using a trivially-true WHERE clause to
-    // satisfy PostgREST's requirement.
-    await _supabase.from('award_votes').delete().neq('id', '');
-    await _supabase.from('award_emojis').delete().neq('id', '');
-    await _supabase.from('award_comments').delete().neq('id', '');
-    await _supabase.from('award_nominations').delete().neq('id', '');
-    await _supabase.from('award_nominees').delete().neq('id', '');
-    await _supabase.from('award_message_emojis').delete().neq('id', '');
-    await _supabase.from('award_chat_messages').delete().neq('id', '');
+    // satisfy PostgREST's requirement. Use a valid all-zero UUID so
+    // the comparison type matches the uuid id column.
+    const dummyUuid = '00000000-0000-0000-0000-000000000000';
+    await _supabase.from('award_votes').delete().neq('id', dummyUuid);
+    await _supabase.from('award_emojis').delete().neq('id', dummyUuid);
+    await _supabase.from('award_comments').delete().neq('id', dummyUuid);
+    await _supabase.from('award_nominations').delete().neq('id', dummyUuid);
+    await _supabase.from('award_nominees').delete().neq('id', dummyUuid);
+    await _supabase.from('award_message_emojis').delete().neq('id', dummyUuid);
+    await _supabase.from('award_chat_messages').delete().neq('id', dummyUuid);
 
     // Start next cycle with no end date configured.
     await setVotingEndsAt(null);
