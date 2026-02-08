@@ -595,6 +595,18 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                 'These prices apply to all new banquet bookings.',
                 style: TextStyle(color: Colors.white54, fontSize: 11),
               ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _confirmResetBanquet,
+                  icon: const Icon(Icons.refresh, color: Colors.redAccent),
+                  label: const Text(
+                    'Reset menu & all orders',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1225,6 +1237,76 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         );
       },
     );
+  }
+
+  Future<void> _confirmResetBanquet() async {
+    if (!_isAdmin) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111318),
+          title: const Text(
+            'Reset banquet?',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'This will clear all banquet menu options and every reservation in the system for this banquet. '
+            'Stripe payment history is not affected, but members will need to re-book if you open bookings again.',
+            style: TextStyle(color: Colors.white70, height: 1.3),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Reset',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await RunnersBanquetService.adminResetAll(eventId: _configEventId);
+
+      // Clear local state so UI matches the reset backend.
+      setState(() {
+        for (final c in _optionLabels) {
+          c.clear();
+        }
+        _memberPriceController.text = '0.00';
+        _partnerPriceController.text = '0.00';
+        _otherPriceController.text = '0.00';
+        _adminSummary = [];
+        _myReservations = [];
+        _memberQuantity = 1;
+        _partnerQuantity = 0;
+        _otherQuantity = 0;
+        _selectedOptionIndex = -1;
+        _partnerOptionIndex = -1;
+        _otherOptionIndex = -1;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Banquet menu and all orders have been reset.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to reset banquet: $e')));
+    }
   }
 
   Widget _buildMyBookingSection(Color themeYellow) {

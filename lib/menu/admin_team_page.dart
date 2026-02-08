@@ -567,7 +567,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                           fontSize: 12,
                                         ),
                                       ),
-                                      Row(
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
                                         children: [
                                           Chip(
                                             label: Text(
@@ -582,7 +584,6 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                               fontSize: 12,
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
                                           Chip(
                                             label: Text(
                                               user['membership_type'] ?? '—',
@@ -594,8 +595,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                               fontSize: 12,
                                             ),
                                           ),
-                                          if (isBlocked) ...[
-                                            const SizedBox(width: 6),
+                                          if (isBlocked)
                                             Chip(
                                               label: const Text('Blocked'),
                                               backgroundColor: Colors.red
@@ -605,7 +605,6 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
-                                          ],
                                         ],
                                       ),
                                       if (user['block_reason'] != null &&

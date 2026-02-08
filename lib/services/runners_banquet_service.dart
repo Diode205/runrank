@@ -181,4 +181,39 @@ class RunnersBanquetService {
       return [];
     }
   }
+
+  /// Admin-only reset of all banquet configuration and reservations.
+  ///
+  /// This clears runners_banquet_reservations and runners_banquet_config
+  /// (optionally scoped to a specific event when [eventId] is provided).
+  static Future<void> adminResetAll({String? eventId}) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please log in');
+    }
+
+    try {
+      // Delete reservations first so reports drop to zero immediately.
+      var reservationsDelete = _supabase
+          .from('runners_banquet_reservations')
+          .delete();
+      if (eventId != null) {
+        reservationsDelete = reservationsDelete.eq('event_id', eventId);
+      }
+      await reservationsDelete;
+
+      // Then clear the corresponding menu/config rows.
+      var configDelete = _supabase.from('runners_banquet_config').delete();
+      if (eventId != null) {
+        configDelete = configDelete.eq('event_id', eventId);
+      }
+      await configDelete;
+    } on PostgrestException catch (e) {
+      // If RLS blocks this, surface a friendly error.
+      if (e.code == '42501' || e.code == 'PGRST301') {
+        throw Exception('Admin permissions are required to reset the banquet');
+      }
+      rethrow;
+    }
+  }
 }
