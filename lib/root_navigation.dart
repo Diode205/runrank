@@ -45,7 +45,9 @@ class _RootNavigationState extends State<RootNavigation>
 
     _loadInitialUnreadCount();
 
-    _unreadSubscription = NotificationService.watchUnreadCountStream().listen((count) {
+    _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
+      count,
+    ) {
       if (mounted) setState(() => _unread = count);
     });
 
@@ -68,7 +70,8 @@ class _RootNavigationState extends State<RootNavigation>
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      _activatedTabs[index] = true; // Activate the tab the first time it's clicked
+      _activatedTabs[index] =
+          true; // Activate the tab the first time it's clicked
       if (index == 2) _postActivityCount = 0;
     });
   }
@@ -76,14 +79,19 @@ class _RootNavigationState extends State<RootNavigation>
   Future<void> _setupPostActivityListener() async {
     final supabase = Supabase.instance.client;
     // Simple listener for badges, much lighter than the full feed logic
-    supabase.channel('public:club_posts').onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'club_posts',
-      callback: (_) {
-        if (mounted && _selectedIndex != 2) setState(() => _postActivityCount++);
-      },
-    ).subscribe();
+    supabase
+        .channel('public:club_posts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'club_posts',
+          callback: (_) {
+            if (!mounted) return;
+            // Any new post (including your own) should highlight the Posts tab
+            setState(() => _postActivityCount++);
+          },
+        )
+        .subscribe();
   }
 
   @override
@@ -92,10 +100,18 @@ class _RootNavigationState extends State<RootNavigation>
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          _activatedTabs[0] ? const ClubStandardsView() : const SizedBox.shrink(),
-          _activatedTabs[1] ? const ClubEventsCalendar() : const SizedBox.shrink(),
-          _activatedTabs[2] ? const PostsFeedFacebookScreen() : const SizedBox.shrink(),
-          _activatedTabs[3] ? const NotificationsScreen() : const SizedBox.shrink(),
+          _activatedTabs[0]
+              ? const ClubStandardsView()
+              : const SizedBox.shrink(),
+          _activatedTabs[1]
+              ? const ClubEventsCalendar()
+              : const SizedBox.shrink(),
+          _activatedTabs[2]
+              ? const PostsFeedFacebookScreen()
+              : const SizedBox.shrink(),
+          _activatedTabs[3]
+              ? const NotificationsScreen()
+              : const SizedBox.shrink(),
           _activatedTabs[4] ? const MenuScreen() : const SizedBox.shrink(),
         ],
       ),
@@ -114,13 +130,29 @@ class _RootNavigationState extends State<RootNavigation>
             label: 'Club Hub',
           ),
           NavigationDestination(
-            icon: _buildBadgeIcon(Icons.article_outlined, _postActivityCount, Colors.amber),
-            selectedIcon: _buildBadgeIcon(Icons.article, _postActivityCount, Colors.amber),
+            icon: _buildBadgeIcon(
+              Icons.article_outlined,
+              _postActivityCount,
+              Colors.amber,
+            ),
+            selectedIcon: _buildBadgeIcon(
+              Icons.article,
+              _postActivityCount,
+              Colors.amber,
+            ),
             label: 'Posts',
           ),
           NavigationDestination(
-            icon: _buildBadgeIcon(Icons.notifications_outlined, _unread, Colors.redAccent),
-            selectedIcon: _buildBadgeIcon(Icons.notifications, _unread, Colors.redAccent),
+            icon: _buildBadgeIcon(
+              Icons.notifications_outlined,
+              _unread,
+              Colors.redAccent,
+            ),
+            selectedIcon: _buildBadgeIcon(
+              Icons.notifications,
+              _unread,
+              Colors.redAccent,
+            ),
             label: 'Alerts',
           ),
           const NavigationDestination(
@@ -160,10 +192,17 @@ class _RootNavigationState extends State<RootNavigation>
                 top: -4,
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
                   child: Text(
                     count.toString(),
-                    style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
