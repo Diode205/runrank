@@ -1,11 +1,13 @@
 // lib/services/notification_service.dart
 
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationService {
   static final _supabase = Supabase.instance.client;
   static final _unreadCountController = StreamController<int>.broadcast();
+  static final _eventActivityController = StreamController<int>.broadcast();
 
   // ---------------------------------------------------------------
   // SEND NOTIFICATION TO ALL USERS
@@ -262,5 +264,74 @@ class NotificationService {
     final count = await unreadCount();
     print("DEBUG: Refreshing unread count: $count");
     _unreadCountController.add(count);
+  }
+
+  // ---------------------------------------------------------------
+  // EVENT ACTIVITY (UNSEEN EVENTS FOR CLUB HUB)
+  // ---------------------------------------------------------------
+
+  static Stream<int> watchEventActivityStream() {
+    return _eventActivityController.stream;
+  }
+
+  static Future<int> unseenEventCount() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seenKey = 'events_seen_ids_${user.id}';
+      final seenIds = prefs.getStringList(seenKey) ?? const <String>[];
+
+      final rows = await _supabase
+          .from('club_events')
+          .select('id, date, time')
+          .order('date')
+          .order('time');
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      int count = 0;
+      for (final row in rows as List) {
+        final dateStr = row['date'] as String?;
+        final timeVal = row['time'];
+        if (dateStr == null || timeVal == null) continue;
+
+        final timeStr = timeVal.toString().split('.').first;
+        DateTime dt;
+        try {
+          dt = DateTime.parse('$dateStr $timeStr');
+        } catch (_) {
+          continue;
+        }
+
+        final d = DateTime(dt.year, dt.month, dt.day);
+        if (d.isBefore(today)) continue;
+
+        final id = row['id'].toString();
+        if (!seenIds.contains(id)) {
+          count++;
+        }
+      }
+
+      return count;
+    } catch (e) {
+      print('DEBUG: unseenEventCount error: $e');
+      return 0;
+    }
+  }
+
+  static Future<void> refreshEventActivityCount() async {
+    final count = await unseenEventCount();
+    print('DEBUG: Refreshing event activity count: $count');
+    _eventActivityController.add(count);
+  }
+
+  // Fire a local signal when this client creates a new event or marks
+  // one as seen. The underlying count is recomputed from Supabase
+  // and local "seen" state, so this is safe to call repeatedly.
+  static Future<void> signalLocalEventActivityChanged() async {
+    await refreshEventActivityCount();
   }
 }

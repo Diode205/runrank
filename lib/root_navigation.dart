@@ -20,12 +20,13 @@ class _RootNavigationState extends State<RootNavigation>
   int _selectedIndex = 0;
   int _unread = 0;
   int _postActivityCount = 0;
+  int _eventActivityCount = 0;
 
   // Track which tabs have been visited to load them lazily
   final List<bool> _activatedTabs = [true, false, false, false, false];
 
-  Timer? _postActivityTimer;
   StreamSubscription<int>? _unreadSubscription;
+  StreamSubscription<int>? _eventActivitySubscription;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -44,27 +45,46 @@ class _RootNavigationState extends State<RootNavigation>
     );
 
     _loadInitialUnreadCount();
+    _loadInitialEventActivityCount();
 
     _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
       count,
     ) {
-      if (mounted) setState(() => _unread = count);
+      if (!mounted) return;
+      setState(() => _unread = count);
     });
 
     _setupPostActivityListener();
+
+    // Watch for event activity (unseen events) to highlight Club Hub
+    _eventActivitySubscription = NotificationService.watchEventActivityStream()
+        .listen((count) {
+          if (!mounted) return;
+          setState(() {
+            _eventActivityCount = count;
+            debugPrint(
+              'RootNavigation: event activity count updated -> $_eventActivityCount',
+            );
+          });
+        });
   }
 
   @override
   void dispose() {
     _unreadSubscription?.cancel();
     _glowController.dispose();
-    _postActivityTimer?.cancel();
+    _eventActivitySubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _loadInitialUnreadCount() async {
     final count = await NotificationService.unreadCount();
     if (mounted) setState(() => _unread = count);
+  }
+
+  Future<void> _loadInitialEventActivityCount() async {
+    final count = await NotificationService.unseenEventCount();
+    if (mounted) setState(() => _eventActivityCount = count);
   }
 
   void _onItemTapped(int index) {
@@ -124,9 +144,17 @@ class _RootNavigationState extends State<RootNavigation>
             selectedIcon: Icon(Icons.directions_run, color: Colors.white),
             label: 'RunHome',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.groups_outlined, color: Colors.white70),
-            selectedIcon: Icon(Icons.groups, color: Colors.white),
+          NavigationDestination(
+            icon: _buildBadgeIcon(
+              Icons.groups_outlined,
+              _eventActivityCount,
+              const Color(0xFF0057B7), // club blue
+            ),
+            selectedIcon: _buildBadgeIcon(
+              Icons.groups,
+              _eventActivityCount,
+              const Color(0xFF0057B7),
+            ),
             label: 'Club Hub',
           ),
           NavigationDestination(

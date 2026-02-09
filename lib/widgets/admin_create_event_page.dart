@@ -335,18 +335,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       final navigator = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
 
-      // Send notification to all users about new event
       if (result.isNotEmpty) {
-        final eventId = result.first['id']?.toString();
-        if (eventId != null) {
-          final eventTitle = buildTitle();
-
-          await NotificationService.notifyAllUsers(
-            title: 'New Event Created',
-            body: '$eventTitle has been added to the calendar',
-            eventId: eventId,
-          );
-        }
+        // Recompute unseen-event count so Club Hub badge reflects the
+        // newly created event (which starts as "unseen").
+        await NotificationService.signalLocalEventActivityChanged();
       }
 
       if (mounted) {

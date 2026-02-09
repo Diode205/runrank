@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
@@ -24,11 +25,53 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   bool _loading = true;
   String userRole = "reader"; // reader or admin
 
+  // Track which event cards have been opened/seen locally
+  Set<String> _seenEventIds = {};
+
+  Future<void> _loadSeenEvents() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'events_seen_ids_${user.id}';
+      final list = prefs.getStringList(key) ?? <String>[];
+      if (mounted) {
+        setState(() {
+          _seenEventIds = list.toSet();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading seen events: $e');
+    }
+  }
+
+  Future<void> _markEventSeen(String eventId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+      if (_seenEventIds.contains(eventId)) return;
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'events_seen_ids_${user.id}';
+      final updated = {..._seenEventIds, eventId};
+      await prefs.setStringList(key, updated.toList());
+      if (mounted) {
+        setState(() {
+          _seenEventIds = updated;
+        });
+      }
+      // Update the global Club Hub badge count
+      await NotificationService.signalLocalEventActivityChanged();
+    } catch (e) {
+      debugPrint('Error marking event seen: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadRole();
     _loadEvents();
+    _loadSeenEvents();
   }
 
   Future<void> _loadRole() async {
@@ -147,8 +190,10 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   String _fmtTime(DateTime dt) =>
       "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
 
-  void _openEvent(ClubEvent e) {
-    Navigator.push(
+  Future<void> _openEvent(ClubEvent e) async {
+    await _markEventSeen(e.id);
+    if (!mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => EventDetailsPage(event: e)),
     );
@@ -252,6 +297,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         subtitleText = e.venue;
                       }
 
+                      final isNew = !_seenEventIds.contains(e.id);
+
                       Widget card = GestureDetector(
                         onTap: () => _openEvent(e),
                         child: _EventCard(
@@ -262,6 +309,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                           subtitle: subtitleText,
                           activityType: e.eventType,
                           isCancelled: e.isCancelled,
+                          isNew: isNew,
                         ),
                       );
 
@@ -435,6 +483,7 @@ class _EventCard extends StatelessWidget {
   final String subtitle;
   final String activityType;
   final bool isCancelled;
+  final bool isNew;
 
   const _EventCard({
     required this.weekday,
@@ -444,6 +493,7 @@ class _EventCard extends StatelessWidget {
     required this.subtitle,
     required this.activityType,
     required this.isCancelled,
+    required this.isNew,
   });
 
   Color _background(String t) {
@@ -522,6 +572,20 @@ class _EventCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
+                  if (isNew && !isCancelled)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        margin: const EdgeInsets.all(6),
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFD300), // yellow dot
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
                   Positioned(
                     right: 0,
                     top: 0,
