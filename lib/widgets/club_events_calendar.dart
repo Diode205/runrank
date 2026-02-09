@@ -32,23 +32,31 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   }
 
   Future<void> _loadRole() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
 
-    final row = await supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
+      final row = await supabase
+          .from("user_profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
 
-    setState(() {
-      userRole = row?["role"] ?? "reader";
-    });
+      if (mounted) {
+        setState(() {
+          userRole = row?["role"] ?? "reader";
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading role: $e');
+    }
   }
 
   /// Load all future events + today
   Future<void> _loadEvents() async {
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
 
     try {
       final rows = await supabase
@@ -78,13 +86,17 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
       parsed.sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
-      setState(() {
-        _events = parsed;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _events = parsed;
+          _loading = false;
+        });
+      }
     } catch (e) {
       print("ERROR loading events: $e");
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

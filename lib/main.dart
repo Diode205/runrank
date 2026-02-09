@@ -13,10 +13,28 @@ import 'package:runrank/app_routes.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/painting.dart' as painting;
 import 'package:runrank/services/payment_service.dart';
+import 'dart:io';
 
 // Global RouteObserver to support auto-refresh on page resume
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
+
+bool _isTransientNetworkError(Object error) {
+  // Supabase wraps some network issues in AuthException with a SocketException
+  if (error is AuthException) {
+    final msg = error.message ?? '';
+    if (msg.contains('Failed host lookup') || msg.contains('SocketException')) {
+      return true;
+    }
+  }
+
+  if (error is SocketException) {
+    // Typical offline / DNS failure
+    return true;
+  }
+
+  return false;
+}
 
 void main() {
   runZonedGuarded(
@@ -45,9 +63,27 @@ void main() {
 
       if (crashlyticsEnabled) {
         FlutterError.onError = (FlutterErrorDetails details) {
-          FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+          final error = details.exception;
+          if (_isTransientNetworkError(error)) {
+            // Log as non-fatal to avoid noisy "crashes" when offline
+            FirebaseCrashlytics.instance.recordError(
+              error,
+              details.stack,
+              fatal: false,
+            );
+          } else {
+            FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+          }
         };
         ui.PlatformDispatcher.instance.onError = (error, stack) {
+          if (_isTransientNetworkError(error)) {
+            FirebaseCrashlytics.instance.recordError(
+              error,
+              stack,
+              fatal: false,
+            );
+            return true; // handled gracefully
+          }
           FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
           return true; // handled
         };

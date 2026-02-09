@@ -27,6 +27,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
   // Attachments collected via + button (images or URLs)
   final List<Map<String, String>> _attachments = [];
   bool _uploading = false;
+  bool _attachmentUploading = false;
 
   @override
   void initState() {
@@ -103,8 +104,85 @@ class _CreatePostPageState extends State<CreatePostPage> {
     }
   }
 
+  Future<void> _addAttachmentVideo() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _attachmentUploading = true;
+        });
+      }
+
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 5),
+      );
+
+      if (pickedFile == null) {
+        if (mounted) {
+          setState(() {
+            _attachmentUploading = false;
+          });
+        }
+        return;
+      }
+
+      final file = File(pickedFile.path);
+      final fileName = pickedFile.name;
+
+      const maxVideoBytes = 50 * 1024 * 1024; // ~50MB
+      final fileSize = await file.length();
+      if (fileSize > maxVideoBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Video too large. Please upload a shorter or compressed clip (max ~50MB).',
+              ),
+            ),
+          );
+          setState(() {
+            _attachmentUploading = false;
+          });
+        }
+        return;
+      }
+
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final storagePath =
+          'club_posts/${user.id}_${DateTime.now().millisecondsSinceEpoch}_$fileName';
+
+      await supabase.storage.from('club-media').upload(storagePath, file);
+
+      final publicUrl = supabase.storage
+          .from('club-media')
+          .getPublicUrl(storagePath);
+      setState(() {
+        _attachments.add({'type': 'video', 'url': publicUrl, 'name': fileName});
+        _attachmentUploading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading video: $e')));
+        setState(() {
+          _attachmentUploading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _addAttachmentFile() async {
     try {
+      if (mounted) {
+        setState(() {
+          _attachmentUploading = true;
+        });
+      }
+
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
         type: FileType.custom,
@@ -131,10 +209,44 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ],
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (result == null || result.files.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _attachmentUploading = false;
+          });
+        }
+        return;
+      }
+      final picked = result.files.single;
+      final file = File(picked.path!);
+      final fileName = picked.name;
 
-      final file = File(result.files.single.path!);
-      final fileName = result.files.single.name;
+      // Enforce a soft size limit for video files to avoid large storage usage
+      final lowerName = fileName.toLowerCase();
+      final isVideo =
+          lowerName.endsWith('.mp4') ||
+          lowerName.endsWith('.mov') ||
+          lowerName.endsWith('.avi') ||
+          lowerName.endsWith('.mkv') ||
+          lowerName.endsWith('.webm') ||
+          lowerName.endsWith('.flv');
+
+      const maxVideoBytes = 50 * 1024 * 1024; // ~50MB
+      if (isVideo && picked.size > maxVideoBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Video too large. Please upload a shorter or compressed clip (max ~50MB).',
+              ),
+            ),
+          );
+          setState(() {
+            _attachmentUploading = false;
+          });
+        }
+        return;
+      }
 
       // Upload file to storage
       final user = supabase.auth.currentUser;
@@ -151,19 +263,13 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       // Determine attachment type based on file extension
       String attachmentType = 'file';
-      final lowerName = fileName.toLowerCase();
       if (lowerName.endsWith('.png') ||
           lowerName.endsWith('.jpg') ||
           lowerName.endsWith('.jpeg') ||
           lowerName.endsWith('.gif') ||
           lowerName.endsWith('.webp')) {
         attachmentType = 'image';
-      } else if (lowerName.endsWith('.mp4') ||
-          lowerName.endsWith('.mov') ||
-          lowerName.endsWith('.avi') ||
-          lowerName.endsWith('.mkv') ||
-          lowerName.endsWith('.webm') ||
-          lowerName.endsWith('.flv')) {
+      } else if (isVideo) {
         attachmentType = 'video';
       }
 
@@ -173,12 +279,16 @@ class _CreatePostPageState extends State<CreatePostPage> {
           'url': publicUrl,
           'name': fileName,
         });
+        _attachmentUploading = false;
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error uploading file: $e')));
+        setState(() {
+          _attachmentUploading = false;
+        });
       }
     }
   }
@@ -476,7 +586,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                             children: [
                               IconButton(
                                 tooltip: 'Photo from Gallery',
-                                onPressed: _addAttachmentFromGallery,
+                                onPressed: _attachmentUploading
+                                    ? null
+                                    : _addAttachmentFromGallery,
                                 icon: const Icon(
                                   Icons.image,
                                   color: Colors.blue,
@@ -485,7 +597,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               ),
                               IconButton(
                                 tooltip: 'Take Photo',
-                                onPressed: _addAttachmentFromCamera,
+                                onPressed: _attachmentUploading
+                                    ? null
+                                    : _addAttachmentFromCamera,
                                 icon: const Icon(
                                   Icons.camera_alt,
                                   color: Colors.green,
@@ -494,10 +608,23 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               ),
                               IconButton(
                                 tooltip: 'Attach Document',
-                                onPressed: _addAttachmentFile,
+                                onPressed: _attachmentUploading
+                                    ? null
+                                    : _addAttachmentFile,
                                 icon: const Icon(
                                   Icons.attach_file,
                                   color: Colors.orange,
+                                  size: 24,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Attach Video',
+                                onPressed: _attachmentUploading
+                                    ? null
+                                    : _addAttachmentVideo,
+                                icon: const Icon(
+                                  Icons.videocam,
+                                  color: Colors.purple,
                                   size: 24,
                                 ),
                               ),
@@ -506,6 +633,36 @@ class _CreatePostPageState extends State<CreatePostPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tip: Any https:// link in Content becomes a tappable link in the post. '
+                      'Videos are limited to about 50MB to save storage.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    if (_attachmentUploading) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Uploading attachment... please wait before publishing.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (_attachments.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Wrap(
@@ -566,7 +723,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                         ],
                       ),
                       child: FilledButton.icon(
-                        onPressed: _submitPost,
+                        onPressed: (_uploading || _attachmentUploading)
+                            ? null
+                            : _submitPost,
                         icon: const Icon(Icons.send),
                         label: const Text('Publish Post'),
                         style: FilledButton.styleFrom(

@@ -15,9 +15,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   late TabController _tabController;
   final _service = KitProductsService();
 
-  late Future<List<KitProduct>> _maleProducts;
-  late Future<List<KitProduct>> _femaleProducts;
-  late Future<List<KitProduct>> _hoodies;
+  Future<List<KitProduct>>? _maleProducts;
+  Future<List<KitProduct>>? _femaleProducts;
+  Future<List<KitProduct>>? _hoodies;
   bool _isAdmin = false;
 
   @override
@@ -28,11 +28,23 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   }
 
   Future<void> _loadData() async {
-    _isAdmin = await UserService.isAdmin();
-    _maleProducts = _service.getProductsByCategory('male');
-    _femaleProducts = _service.getProductsByCategory('female');
-    _hoodies = _service.getProductsByCategory('hoodie');
-    setState(() {});
+    try {
+      final isAdmin = await UserService.isAdmin();
+      final male = _service.getProductsByCategory('male');
+      final female = _service.getProductsByCategory('female');
+      final hoodies = _service.getProductsByCategory('hoodie');
+
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+          _maleProducts = male;
+          _femaleProducts = female;
+          _hoodies = hoodies;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading kit data: $e');
+    }
   }
 
   @override
@@ -217,13 +229,27 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
     );
   }
 
-  Widget _buildProductTab(Future<List<KitProduct>> productsFuture) {
+  Widget _buildProductTab(Future<List<KitProduct>>? productsFuture) {
+    if (productsFuture == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF0055FF)),
+      );
+    }
     return FutureBuilder<List<KitProduct>>(
       future: productsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFF0055FF)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading products',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           );
         }
 
@@ -237,11 +263,10 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
         }
 
         final products = snapshot.data!;
-        return ListView(
+        return ListView.builder(
           padding: const EdgeInsets.all(16),
-          children: products
-              .map((product) => _buildProductCard(product))
-              .toList(),
+          itemCount: products.length,
+          itemBuilder: (context, index) => _buildProductCard(products[index]),
         );
       },
     );
@@ -325,59 +350,54 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
               const SizedBox(height: 8),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: product.stock.entries.map((entry) {
-                      final size = entry.key;
-                      final qty = entry.value;
-                      final inStock = qty > 0;
+                child: Row(
+                  children: product.stock.entries.map((entry) {
+                    final size = entry.key;
+                    final qty = entry.value;
+                    final inStock = qty > 0;
 
-                      return Container(
-                        width: 52,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
+                    return Container(
+                      width: 52,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: inStock
+                            ? const Color(0xFF0055FF).withValues(alpha: 0.2)
+                            : Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
                           color: inStock
-                              ? const Color(0xFF0055FF).withValues(alpha: 0.2)
-                              : Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: inStock
-                                ? const Color(0xFF0055FF).withValues(alpha: 0.5)
-                                : Colors.red.withValues(alpha: 0.3),
+                              ? const Color(0xFF0055FF).withValues(alpha: 0.5)
+                              : Colors.red.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            size,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: inStock ? Colors.white : Colors.white38,
+                            ),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              size,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: inStock ? Colors.white : Colors.white38,
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$qty',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: inStock
+                                  ? const Color(0xFF0055FF)
+                                  : Colors.redAccent,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$qty',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: inStock
-                                    ? const Color(0xFF0055FF)
-                                    : Colors.redAccent,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
               const SizedBox(height: 16),

@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
 import 'package:runrank/admin/create_post_page.dart';
+import 'package:runrank/widgets/inline_video_player.dart';
+import 'package:runrank/widgets/linkified_text.dart';
 
 class PostsFeedScreen extends StatefulWidget {
   const PostsFeedScreen({super.key});
@@ -391,9 +393,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                             ),
                             const SizedBox(height: 6),
 
-                            // Content preview
-                            Text(
-                              post['content'] ?? '',
+                            // Content preview with tappable URLs
+                            LinkifiedText(
+                              text: post['content'] ?? '',
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -448,6 +450,12 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                                 ),
                                           ),
                                         ),
+                                      if (videos.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        InlineVideoPlayer(
+                                          url: videos.first['url'] as String,
+                                        ),
+                                      ],
                                       // Rest as small chips
                                       if (images.length > 1 ||
                                           links.isNotEmpty ||
@@ -492,35 +500,37 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                                                 ),
                                               ),
                                             ),
-                                            ...videos.map(
-                                              (a) => ActionChip(
-                                                avatar: const Icon(
-                                                  Icons.videocam,
-                                                  size: 16,
-                                                ),
-                                                label: Text(
-                                                  a['name'] ?? 'Video',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
+                                            ...videos
+                                                .skip(1)
+                                                .map(
+                                                  (a) => ActionChip(
+                                                    avatar: const Icon(
+                                                      Icons.videocam,
+                                                      size: 16,
+                                                    ),
+                                                    label: Text(
+                                                      a['name'] ?? 'Video',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    onPressed: () async {
+                                                      final url =
+                                                          a['url'] as String?;
+                                                      if (url == null ||
+                                                          url.isEmpty) {
+                                                        return;
+                                                      }
+                                                      try {
+                                                        await launchUrl(
+                                                          Uri.parse(url),
+                                                          mode: LaunchMode
+                                                              .externalApplication,
+                                                        );
+                                                      } catch (_) {}
+                                                    },
                                                   ),
                                                 ),
-                                                onPressed: () async {
-                                                  final url =
-                                                      a['url'] as String?;
-                                                  if (url == null ||
-                                                      url.isEmpty) {
-                                                    return;
-                                                  }
-                                                  try {
-                                                    await launchUrl(
-                                                      Uri.parse(url),
-                                                      mode: LaunchMode
-                                                          .externalApplication,
-                                                    );
-                                                  } catch (_) {}
-                                                },
-                                              ),
-                                            ),
                                             ...files.map(
                                               (a) => ActionChip(
                                                 avatar: const Icon(

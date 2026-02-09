@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:runrank/widgets/inline_video_player.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/admin/edit_post_page.dart';
+import 'package:runrank/widgets/linkified_text.dart';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
   const PostsFeedFacebookScreen({super.key});
@@ -20,15 +22,16 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   bool isAdmin = false;
 
   RealtimeChannel? _postChannel;
-  RealtimeChannel? _reactionChannel;
-  RealtimeChannel? _commentChannel;
 
-  // Per-post caches
+  // Cache for reactions and comments to avoid redundant fetches
   final Map<String, Map<String, int>> _reactionCounts = {};
   final Map<String, Set<String>> _userReactionsByPost = {};
   final Map<String, List<Map<String, dynamic>>> _commentsByPost = {};
   final Map<String, TextEditingController> _commentControllers = {};
   final Map<String, bool> _showCommentInput = {};
+
+  // Track which posts are currently fetching details to avoid duplicate calls
+  final Set<String> _fetchingPostDetails = {};
 
   static const List<String> availableEmojis = [
     '👍',
@@ -39,78 +42,38 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     '😡',
   ];
 
-  Color _membershipColor(String? membershipType) {
-    switch (membershipType) {
-      case '1st Claim':
-        return const Color(0xFFFFD700);
-      case '2nd Claim':
-        return const Color(0xFF0055FF);
-      case 'Social':
-        return Colors.grey;
-      case 'Full-Time Education':
-        return const Color(0xFF2E8B57);
-      default:
-        return const Color(0xFFF5C542);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
-    _loadPosts();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _checkAdminStatus();
+    await _loadPosts();
     _setupRealtime();
   }
 
   @override
   void dispose() {
     _postChannel?.unsubscribe();
-    _reactionChannel?.unsubscribe();
-    _commentChannel?.unsubscribe();
+    for (var controller in _commentControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   void _setupRealtime() {
+    // Only listen to the main post table for major changes (new posts/deletes)
     _postChannel = supabase
-        .channel('club_posts_changes')
+        .channel('public:club_posts')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'club_posts',
-          callback: (_) => _loadPosts(),
-        )
-        .subscribe();
-
-    _reactionChannel = supabase
-        .channel('club_post_reactions_changes')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'club_post_reactions',
           callback: (payload) {
-            final postId =
-                payload.newRecord['post_id'] ?? payload.oldRecord['post_id'];
-            if (postId is String) {
-              _loadReactions(postId);
-            } else {
-              _loadPosts();
-            }
-          },
-        )
-        .subscribe();
-
-    _commentChannel = supabase
-        .channel('club_post_comments_changes')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'club_post_comments',
-          callback: (payload) {
-            final postId =
-                payload.newRecord['post_id'] ?? payload.oldRecord['post_id'];
-            if (postId is String) {
-              _loadComments(postId);
-            } else {
+            if (payload.eventType == PostgresChangeEvent.insert ||
+                payload.eventType == PostgresChangeEvent.delete) {
               _loadPosts();
             }
           },
@@ -126,9 +89,9 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           .from('user_profiles')
           .select('is_admin')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
       if (mounted) {
-        setState(() => isAdmin = profile['is_admin'] ?? false);
+        setState(() => isAdmin = profile?['is_admin'] ?? false);
       }
     } catch (e) {
       debugPrint('Error checking admin status: $e');
@@ -140,80 +103,19 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       final now = DateTime.now().toIso8601String();
       final user = supabase.auth.currentUser;
 
-      List data;
-      if (isAdmin) {
-        data = await supabase
-            .from('club_posts')
-            .select('''
-              id,
-              title,
-              content,
-              author_id,
-              author_name,
-              created_at,
-              is_approved,
-              expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
-              club_post_attachments(*)
-            ''')
-            .gte('expiry_date', now)
-            .order('created_at', ascending: false);
-      } else if (user != null) {
-        final approved = await supabase
-            .from('club_posts')
-            .select('''
-              id,
-              title,
-              content,
-              author_id,
-              author_name,
-              created_at,
-              is_approved,
-              expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
-              club_post_attachments(*)
-            ''')
-            .gte('expiry_date', now)
-            .eq('is_approved', true)
-            .order('created_at', ascending: false);
-
-        final mine = await supabase
-            .from('club_posts')
-            .select('''
-              id,
-              title,
-              content,
-              author_id,
-              author_name,
-              created_at,
-              is_approved,
-              expiry_date,
-              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
-              club_post_attachments(*)
-            ''')
-            .gte('expiry_date', now)
-            .eq('author_id', user.id)
-            .order('created_at', ascending: false);
-
-        final seen = <String>{};
-        data = [];
-        for (final row in approved) {
-          if (seen.add(row['id'] as String)) data.add(row);
-        }
-        for (final row in mine) {
-          if (seen.add(row['id'] as String)) data.add(row);
-        }
-        data.sort(
-          (a, b) =>
-              (b['created_at'] as String).compareTo(a['created_at'] as String),
-        );
-      } else {
-        data = [];
-      }
+      final response = await supabase
+          .from('club_posts')
+          .select('''
+            id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
+            user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
+            club_post_attachments(*)
+          ''')
+          .gte('expiry_date', now)
+          .order('created_at', ascending: false);
 
       if (mounted) {
         setState(() {
-          posts = List<Map<String, dynamic>>.from(data);
+          posts = List<Map<String, dynamic>>.from(response);
           loading = false;
         });
       }
@@ -223,60 +125,15 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     }
   }
 
-  Future<void> _rejectPost(String postId) async {
-    try {
-      await supabase.from('club_posts').delete().eq('id', postId);
-      await _loadPosts();
-    } catch (e) {
-      print('Reject error: $e');
-    }
-  }
+  Future<void> _loadPostDetails(String postId) async {
+    if (_fetchingPostDetails.contains(postId)) return;
+    _fetchingPostDetails.add(postId);
 
-  Future<void> _approvePost(String postId) async {
     try {
-      await supabase
-          .from('club_posts')
-          .update({
-            'is_approved': true,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', postId);
-      await _loadPosts();
-    } catch (e) {
-      print('Approve error: $e');
+      await Future.wait([_loadReactions(postId), _loadComments(postId)]);
+    } finally {
+      _fetchingPostDetails.remove(postId);
     }
-  }
-
-  void _openImageFullscreen(String imageUrl) {
-    // Guard against invalid/empty URLs to prevent runtime exceptions
-    final uri = Uri.tryParse(imageUrl);
-    if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) {
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              child: Center(
-                child: Image.network(imageUrl, fit: BoxFit.contain),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _loadReactions(String postId) async {
@@ -284,7 +141,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       final user = supabase.auth.currentUser;
       final data = await supabase
           .from('club_post_reactions')
-          .select('post_id, user_id, emoji')
+          .select('emoji, user_id')
           .eq('post_id', postId);
 
       final counts = <String, int>{};
@@ -297,18 +154,42 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         }
       }
 
-      setState(() {
-        _reactionCounts[postId] = counts;
-        _userReactionsByPost[postId] = userSet;
-      });
+      if (mounted) {
+        setState(() {
+          _reactionCounts[postId] = counts;
+          _userReactionsByPost[postId] = userSet;
+        });
+      }
     } catch (e) {
-      print('Error loading reactions: $e');
+      debugPrint('Error loading reactions: $e');
+    }
+  }
+
+  Future<void> _loadComments(String postId) async {
+    try {
+      final data = await supabase
+          .from('club_post_comments')
+          .select('''
+            id, user_id, comment, created_at,
+            user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
+          ''')
+          .eq('post_id', postId)
+          .order('created_at', ascending: true);
+
+      if (mounted) {
+        setState(() {
+          _commentsByPost[postId] = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading comments: $e');
     }
   }
 
   Future<void> _toggleReaction(String postId, String emoji) async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
+
     try {
       final hasReacted = _userReactionsByPost[postId]?.contains(emoji) ?? false;
       if (hasReacted) {
@@ -325,38 +206,20 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           'emoji': emoji,
         });
       }
-      await _loadReactions(postId);
+      _loadReactions(postId);
     } catch (e) {
-      print('Reaction error: $e');
-    }
-  }
-
-  Future<void> _loadComments(String postId) async {
-    try {
-      final data = await supabase
-          .from('club_post_comments')
-          .select('''
-            id, user_id, comment, created_at,
-        user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
-          ''')
-          .eq('post_id', postId)
-          .order('created_at', ascending: true);
-      setState(() {
-        _commentsByPost[postId] = List<Map<String, dynamic>>.from(data);
-      });
-    } catch (e) {
-      print('Error loading comments: $e');
+      debugPrint('Reaction error: $e');
     }
   }
 
   Future<void> _addComment(String postId, String text) async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-    if (await UserService.isBlocked(context: context)) {
-      return;
-    }
+    if (await UserService.isBlocked(context: context)) return;
+
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+
     try {
       await supabase.from('club_post_comments').insert({
         'post_id': postId,
@@ -364,13 +227,9 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         'comment': trimmed,
       });
       _commentControllers[postId]?.clear();
-      // Keep comment input visible after posting
-      setState(() {
-        _showCommentInput[postId] = true;
-      });
-      await _loadComments(postId);
+      _loadComments(postId);
     } catch (e) {
-      print('Comment error: $e');
+      debugPrint('Comment error: $e');
     }
   }
 
@@ -390,6 +249,21 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     }
   }
 
+  Color _membershipColor(String? type) {
+    switch (type) {
+      case '1st Claim':
+        return const Color(0xFFFFD700);
+      case '2nd Claim':
+        return const Color(0xFF0055FF);
+      case 'Social':
+        return Colors.grey;
+      case 'Full-Time Education':
+        return const Color(0xFF2E8B57);
+      default:
+        return const Color(0xFFF5C542);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -397,9 +271,9 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         title: const Text('Club Posts'),
         centerTitle: true,
         flexibleSpace: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: [Color(0x4DFFD300), Color(0x4D0057B7)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -408,46 +282,15 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreatePostPage()),
-              );
-              _loadPosts();
-            },
-            tooltip: 'Create Post',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreatePostPage()),
+            ).then((_) => _loadPosts()),
           ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : posts.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.article_outlined,
-                    size: 64,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No posts yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[400],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Check back for updates from the club',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            )
           : RefreshIndicator(
               onRefresh: _loadPosts,
               child: ListView.builder(
@@ -455,836 +298,496 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
                   final post = posts[index];
-                  final postId = post['id'] as String;
-                  final profileAuthorName =
-                      (post['user_profiles']?['full_name'] as String?)?.trim();
-                  final fallbackAuthorName = (post['author_name'] as String?)
-                      ?.trim();
-                  final displayAuthor =
-                      (profileAuthorName != null &&
-                          profileAuthorName.isNotEmpty)
-                      ? profileAuthorName
-                      : (fallbackAuthorName != null &&
-                            fallbackAuthorName.isNotEmpty)
-                      ? fallbackAuthorName
-                      : 'Unknown';
+                  final postId = post['id'];
 
-                  final authorAvatarUrl =
-                      post['user_profiles']?['avatar_url'] as String?;
-                  final attachments =
-                      (post['club_post_attachments'] as List?)
-                          ?.map((e) => e as Map<String, dynamic>)
-                          .toList() ??
-                      [];
-                  final timeAgo = _getTimeAgo(post['created_at']);
-                  final isApproved = post['is_approved'] ?? true;
-
-                  // Ensure data is loaded for this post
+                  // Trigger details load only when item is built
                   if (!_reactionCounts.containsKey(postId)) {
-                    _reactionCounts[postId] = {};
-                    _userReactionsByPost[postId] = {};
-                    _loadReactions(postId);
-                  }
-                  if (!_commentsByPost.containsKey(postId)) {
-                    _commentsByPost[postId] = [];
-                    _loadComments(postId);
-                  }
-                  if (!_commentControllers.containsKey(postId)) {
-                    _commentControllers[postId] = TextEditingController();
+                    _loadPostDetails(postId);
                   }
 
-                  final totalReactions = (_reactionCounts[postId] ?? const {})
-                      .values
-                      .fold(0, (a, b) => a + b);
-                  final commentCount =
-                      (_commentsByPost[postId] ?? const []).length;
-                  final reactionEmojis = (_reactionCounts[postId] ?? const {})
-                      .keys
-                      .toList()
-                      .take(3)
-                      .toList();
-
-                  final postCard = Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  Widget card = _PostCard(
+                    post: post,
+                    isAdmin: isAdmin,
+                    reactionCounts: _reactionCounts[postId] ?? {},
+                    userReactions: _userReactionsByPost[postId] ?? {},
+                    comments: _commentsByPost[postId] ?? [],
+                    showCommentInput: _showCommentInput[postId] ?? false,
+                    commentController: _commentControllers.putIfAbsent(
+                      postId,
+                      () => TextEditingController(),
                     ),
-                    color: Colors.grey[850],
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(1.6),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _membershipColor(
-                                      post['user_profiles']?['membership_type']
-                                          as String?,
-                                    ),
-                                    width: 1.6,
-                                  ),
-                                ),
-                                child: CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: Colors.white12,
-                                  backgroundImage: authorAvatarUrl != null
-                                      ? NetworkImage(
-                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                        )
-                                      : null,
-                                  child: authorAvatarUrl == null
-                                      ? Text(
-                                          displayAuthor.isNotEmpty
-                                              ? displayAuthor[0].toUpperCase()
-                                              : '?',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      displayAuthor,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    Text(
-                                      timeAgo,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[400],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!isApproved) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0x33FFD300),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: const Color(0x80FFD300),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Pending',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                if (isAdmin) ...[
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 24,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () => _approvePost(postId),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.cancel,
-                                      color: Colors.red,
-                                      size: 24,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () => _rejectPost(postId),
-                                  ),
-                                ],
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        // Title + Content
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                post['title'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                post['content'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[300],
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Attachments
-                        if (attachments.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Builder(
-                              builder: (context) {
-                                final images = attachments
-                                    .where((a) => a['type'] == 'image')
-                                    .toList();
-                                final links = attachments
-                                    .where((a) => a['type'] == 'link')
-                                    .toList();
-                                final files = attachments
-                                    .where((a) => a['type'] == 'file')
-                                    .toList();
-                                final videos = attachments
-                                    .where((a) => a['type'] == 'video')
-                                    .toList();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (images.isNotEmpty)
-                                      GestureDetector(
-                                        onTap: () => _openImageFullscreen(
-                                          images.first['url'],
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Image.network(
-                                            images.first['url'],
-                                            width: double.infinity,
-                                            height: 200,
-                                            fit: BoxFit.cover,
-                                            loadingBuilder:
-                                                (
-                                                  context,
-                                                  child,
-                                                  loadingProgress,
-                                                ) {
-                                                  if (loadingProgress == null) {
-                                                    return child;
-                                                  }
-                                                  return Container(
-                                                    color: Colors.grey[800],
-                                                    alignment: Alignment.center,
-                                                    child: const SizedBox(
-                                                      width: 24,
-                                                      height: 24,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                            strokeWidth: 2,
-                                                          ),
-                                                    ),
-                                                  );
-                                                },
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Container(
-                                                    color: Colors.grey[800],
-                                                    height: 200,
-                                                    alignment: Alignment.center,
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        const Icon(
-                                                          Icons.broken_image,
-                                                          color:
-                                                              Colors.redAccent,
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 8,
-                                                        ),
-                                                        Text(
-                                                          'Failed to load image',
-                                                          style: TextStyle(
-                                                            color: Colors
-                                                                .grey[400],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                          ),
-                                        ),
-                                      ),
-                                    if (images.length > 1 ||
-                                        links.isNotEmpty ||
-                                        files.isNotEmpty ||
-                                        videos.isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 6,
-                                        children: [
-                                          ...images
-                                              .skip(1)
-                                              .map(
-                                                (a) => Chip(
-                                                  visualDensity:
-                                                      VisualDensity.compact,
-                                                  avatar: const Icon(
-                                                    Icons.image,
-                                                    size: 16,
-                                                  ),
-                                                  label: Text(
-                                                    a['name'] ?? 'Image',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ...links.map(
-                                            (a) => Chip(
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                              avatar: const Icon(
-                                                Icons.link,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                a['name'] ?? 'Link',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          ...videos.map(
-                                            (a) => ActionChip(
-                                              avatar: const Icon(
-                                                Icons.videocam,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                a['name'] ?? 'Video',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              onPressed: () async {
-                                                final url = a['url'] as String?;
-                                                if (url == null || url.isEmpty)
-                                                  return;
-                                                try {
-                                                  await launchUrl(
-                                                    Uri.parse(url),
-                                                    mode: LaunchMode
-                                                        .externalApplication,
-                                                  );
-                                                } catch (_) {}
-                                              },
-                                            ),
-                                          ),
-                                          ...files.map(
-                                            (a) => ActionChip(
-                                              avatar: const Icon(
-                                                Icons.attachment,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                a['name'] ?? 'File',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              onPressed: () async {
-                                                final url = a['url'] as String?;
-                                                if (url == null || url.isEmpty)
-                                                  return;
-                                                try {
-                                                  await launchUrl(
-                                                    Uri.parse(url),
-                                                    mode: LaunchMode
-                                                        .externalApplication,
-                                                  );
-                                                } catch (_) {}
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-
-                        // Reactions + Comments count (Facebook-style)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              if (totalReactions > 0) ...[
-                                Row(
-                                  children: [
-                                    ...reactionEmojis.map(
-                                      (e) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 2,
-                                        ),
-                                        child: Text(
-                                          e,
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '$totalReactions',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[400],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const Spacer(),
-                              if (commentCount > 0)
-                                Text(
-                                  '$commentCount comments',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[400],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        // Divider
-                        Divider(
-                          color: Colors.grey[800],
-                          height: 1,
-                          thickness: 0.5,
-                        ),
-
-                        // Action buttons (Like, Comment, Share)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              // Like (expand emojis)
-                              _buildActionButton(
-                                icon: Icons.thumb_up_outlined,
-                                label: 'Like',
-                                onTap: () async {
-                                  await showModalBottomSheet(
-                                    context: context,
-                                    builder: (_) => Container(
-                                      color: Colors.grey[900],
-                                      padding: const EdgeInsets.all(16),
-                                      child: Wrap(
-                                        spacing: 12,
-                                        runSpacing: 12,
-                                        children: availableEmojis
-                                            .map(
-                                              (emoji) => GestureDetector(
-                                                onTap: () {
-                                                  _toggleReaction(
-                                                    postId,
-                                                    emoji,
-                                                  );
-                                                  Navigator.pop(context);
-                                                },
-                                                child: Text(
-                                                  emoji,
-                                                  style: const TextStyle(
-                                                    fontSize: 32,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              // Comment
-                              _buildActionButton(
-                                icon: Icons.chat_bubble_outline,
-                                label: 'Comment',
-                                onTap: () {
-                                  setState(() {
-                                    _showCommentInput[postId] =
-                                        !(_showCommentInput[postId] ?? false);
-                                  });
-                                },
-                              ),
-                              // Share
-                              _buildActionButton(
-                                icon: Icons.share_outlined,
-                                label: 'Share',
-                                onTap: () {},
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Comments section
-                        if ((_commentsByPost[postId] ?? const [])
-                            .isNotEmpty) ...[
-                          Divider(
-                            color: Colors.grey[800],
-                            height: 1,
-                            thickness: 0.5,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: (_commentsByPost[postId] ?? const []).map((
-                                c,
-                              ) {
-                                final commentAuthor =
-                                    c['user_profiles']?['full_name'] ??
-                                    'Unknown';
-                                final commentAvatarUrl =
-                                    c['user_profiles']?['avatar_url']
-                                        as String?;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(1.2),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: _membershipColor(
-                                              c['user_profiles']?['membership_type']
-                                                  as String?,
-                                            ),
-                                            width: 1.2,
-                                          ),
-                                        ),
-                                        child: CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor: Colors.white12,
-                                          backgroundImage:
-                                              commentAvatarUrl != null
-                                              ? NetworkImage(
-                                                  '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                                )
-                                              : null,
-                                          child: commentAvatarUrl == null
-                                              ? const Icon(
-                                                  Icons.person,
-                                                  size: 16,
-                                                  color: Colors.white,
-                                                )
-                                              : null,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[800],
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                commentAuthor,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                c['comment'] ?? '',
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                _getTimeAgo(
-                                                  c['created_at']?.toString(),
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-
-                        // Comment input (always visible if toggled)
-                        if (_showCommentInput[postId] == true) ...[
-                          Divider(
-                            color: Colors.grey[800],
-                            height: 1,
-                            thickness: 0.5,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: Colors.blue,
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _commentControllers[postId],
-                                    decoration: InputDecoration(
-                                      hintText: 'Write a comment...',
-                                      hintStyle: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(20),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey[700]!,
-                                        ),
-                                      ),
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 8,
-                                          ),
-                                      isDense: true,
-                                    ),
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.send,
-                                    size: 20,
-                                    color: Colors.blue,
-                                  ),
-                                  onPressed: () {
-                                    _addComment(
-                                      postId,
-                                      _commentControllers[postId]?.text ?? '',
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
+                    onToggleReaction: (emoji) => _toggleReaction(postId, emoji),
+                    onCommentToggle: () => setState(
+                      () => _showCommentInput[postId] =
+                          !(_showCommentInput[postId] ?? false),
                     ),
+                    onSendComment: (text) => _addComment(postId, text),
+                    onApprove: () => _approvePost(postId),
+                    onReject: () => _rejectPost(postId),
+                    membershipColor: _membershipColor(
+                      post['user_profiles']?['membership_type'],
+                    ),
+                    timeAgo: _getTimeAgo(post['created_at']),
                   );
 
-                  final currentUser = supabase.auth.currentUser;
-                  final postAuthorId = post['author_id'] as String?;
-                  final isCreator =
-                      currentUser != null &&
-                      postAuthorId != null &&
-                      postAuthorId == currentUser.id;
-
-                  // Add swipe gestures based on permissions
-                  Widget result = postCard;
-
-                  if (isCreator || isAdmin) {
-                    // Determine swipe direction(s)
-                    DismissDirection swipeDirection;
-                    if (isCreator && isAdmin) {
-                      swipeDirection = DismissDirection.horizontal; // both
-                    } else if (isCreator) {
-                      swipeDirection = DismissDirection.startToEnd; // edit only
-                    } else {
-                      swipeDirection =
-                          DismissDirection.endToStart; // delete only
-                    }
-
-                    result = Dismissible(
-                      key: ValueKey('post-swipe-$postId'),
-                      direction: swipeDirection,
-                      confirmDismiss: (direction) async {
-                        if (direction == DismissDirection.startToEnd) {
-                          // Edit action (left-to-right)
-                          if (!context.mounted) return false;
-                          try {
-                            final updated = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EditPostPage(post: post),
-                              ),
-                            );
-                            if (updated == true && context.mounted) {
-                              await _loadPosts();
-                            }
-                          } catch (e) {
-                            debugPrint('Error navigating to EditPostPage: $e');
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e')),
-                              );
-                            }
-                          }
-                          return false;
-                        } else {
-                          // Delete action (right-to-left)
-                          return await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Post'),
-                                  content: const Text(
-                                    'Are you sure you want to delete this post?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text(
-                                        'Delete',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ) ??
-                              false;
-                        }
-                      },
-                      onDismissed: (direction) async {
-                        if (direction == DismissDirection.endToStart) {
-                          // Only delete executes onDismissed
-                          try {
-                            await supabase
-                                .from('club_posts')
-                                .delete()
-                                .eq('id', postId);
-                            await _loadPosts();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Post deleted')),
-                              );
-                            }
-                          } catch (e) {
-                            debugPrint('Error deleting post: $e');
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e')),
-                              );
-                            }
-                          }
-                        }
-                      },
+                  if (isAdmin) {
+                    return Dismissible(
+                      key: ValueKey('post-fb-$postId'),
+                      direction: DismissDirection.horizontal,
                       background: Container(
-                        color: Colors.blue,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 16),
-                        child: const Icon(Icons.edit, color: Colors.white),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                       secondaryBackground: Container(
-                        color: Colors.red,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        child: const Icon(Icons.delete, color: Colors.white),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                      child: result,
+                      confirmDismiss: (direction) async {
+                        if (direction == DismissDirection.startToEnd) {
+                          // Edit post
+                          final updated = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditPostPage(post: post),
+                            ),
+                          );
+                          if (updated == true) {
+                            await _loadPosts();
+                          }
+                          return false; // keep card on edit
+                        }
+
+                        // Delete confirmation
+                        final shouldDelete =
+                            await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text('Delete post?'),
+                                content: const Text(
+                                  'This will permanently delete the post.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            ) ??
+                            false;
+
+                        if (!shouldDelete) return false;
+
+                        try {
+                          await supabase
+                              .from('club_posts')
+                              .delete()
+                              .eq('id', postId);
+                          await _loadPosts();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Post deleted')),
+                            );
+                          }
+                          return true;
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error deleting post: $e'),
+                              ),
+                            );
+                          }
+                          await _loadPosts();
+                          return false;
+                        }
+                      },
+                      child: card,
                     );
                   }
 
-                  return result;
+                  return card;
                 },
               ),
             ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  Future<void> _approvePost(String id) async {
+    await supabase
+        .from('club_posts')
+        .update({'is_approved': true})
+        .eq('id', id);
+    _loadPosts();
+  }
+
+  Future<void> _rejectPost(String id) async {
+    await supabase.from('club_posts').delete().eq('id', id);
+    _loadPosts();
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  final Map<String, dynamic> post;
+  final bool isAdmin;
+  final Map<String, int> reactionCounts;
+  final Set<String> userReactions;
+  final List<Map<String, dynamic>> comments;
+  final bool showCommentInput;
+  final TextEditingController commentController;
+  final Function(String) onToggleReaction;
+  final VoidCallback onCommentToggle;
+  final Function(String) onSendComment;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+  final Color membershipColor;
+  final String timeAgo;
+
+  const _PostCard({
+    required this.post,
+    required this.isAdmin,
+    required this.reactionCounts,
+    required this.userReactions,
+    required this.comments,
+    required this.showCommentInput,
+    required this.commentController,
+    required this.onToggleReaction,
+    required this.onCommentToggle,
+    required this.onSendComment,
+    required this.onApprove,
+    required this.onReject,
+    required this.membershipColor,
+    required this.timeAgo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = post['user_profiles'];
+    final authorName =
+        (profile?['full_name'] ?? post['author_name'] ?? 'Unknown').toString();
+    final avatarUrl = profile?['avatar_url'] as String?;
+    final attachments = (post['club_post_attachments'] as List?) ?? [];
+    final totalReactions = reactionCounts.values.fold(0, (a, b) => a + b);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.grey[900],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.grey[500]),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: membershipColor,
+              backgroundImage: avatarUrl != null
+                  ? NetworkImage(avatarUrl)
+                  : null,
+              child: avatarUrl == null ? Text(authorName[0]) : null,
+            ),
+            title: Text(
+              authorName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(timeAgo),
+            trailing: isAdmin && !(post['is_approved'] ?? false)
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.check, color: Colors.green),
+                        onPressed: onApprove,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: onReject,
+                      ),
+                    ],
+                  )
+                : null,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (post['title'] != null)
+                  Text(
+                    post['title'],
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                LinkifiedText(text: post['content'] ?? ''),
+              ],
+            ),
+          ),
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _PostAttachments(attachments: attachments),
+          ],
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                if (totalReactions > 0)
+                  Text(
+                    '👍 $totalReactions',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                const Spacer(),
+                if (comments.isNotEmpty)
+                  Text(
+                    '${comments.length} comments',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              TextButton.icon(
+                icon: Icon(
+                  userReactions.isNotEmpty
+                      ? Icons.thumb_up
+                      : Icons.thumb_up_outlined,
+                ),
+                label: const Text('Like'),
+                onPressed: () => onToggleReaction('👍'),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text('Comment'),
+                onPressed: onCommentToggle,
+              ),
+            ],
+          ),
+          if (showCommentInput) ...[
+            const Divider(),
+            _CommentSection(
+              comments: comments,
+              controller: commentController,
+              onSend: onSendComment,
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _PostAttachments extends StatelessWidget {
+  final List attachments;
+  const _PostAttachments({required this.attachments});
+
+  @override
+  Widget build(BuildContext context) {
+    final images = attachments.where((a) => a['type'] == 'image').toList();
+    final links = attachments.where((a) => a['type'] == 'link').toList();
+    final files = attachments.where((a) => a['type'] == 'file').toList();
+    final videos = attachments.where((a) => a['type'] == 'video').toList();
+
+    if (images.isEmpty && links.isEmpty && files.isEmpty && videos.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (images.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              images.first['url'],
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 200,
+              errorBuilder: (_, __, ___) => Container(
+                height: 200,
+                color: Colors.grey[800],
+                child: Icon(
+                  Icons.broken_image,
+                  size: 48,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          ),
+        if (videos.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          InlineVideoPlayer(url: videos.first['url'] as String),
+        ],
+        if (images.length > 1 ||
+            links.isNotEmpty ||
+            files.isNotEmpty ||
+            videos.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ...images
+                  .skip(1)
+                  .map(
+                    (a) => Chip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.image, size: 16),
+                      label: Text(
+                        a['name'] ?? 'Image',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+              ...links.map(
+                (a) => ActionChip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: const Icon(Icons.link, size: 16),
+                  label: Text(
+                    a['name'] ?? 'Link',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: () async {
+                    final url = a['url'] as String?;
+                    if (url == null) return;
+                    final uri = Uri.tryParse(url);
+                    if (uri == null) return;
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                ),
+              ),
+              ...videos
+                  .skip(1)
+                  .map(
+                    (a) => ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.videocam, size: 16),
+                      label: Text(
+                        a['name'] ?? 'Video',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () async {
+                        final url = a['url'] as String?;
+                        if (url == null) return;
+                        final uri = Uri.tryParse(url);
+                        if (uri == null) return;
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+              ...files.map(
+                (a) => ActionChip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: const Icon(Icons.attachment, size: 16),
+                  label: Text(
+                    a['name'] ?? 'File',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: () async {
+                    final url = a['url'] as String?;
+                    if (url == null) return;
+                    final uri = Uri.tryParse(url);
+                    if (uri == null) return;
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CommentSection extends StatelessWidget {
+  final List<Map<String, dynamic>> comments;
+  final TextEditingController controller;
+  final Function(String) onSend;
+
+  const _CommentSection({
+    required this.comments,
+    required this.controller,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ...comments.map(
+          (c) => ListTile(
+            dense: true,
+            title: Text(
+              c['user_profiles']?['full_name'] ?? 'User',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(c['comment'] ?? ''),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    hintText: 'Add a comment...',
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: () => onSend(controller.text),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

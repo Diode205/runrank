@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import Stripe
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,5 +10,14 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // Handle URL redirects for Stripe
+  override func application(
+      _ app: UIApplication,
+      open url: URL,
+      options: [UIApplication.OpenURLOptionsKey : Any] = [:]
+  ) -> Bool {
+      return StripeAPI.handleURLCallback(with: url)
   }
 }

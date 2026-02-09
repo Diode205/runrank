@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_email_sender/flutter_email_sender.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -228,51 +227,35 @@ class _ExpensesClaimPageState extends State<ExpensesClaimPage> {
       }
     }
 
-    final email = Email(
-      body: bodyBuffer.toString(),
-      subject: subject,
-      recipients: const [_expensesRecipientEmail],
-      attachmentPaths: attachmentPaths,
-      isHTML: false,
-    );
+    // Try to open the user's mail app via a mailto: link.
+    final mailOpened = await _openMailFallback(subject, bodyBuffer.toString());
 
-    try {
-      await FlutterEmailSender.send(email);
+    if (!mailOpened) {
+      // Final fallback: open system share sheet with attachments and body.
+      final List<XFile> shareFiles = [];
+      for (final image in _receiptImages) {
+        if (image.path.isNotEmpty) shareFiles.add(XFile(image.path));
+      }
+      for (final file in _receiptFiles) {
+        final p = file.path;
+        if (p != null && p.isNotEmpty) shareFiles.add(XFile(p));
+      }
+      await Share.shareXFiles(
+        shareFiles,
+        text: bodyBuffer.toString(),
+        subject: subject,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Opened share sheet to send your claim.')),
+      );
+    } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Expenses claim email created with attachments.'),
+          content: Text('Opening your mail app to send the claim.'),
         ),
       );
-    } catch (e) {
-      // Fallback to a mailto: URL if the email composer cannot be opened
-      // via the plugin (for example, on some simulators or devices).
-      final mailOpened = await _openMailFallback(
-        subject,
-        bodyBuffer.toString(),
-      );
-      if (!mailOpened) {
-        // Final fallback: open system share sheet with attachments and body.
-        final List<XFile> shareFiles = [];
-        for (final image in _receiptImages) {
-          if (image.path.isNotEmpty) shareFiles.add(XFile(image.path));
-        }
-        for (final file in _receiptFiles) {
-          final p = file.path;
-          if (p != null && p.isNotEmpty) shareFiles.add(XFile(p));
-        }
-        await Share.shareXFiles(
-          shareFiles,
-          text: bodyBuffer.toString(),
-          subject: subject,
-        );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opened share sheet to send your claim.'),
-          ),
-        );
-      }
     }
   }
 

@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/widgets/inline_video_player.dart';
+import 'package:runrank/widgets/linkified_text.dart';
 
 class PostsFeedInlineScreen extends StatefulWidget {
   const PostsFeedInlineScreen({super.key});
@@ -549,8 +551,8 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            post['content'] ?? '',
+                          LinkifiedText(
+                            text: post['content'] ?? '',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[300],
@@ -605,6 +607,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                           ),
                                         ),
                                       ),
+                                    if (videos.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      InlineVideoPlayer(
+                                        url: videos.first['url'] as String,
+                                      ),
+                                    ],
                                     if (images.length > 1 ||
                                         links.isNotEmpty ||
                                         files.isNotEmpty ||
@@ -652,26 +660,28 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                   ),
                                             ),
                                           ),
-                                          ...videos.map(
-                                            (a) => ActionChip(
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                              avatar: const Icon(
-                                                Icons.videocam,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                a['name'] ?? 'Video',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
+                                          ...videos
+                                              .skip(1)
+                                              .map(
+                                                (a) => ActionChip(
+                                                  visualDensity:
+                                                      VisualDensity.compact,
+                                                  avatar: const Icon(
+                                                    Icons.videocam,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    a['name'] ?? 'Video',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  onPressed: () =>
+                                                      _openAttachmentUrl(
+                                                        a['url'] as String?,
+                                                      ),
                                                 ),
                                               ),
-                                              onPressed: () =>
-                                                  _openAttachmentUrl(
-                                                    a['url'] as String?,
-                                                  ),
-                                            ),
-                                          ),
                                           ...files.map(
                                             (a) => ActionChip(
                                               visualDensity:

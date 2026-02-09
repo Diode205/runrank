@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/widgets/inline_video_player.dart';
 
 class PostDetailPage extends StatefulWidget {
   final String postId;
@@ -613,80 +614,134 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: attachments.map((a) {
-                              final attachType = a['type'] as String? ?? 'file';
-                              final fileName =
-                                  a['name'] as String? ?? 'Attachment';
-                              final isImage = attachType == 'image';
-
-                              IconData getIcon() {
-                                if (isImage) return Icons.image;
-                                if (fileName.toLowerCase().endsWith('.pdf')) {
-                                  return Icons.picture_as_pdf;
-                                }
-                                if (fileName.toLowerCase().endsWith('.doc') ||
-                                    fileName.toLowerCase().endsWith('.docx')) {
-                                  return Icons.description;
-                                }
-                                if (fileName.toLowerCase().endsWith('.xls') ||
-                                    fileName.toLowerCase().endsWith('.xlsx')) {
-                                  return Icons.table_chart;
-                                }
-                                if (fileName.toLowerCase().endsWith('.ppt') ||
-                                    fileName.toLowerCase().endsWith('.pptx')) {
-                                  return Icons.slideshow;
-                                }
-                                if (fileName.toLowerCase().endsWith('.mp4') ||
-                                    fileName.toLowerCase().endsWith('.mov') ||
-                                    fileName.toLowerCase().endsWith('.avi') ||
-                                    fileName.toLowerCase().endsWith('.mkv') ||
-                                    fileName.toLowerCase().endsWith('.webm') ||
-                                    fileName.toLowerCase().endsWith('.flv')) {
-                                  return Icons.videocam;
-                                }
-                                if (fileName.toLowerCase().endsWith('.gif')) {
-                                  return Icons.animation;
-                                }
-                                if (fileName.toLowerCase().endsWith('.zip') ||
-                                    fileName.toLowerCase().endsWith('.rar') ||
-                                    fileName.toLowerCase().endsWith('.7z')) {
-                                  return Icons.folder_zip;
-                                }
-                                return Icons.attachment;
-                              }
-
-                              return ActionChip(
-                                avatar: Icon(getIcon(), size: 18),
-                                label: Text(
-                                  fileName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (attachments.any(
+                                (a) => a['type'] == 'video',
+                              )) ...[
+                                InlineVideoPlayer(
+                                  url:
+                                      attachments.firstWhere(
+                                            (a) => a['type'] == 'video',
+                                          )['url']
+                                          as String,
                                 ),
-                                onPressed: () async {
-                                  final url = a['url'] as String?;
-                                  if (url == null || url.isEmpty) return;
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
-                                  );
-                                  try {
-                                    final uri = Uri.parse(url);
-                                    await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  } catch (e) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('Cannot open: $fileName'),
-                                      ),
-                                    );
+                                const SizedBox(height: 8),
+                              ],
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: attachments.map<Widget>((a) {
+                                  final attachType =
+                                      a['type'] as String? ?? 'file';
+                                  final fileName =
+                                      a['name'] as String? ?? 'Attachment';
+                                  final isImage = attachType == 'image';
+
+                                  IconData getIcon() {
+                                    if (isImage) return Icons.image;
+                                    if (fileName.toLowerCase().endsWith(
+                                      '.pdf',
+                                    )) {
+                                      return Icons.picture_as_pdf;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                          '.doc',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.docx',
+                                        )) {
+                                      return Icons.description;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                          '.xls',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.xlsx',
+                                        )) {
+                                      return Icons.table_chart;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                          '.ppt',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.pptx',
+                                        )) {
+                                      return Icons.slideshow;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                          '.mp4',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.mov',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.avi',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.mkv',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.webm',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.flv',
+                                        )) {
+                                      return Icons.videocam;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                      '.gif',
+                                    )) {
+                                      return Icons.animation;
+                                    }
+                                    if (fileName.toLowerCase().endsWith(
+                                          '.zip',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.rar',
+                                        ) ||
+                                        fileName.toLowerCase().endsWith(
+                                          '.7z',
+                                        )) {
+                                      return Icons.folder_zip;
+                                    }
+                                    return Icons.attachment;
                                   }
-                                },
-                              );
-                            }).toList(),
+
+                                  return ActionChip(
+                                    avatar: Icon(getIcon(), size: 18),
+                                    label: Text(
+                                      fileName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    onPressed: () async {
+                                      final url = a['url'] as String?;
+                                      if (url == null || url.isEmpty) return;
+                                      final messenger = ScaffoldMessenger.of(
+                                        context,
+                                      );
+                                      try {
+                                        final uri = Uri.parse(url);
+                                        await launchUrl(
+                                          uri,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      } catch (e) {
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Cannot open: $fileName',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
                         ],
                       ),
