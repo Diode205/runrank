@@ -27,6 +27,7 @@ class _RootNavigationState extends State<RootNavigation>
 
   StreamSubscription<int>? _unreadSubscription;
   StreamSubscription<int>? _eventActivitySubscription;
+  Timer? _unreadPollTimer;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -54,6 +55,15 @@ class _RootNavigationState extends State<RootNavigation>
       setState(() => _unread = count);
     });
 
+    // Periodic fallback in case realtime updates are missed
+    _unreadPollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!mounted) return;
+      final count = await NotificationService.unreadCount();
+      if (mounted) {
+        setState(() => _unread = count);
+      }
+    });
+
     _setupPostActivityListener();
 
     // Watch for event activity (unseen events) to highlight Club Hub
@@ -72,6 +82,7 @@ class _RootNavigationState extends State<RootNavigation>
   @override
   void dispose() {
     _unreadSubscription?.cancel();
+    _unreadPollTimer?.cancel();
     _glowController.dispose();
     _eventActivitySubscription?.cancel();
     super.dispose();

@@ -155,6 +155,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
               userId: authorId,
               title: 'New reaction on your post',
               body: 'Someone reacted $emoji on "$title".',
+              route: 'post_$postId',
             );
           }
         } catch (e) {
@@ -224,6 +225,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
             userId: authorId,
             title: 'New comment on your post',
             body: 'Someone commented on "$title".',
+            route: 'post_$postId',
           );
         }
       } catch (e) {

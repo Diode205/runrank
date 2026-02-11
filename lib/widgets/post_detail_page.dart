@@ -26,6 +26,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   bool isAdmin = false;
   bool isAuthor = false;
   bool isApproved = true;
+  RealtimeChannel? _commentsChannel;
 
   static const List<String> availableEmojis = [
     '👍',
@@ -55,6 +56,51 @@ class _PostDetailPageState extends State<PostDetailPage> {
   void initState() {
     super.initState();
     _loadPostDetails();
+
+    // Listen for new comments on this post so the thread updates live
+    _commentsChannel = supabase
+        .channel('post_comments_${widget.postId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'club_post_comments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'post_id',
+            value: widget.postId,
+          ),
+          callback: (_) async {
+            if (!mounted) return;
+            // Reload only the comments portion to keep the view fresh
+            try {
+              final data = await supabase
+                  .from('club_post_comments')
+                  .select('''
+                    *,
+                user_profiles!club_post_comments_user_id_fkey(full_name, avatar_url, membership_type)
+                  ''')
+                  .eq('post_id', widget.postId)
+                  .order('created_at', ascending: true);
+
+              if (!mounted) return;
+              setState(() {
+                comments = List<Map<String, dynamic>>.from(
+                  data as List<dynamic>,
+                );
+              });
+            } catch (_) {
+              // Fail silently; main refresh still works via manual reloads.
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _commentsChannel?.unsubscribe();
+    _commentController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPostDetails() async {
@@ -334,6 +380,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               userId: authorId,
               title: 'New reaction on your post',
               body: 'Someone reacted $emoji on "$title".',
+              route: 'post_${widget.postId}',
             );
           }
         } catch (e) {
@@ -377,6 +424,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             userId: authorId,
             title: 'New comment on your post',
             body: 'Someone commented on "$title".',
+            route: 'post_${widget.postId}',
           );
         }
       } catch (e) {
@@ -410,12 +458,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
     } catch (_) {
       return '';
     }
-  }
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
   }
 
   @override

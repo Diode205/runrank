@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
+import 'package:runrank/widgets/post_detail_page.dart';
+import 'package:runrank/menu/club_records_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -18,6 +20,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool loading = true;
   List<Map<String, dynamic>> notifications = [];
   StreamSubscription<int>? _unreadSubscription;
+  RealtimeChannel? _notificationsChannel;
+  Timer? _refreshTimer;
 
   // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
   String? _extractRoute(String text) {
@@ -44,11 +48,46 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         loadData();
       }
     });
+
+    // Also subscribe directly to notifications table changes for this user
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      _notificationsChannel = supabase
+          .channel('notifications_list_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'notifications',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: user.id,
+            ),
+            callback: (_) {
+              if (mounted) {
+                loadData();
+              }
+            },
+          )
+          .subscribe();
+    }
+
+    // Periodic fallback refresh in case realtime events are missed
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        loadData();
+      }
+    });
   }
 
   @override
   void dispose() {
     _unreadSubscription?.cancel();
+    if (_notificationsChannel != null) {
+      Supabase.instance.client.removeChannel(_notificationsChannel!);
+    }
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -135,8 +174,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _markAsReadAndNavigate(Map<String, dynamic> notification) async {
-    final eventId = notification['event_id'] as String?;
-    final notificationId = notification['id'] as String?;
+    final dynamic rawEventId = notification['event_id'];
+    final String? eventId = rawEventId == null ? null : rawEventId.toString();
+    final dynamic rawNotificationId = notification['id'];
+    final String? notificationId = rawNotificationId == null
+        ? null
+        : rawNotificationId.toString();
     final title = (notification['title'] ?? '').toString();
     final rawBody = (notification['body'] ?? '').toString();
     final body = _stripRouteTag(rawBody);
@@ -161,13 +204,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final route = _extractRoute(rawBody);
     if (route != null) {
       if (!mounted) return;
-      switch (route) {
-        case 'malcolm_ball_award':
+
+      if (route == 'malcolm_ball_award') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route == 'club_records') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ClubRecordsPage()),
+        ).then((_) => loadData());
+        return;
+      }
+
+      // Deep-link to a specific post when route encodes a post ID
+      if (route.startsWith('post_')) {
+        final postId = route.substring('post_'.length);
+        if (postId.isNotEmpty) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+            MaterialPageRoute(builder: (_) => PostDetailPage(postId: postId)),
           ).then((_) => loadData());
           return;
+        }
       }
     }
 
@@ -323,7 +386,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               itemCount: notifications.length,
               itemBuilder: (context, i) {
                 final n = notifications[i];
-                final notificationId = n['id'] as String?;
+                final dynamic rawId = n['id'];
+                final String? notificationId = rawId == null
+                    ? null
+                    : rawId.toString();
                 final title = n['title'] ?? '';
                 final body = n['body'] ?? '';
                 final createdAt = n['created_at'] as String?;

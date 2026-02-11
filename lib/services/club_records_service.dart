@@ -212,6 +212,8 @@ class ClubRecordsService {
         await NotificationService.notifyAllUsers(
           title: 'New club record set',
           body: '$runner set a new $distance club record in $time.',
+          // Use a route tag so Alerts can deep-link to Club Records
+          route: 'club_records',
         );
       } catch (e) {
         print('Error sending club record notification: $e');

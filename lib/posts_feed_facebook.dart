@@ -221,6 +221,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
               userId: authorId,
               title: 'New reaction on your post',
               body: 'Someone reacted $emoji on "$title".',
+              route: 'post_$postId',
             );
           }
         } catch (e) {
@@ -264,6 +265,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
             userId: authorId,
             title: 'New comment on your post',
             body: 'Someone commented on "$title".',
+            route: 'post_$postId',
           );
         }
       } catch (e) {
