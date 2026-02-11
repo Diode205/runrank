@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -15,6 +17,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   bool loading = true;
   List<Map<String, dynamic>> notifications = [];
+  StreamSubscription<int>? _unreadSubscription;
 
   // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
   String? _extractRoute(String text) {
@@ -31,6 +34,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     loadData();
+
+    // Listen for unread-count changes so the list refreshes
+    _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
+      _,
+    ) {
+      // Whenever a notification is inserted/updated/deleted, reload the list
+      if (mounted) {
+        loadData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _unreadSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> loadData() async {
@@ -69,6 +88,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error deleting notification: $e")),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteAllNotifications() async {
+    if (notifications.isEmpty) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete all notifications?'),
+        content: const Text(
+          'This will tick and remove all notifications from your alerts bar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) return;
+
+    try {
+      await NotificationService.deleteAllNotificationsForCurrentUser();
+      if (!mounted) return;
+      setState(() {
+        notifications.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications deleted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting all notifications: $e')),
       );
     }
   }
@@ -210,6 +271,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text("Notifications"),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          if (!loading && notifications.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'Delete all notifications',
+              onPressed: _confirmDeleteAllNotifications,
+            ),
+        ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(

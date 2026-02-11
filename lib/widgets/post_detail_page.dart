@@ -323,6 +323,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        // Notify the post author about the new reaction
+        try {
+          final authorId = post?['author_id'] as String?;
+          final title = post?['title'] as String? ?? 'a post';
+
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your post',
+              body: 'Someone reacted $emoji on "$title".',
+            );
+          }
+        } catch (e) {
+          print('Error sending post reaction notification (detail): $e');
+        }
       }
       _loadPostDetails(); // Refresh reactions
     } catch (e) {
@@ -350,6 +366,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
       _commentController.clear();
       _loadPostDetails(); // Refresh comments
+
+      // Notify the post author about the new comment
+      try {
+        final authorId = post?['author_id'] as String?;
+        final title = post?['title'] as String? ?? 'a post';
+
+        if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+          await NotificationService.notifyUser(
+            userId: authorId,
+            title: 'New comment on your post',
+            body: 'Someone commented on "$title".',
+          );
+        }
+      } catch (e) {
+        print('Error sending post comment notification (detail): $e');
+      }
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text('Error posting comment: $e')),

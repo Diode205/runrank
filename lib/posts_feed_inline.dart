@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
@@ -139,6 +140,26 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        // Notify the post author about the new reaction
+        try {
+          final post = posts.firstWhere(
+            (p) => p['id'] == postId,
+            orElse: () => {},
+          );
+          final authorId = post['author_id'] as String?;
+          final title = post['title'] as String? ?? 'a post';
+
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your post',
+              body: 'Someone reacted $emoji on "$title".',
+            );
+          }
+        } catch (e) {
+          print('Error sending post reaction notification: $e');
+        }
       }
       await _loadReactions(postId);
     } catch (e) {
@@ -188,6 +209,28 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
       });
       _commentControllers[postId]?.clear();
       await _loadComments(postId);
+
+      // Notify the post author about the new comment
+      try {
+        final post = posts.firstWhere(
+          (p) => p['id'] == postId,
+          orElse: () => {},
+        );
+        final authorId = post['author_id'] as String?;
+        final title = post['title'] as String? ?? 'a post';
+
+        if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+          await NotificationService.notifyUser(
+            userId: authorId,
+            title: 'New comment on your post',
+            body: 'Someone commented on "$title".',
+          );
+        }
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Notification error: $e')),
+        );
+      }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Comment error: $e')));
     }

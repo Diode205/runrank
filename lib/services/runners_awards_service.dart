@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class AwardWinnerRow {
   final String awardKey;
@@ -54,6 +55,15 @@ class RunnersAwardsService {
       'female_name': femaleName,
       'male_name': maleName,
     });
+
+    // Notify all users when runners-of-the-year winners are updated
+    try {
+      final label = _labelForAward(awardKey);
+      await NotificationService.notifyAllUsers(
+        title: 'Runners of the Year updated',
+        body: '$label winners updated for $year.',
+      );
+    } catch (_) {}
   }
 
   Future<void> updateWinner({
@@ -67,6 +77,14 @@ class RunnersAwardsService {
         .update({'female_name': femaleName, 'male_name': maleName})
         .eq('award_key', awardKey)
         .eq('year', year);
+
+    try {
+      final label = _labelForAward(awardKey);
+      await NotificationService.notifyAllUsers(
+        title: 'Runners of the Year updated',
+        body: '$label winners updated for $year.',
+      );
+    } catch (_) {}
   }
 
   Future<void> deleteWinner({
@@ -78,5 +96,24 @@ class RunnersAwardsService {
         .delete()
         .eq('award_key', awardKey)
         .eq('year', year);
+
+    try {
+      final label = _labelForAward(awardKey);
+      await NotificationService.notifyAllUsers(
+        title: 'Runners of the Year updated',
+        body: '$label winners removed for $year.',
+      );
+    } catch (_) {}
+  }
+
+  String _labelForAward(String awardKey) {
+    switch (awardKey) {
+      case 'runner_of_the_year':
+        return 'Runner of the Year';
+      case 'newcomer_of_the_year':
+        return 'Newcomer of the Year';
+      default:
+        return 'Runners of the Year';
+    }
   }
 }

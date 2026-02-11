@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class ClubRecord {
   final String id;
@@ -202,6 +203,19 @@ class ClubRecordsService {
   Future<bool> addRecord(ClubRecord record) async {
     try {
       await _supabase.from('club_records').insert(record.toJson());
+
+      // Notify all users that a new club record has been set
+      try {
+        final runner = record.runnerName;
+        final distance = record.distance;
+        final time = record.formattedTime;
+        await NotificationService.notifyAllUsers(
+          title: 'New club record set',
+          body: '$runner set a new $distance club record in $time.',
+        );
+      } catch (e) {
+        print('Error sending club record notification: $e');
+      }
       return true;
     } catch (e) {
       print('Error adding club record: $e');

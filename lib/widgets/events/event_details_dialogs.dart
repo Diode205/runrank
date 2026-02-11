@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
+import 'package:runrank/services/notification_service.dart';
 
 // Prevent log spam when backend tables are missing.
 bool _commentsTableMissing = false;
@@ -340,6 +341,29 @@ class HostChatSheetState extends State<HostChatSheet> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        // Notify the original message sender about the new reaction
+        try {
+          final messageRow = await _supabase
+              .from('event_host_messages')
+              .select('sender_id, event_id')
+              .eq('id', messageId)
+              .maybeSingle();
+
+          final senderId = messageRow?['sender_id'] as String?;
+          final eventId = messageRow?['event_id'] as String?;
+
+          if (senderId != null && senderId.isNotEmpty && senderId != user.id) {
+            await NotificationService.notifyUser(
+              userId: senderId,
+              title: 'New reaction on your event message',
+              body: 'Someone reacted $emoji to your host message.',
+              eventId: eventId,
+            );
+          }
+        } catch (e) {
+          debugPrint('❌ Error sending host message reaction notification: $e');
+        }
       }
 
       await _loadMessageReactions();
@@ -996,6 +1020,29 @@ class CommentsSheetState extends State<CommentsSheet> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        // Notify the comment author about the new reaction
+        try {
+          final commentRow = await _supabase
+              .from('event_comments')
+              .select('user_id, event_id')
+              .eq('id', commentId)
+              .maybeSingle();
+
+          final authorId = commentRow?['user_id'] as String?;
+          final eventId = commentRow?['event_id'] as String?;
+
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your event comment',
+              body: 'Someone reacted $emoji to your comment.',
+              eventId: eventId,
+            );
+          }
+        } catch (e) {
+          debugPrint('❌ Error sending comment reaction notification: $e');
+        }
       }
 
       await _loadCommentReactions();

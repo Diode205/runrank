@@ -267,6 +267,23 @@ class NotificationService {
   }
 
   // ---------------------------------------------------------------
+  // DELETE ALL NOTIFICATIONS FOR CURRENT USER
+  // ---------------------------------------------------------------
+  static Future<void> deleteAllNotificationsForCurrentUser() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _supabase.from('notifications').delete().eq('user_id', user.id);
+
+      // Ensure badges/streams update
+      await refreshUnreadCount();
+    } catch (e) {
+      print('DEBUG: Error deleting all notifications: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------
   // EVENT ACTIVITY (UNSEEN EVENTS FOR CLUB HUB)
   // ---------------------------------------------------------------
 

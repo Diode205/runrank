@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/widgets/inline_video_player.dart';
 import 'package:runrank/admin/create_post_page.dart';
@@ -205,6 +206,26 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        // Notify the post author about the new reaction
+        try {
+          final post = posts.firstWhere(
+            (p) => p['id'] == postId,
+            orElse: () => {},
+          );
+          final authorId = post['author_id'] as String?;
+          final title = post['title'] as String? ?? 'a post';
+
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your post',
+              body: 'Someone reacted $emoji on "$title".',
+            );
+          }
+        } catch (e) {
+          debugPrint('Error sending post reaction notification: $e');
+        }
       }
       _loadReactions(postId);
     } catch (e) {
@@ -228,6 +249,26 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       });
       _commentControllers[postId]?.clear();
       _loadComments(postId);
+
+      // Notify the post author about the new comment
+      try {
+        final post = posts.firstWhere(
+          (p) => p['id'] == postId,
+          orElse: () => {},
+        );
+        final authorId = post['author_id'] as String?;
+        final title = post['title'] as String? ?? 'a post';
+
+        if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+          await NotificationService.notifyUser(
+            userId: authorId,
+            title: 'New comment on your post',
+            body: 'Someone commented on "$title".',
+          );
+        }
+      } catch (e) {
+        debugPrint('Error sending post comment notification: $e');
+      }
     } catch (e) {
       debugPrint('Comment error: $e');
     }
