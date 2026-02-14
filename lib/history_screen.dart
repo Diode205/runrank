@@ -469,123 +469,144 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // First line: race name, date, distance
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  r.raceName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onLongPress: () => _showRaceOptions(r),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // First line: race name, date, distance
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        r.raceName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDate(r.raceDate),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      r.distance,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _formatDate(r.raceDate),
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                r.distance,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ],
+                const SizedBox(height: 4),
+                // Second line: time, level, age-grade (age-grade right-aligned)
+                Row(
+                  children: [
+                    const Icon(Icons.timer, size: 16, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      timeString,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.yellow.shade300,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        r.level,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      ageGradeString,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
           ),
-          const SizedBox(height: 4),
-          // Second line: time, level, age-grade (age-grade right-aligned)
-          Row(
+        ),
+      ),
+    );
+  }
+
+  void _showRaceOptions(RaceRecord r) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1D2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.timer, size: 16, color: Colors.white),
-              const SizedBox(width: 4),
-              Text(
-                timeString,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.white70),
+                title: const Text(
+                  'Edit race',
+                  style: TextStyle(color: Colors.white),
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editRaceRecord(r);
+                },
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.yellow.shade300,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  r.level,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                ageGradeString,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          // Actions: Edit / Delete
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: () => _editRaceRecord(r),
-                icon: const Icon(Icons.edit, size: 16, color: Colors.white70),
-                label: const Text(
-                  'Edit',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () => _confirmDeleteRaceRecord(r),
-                icon: const Icon(
+              ListTile(
+                leading: const Icon(
                   Icons.delete_outline,
-                  size: 16,
                   color: Colors.redAccent,
                 ),
-                label: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                title: const Text(
+                  'Delete race',
+                  style: TextStyle(color: Colors.redAccent),
                 ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteRaceRecord(r);
+                },
               ),
+              const SizedBox(height: 4),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
