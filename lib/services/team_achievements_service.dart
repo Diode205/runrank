@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class TeamAchievement {
   final String id;
@@ -59,6 +60,22 @@ class TeamAchievementsService {
   Future<bool> addAchievement(TeamAchievement achievement) async {
     try {
       await _supabase.from('team_achievements').insert(achievement.toJson());
+
+      // Notify all users about the new team achievement so it appears
+      // in the Alerts bar and can deep-link back to this page.
+      try {
+        final dateLabel = achievement.achievementDate.toIso8601String().split(
+          'T',
+        )[0];
+        await NotificationService.notifyAllUsers(
+          title: 'New team achievement added',
+          body:
+              '${achievement.teams} achieved ${achievement.award} at ${achievement.eventName} on $dateLabel.',
+          route: 'team_achievements',
+        );
+      } catch (e) {
+        print('Error sending team achievement notification: $e');
+      }
       return true;
     } catch (e) {
       print('Error adding team achievement: $e');

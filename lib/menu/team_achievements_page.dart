@@ -210,41 +210,49 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        color: Colors.white60,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(achievement.achievementDate),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        achievement.teams,
                         style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
+                          fontSize: 16,
+                          color: Colors.white,
+                          height: 1.4,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  achievement.teams,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    height: 1.5,
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.calendar_today,
+                            color: Colors.white60,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatDate(achievement.achievementDate),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

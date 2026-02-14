@@ -8,6 +8,8 @@ import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
 import 'package:runrank/menu/club_records_page.dart';
+import 'package:runrank/menu/team_achievements_page.dart';
+import 'package:runrank/menu/club_milestones_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -227,6 +229,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           MaterialPageRoute(
             builder: (_) => ClubRecordsPage(initialDistance: initialDistance),
           ),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route == 'team_achievements') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TeamAchievementsPage()),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route == 'club_milestones') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ClubMilestonesPage()),
         ).then((_) => loadData());
         return;
       }

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class ClubMilestone {
   final String id;
@@ -65,6 +66,18 @@ class ClubMilestonesService {
           .from('club_milestones')
           .insert(milestone.toJson());
       print('Milestone added successfully: $response');
+
+      // Notify all users about the new milestone so it appears in Alerts
+      // and can deep-link back to the Club Milestones page.
+      try {
+        await NotificationService.notifyAllUsers(
+          title: 'New club milestone added',
+          body: '${milestone.milestoneDate}: ${milestone.title}',
+          route: 'club_milestones',
+        );
+      } catch (e) {
+        print('Error sending club milestone notification: $e');
+      }
       return true;
     } catch (e) {
       print('Error adding milestone: $e');
