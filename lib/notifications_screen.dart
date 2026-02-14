@@ -213,10 +213,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return;
       }
 
-      if (route == 'club_records') {
+      if (route.startsWith('club_records')) {
+        // Route may be just 'club_records' or 'club_records/<distance>'
+        String? initialDistance;
+        final parts = route.split('/');
+        if (parts.length > 1 && parts[1].isNotEmpty) {
+          // Decode distance token (e.g. 'Half_M' -> 'Half M')
+          initialDistance = parts[1].replaceAll('_', ' ');
+        }
+
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ClubRecordsPage()),
+          MaterialPageRoute(
+            builder: (_) => ClubRecordsPage(initialDistance: initialDistance),
+          ),
         ).then((_) => loadData());
         return;
       }

@@ -209,11 +209,17 @@ class ClubRecordsService {
         final runner = record.runnerName;
         final distance = record.distance;
         final time = record.formattedTime;
+
+        // Encode the distance into the route so Alerts can deep-link
+        // directly to the correct distance tab. Spaces are replaced
+        // with underscores for a route-safe token.
+        final distanceToken = distance.replaceAll(' ', '_');
+
         await NotificationService.notifyAllUsers(
           title: 'New club record set',
           body: '$runner set a new $distance club record in $time.',
-          // Use a route tag so Alerts can deep-link to Club Records
-          route: 'club_records',
+          // e.g. [route:club_records/10K] or [route:club_records/Half_M]
+          route: 'club_records/' + distanceToken,
         );
       } catch (e) {
         print('Error sending club record notification: $e');
