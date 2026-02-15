@@ -45,6 +45,7 @@ class AuthService {
     required String ukaNumber,
     required String club,
     required String membershipType,
+    required String gender,
   }) async {
     try {
       // 1) Create user in Supabase Auth
@@ -75,6 +76,7 @@ class AuthService {
         "uka_number": ukaNumber,
         "club": club,
         "membership_type": membershipType,
+        "gender": gender,
         "is_admin": false,
         "admin_since": null,
         // NEW ▶ store member_since (ISO string from today)

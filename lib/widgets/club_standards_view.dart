@@ -145,6 +145,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     _startImageTimer();
 
     _initAdminAndStatus();
+    _prefillAgeFromProfile();
   }
 
   @override
@@ -169,6 +170,51 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       });
       _imageController.forward(from: 0);
     });
+  }
+
+  Future<void> _prefillAgeFromProfile() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      final row = await client
+          .from('user_profiles')
+          .select('date_of_birth, gender')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (row == null) return;
+      final dobStr = row['date_of_birth'] as String?;
+      if (dobStr == null || dobStr.isEmpty) return;
+
+      final dob = DateTime.tryParse(dobStr);
+      if (dob == null) return;
+
+      final now = DateTime.now();
+      int age = now.year - dob.year;
+      final hasHadBirthdayThisYear =
+          (now.month > dob.month) ||
+          (now.month == dob.month && now.day >= dob.day);
+      if (!hasHadBirthdayThisYear) {
+        age--;
+      }
+
+      if (age <= 0 || age > 120) return;
+
+      if (!mounted) return;
+      setState(() {
+        _ageController.text = age.toString();
+
+        final rawGender = (row['gender'] as String?)?.trim().toUpperCase();
+        if (rawGender != null && (rawGender == 'M' || rawGender == 'F')) {
+          _selectedGender = rawGender;
+        }
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error pre-filling age from profile: $e');
+    }
   }
 
   Future<void> _initAdminAndStatus() async {

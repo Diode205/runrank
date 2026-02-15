@@ -22,6 +22,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
 
   bool loading = false;
   String? selectedMembershipType;
+  String _selectedGender = 'M';
   bool agreeClubPolicy = false;
   bool agreeAppPolicy = false;
   String? _appPrivacyUrl; // Set when available
@@ -59,6 +60,19 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             TextField(
               controller: uka,
               decoration: const InputDecoration(labelText: "UKA Member Number"),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedGender,
+              decoration: const InputDecoration(labelText: 'Gender'),
+              items: const [
+                DropdownMenuItem(value: 'M', child: Text('Male')),
+                DropdownMenuItem(value: 'F', child: Text('Female')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _selectedGender = value);
+              },
             ),
             TextField(
               controller: password,
@@ -130,6 +144,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         ukaNumber: uka.text.trim(),
                         club: widget.selectedClub,
                         membershipType: selectedMembershipType!,
+                        gender: _selectedGender,
                       );
 
                       setState(() => loading = false);
