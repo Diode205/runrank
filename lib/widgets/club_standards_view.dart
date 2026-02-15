@@ -380,8 +380,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     required double ageGrade,
   }) async {
     final raceDate = _selectedRaceDate ?? DateTime.now();
-
-    await AuthService.submitRaceResult(
+    final success = await AuthService.submitRaceResult(
       raceName: race,
       gender: gender,
       age: age,
@@ -391,23 +390,36 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       ageGrade: ageGrade,
       raceDate: raceDate,
     );
+    if (!success) return;
 
-    // For 20M and Ultra, also ensure there is a matching club record
-    // immediately so that the 20M/Ultra Club Records pages and summary
-    // boxes populate without needing a separate sync.
+    // After a successful submission, ensure club records stay in sync.
+    // For 20M/Ultra we always create a matching club record entry so
+    // their pages populate immediately. For standard distances, we only
+    // add a club record when this performance beats the current holder.
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+
+    final recordsService = ClubRecordsService();
+    bool shouldEnsureRecord = false;
+
     if (distance == '20M' || distance == 'Ultra') {
-      final client = Supabase.instance.client;
-      final user = client.auth.currentUser;
-      if (user != null) {
-        final recordsService = ClubRecordsService();
-        await recordsService.ensureRecordForResult(
-          userId: user.id,
-          distance: distance,
-          timeSeconds: seconds,
-          raceName: race,
-          raceDate: raceDate,
-        );
+      shouldEnsureRecord = true;
+    } else {
+      final currentHolder = await recordsService.getClubRecordHolder(distance);
+      if (currentHolder == null || seconds < currentHolder.timeSeconds) {
+        shouldEnsureRecord = true;
       }
+    }
+
+    if (shouldEnsureRecord) {
+      await recordsService.ensureRecordForResult(
+        userId: user.id,
+        distance: distance,
+        timeSeconds: seconds,
+        raceName: race,
+        raceDate: raceDate,
+      );
     }
   }
 
