@@ -2027,7 +2027,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                       ),
                       child: const Text(
-                        'Check\nRace Records',
+                        'View My\nRace Records',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
