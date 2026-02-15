@@ -55,6 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Map<String, List<RaceRecord>> _byDistance = {};
   Map<String, ClubRecord?> _clubRecords = {};
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -161,6 +162,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (!mounted) return;
       setState(() {
         _byDistance = grouped;
+        _currentUserId = user.id;
         _loading = false;
       });
 
@@ -450,117 +452,186 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  bool _isClubRecordRace(RaceRecord r) {
+    final userId = _currentUserId;
+    if (userId == null) return false;
+
+    final clubRecord = _clubRecords[r.distance];
+    if (clubRecord == null) return false;
+    if (clubRecord.userId == null) return false;
+    if (clubRecord.userId != userId) return false;
+
+    final timeSeconds = r.finishSeconds;
+    if (timeSeconds == null) return false;
+
+    return clubRecord.timeSeconds == timeSeconds;
+  }
+
   // ▶️ INDIVIDUAL RECORD CARD — DARK FLOATING GREY
   Widget _buildRecordCard(RaceRecord r) {
     final timeString = formatTime(r.finishSeconds);
     final ageGradeString = 'Age-Grade: ${r.ageGrade.toStringAsFixed(1)}%';
 
+    final isClubRecordRace = _isClubRecordRace(r);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
+        color: isClubRecordRace
+            ? const Color(0xFF351A4A)
+            : const Color(0xFF2A2A2A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF4A78FF), width: 1.5),
+        border: Border.all(
+          color: isClubRecordRace
+              ? const Color(0xFFFFD700)
+              : const Color(0xFF4A78FF),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 6,
+            color: isClubRecordRace
+                ? Colors.deepPurpleAccent.withOpacity(0.4)
+                : Colors.black.withOpacity(0.18),
+            blurRadius: isClubRecordRace ? 10 : 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onLongPress: () => _showRaceOptions(r),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // First line: race name, date, distance
-                Row(
+      child: Stack(
+        children: [
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onLongPress: () => _showRaceOptions(r),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        r.raceName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                    // First line: race name, date, distance
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            r.raceName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDate(r.raceDate),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          r.distance,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatDate(r.raceDate),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
+                    const SizedBox(height: 4),
+                    // Second line: time, level, age-grade (age-grade right-aligned)
+                    Row(
+                      children: [
+                        const Icon(Icons.timer, size: 16, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          timeString,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow.shade300,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            r.level,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          ageGradeString,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      r.distance,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
+                    const SizedBox(height: 4),
                   ],
                 ),
-                const SizedBox(height: 4),
-                // Second line: time, level, age-grade (age-grade right-aligned)
-                Row(
-                  children: [
-                    const Icon(Icons.timer, size: 16, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      timeString,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.yellow.shade300,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        r.level,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      ageGradeString,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
+              ),
             ),
           ),
-        ),
+          if (isClubRecordRace)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.redAccent.withOpacity(0.9),
+                      const Color(0xFFFFD700),
+                    ],
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.emoji_events, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'CLUB RECORD',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
