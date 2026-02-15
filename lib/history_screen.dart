@@ -682,19 +682,69 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (shouldDelete != true) return;
 
     try {
-      // Delete from race_results
-      await client.from('race_results').delete().eq('id', r.id);
-
-      // Also remove any matching club record for this performance
       final user = client.auth.currentUser;
       final timeSeconds = r.finishSeconds;
-      if (user != null && timeSeconds != null) {
-        await client
-            .from('club_records')
+
+      // First, try to delete this exact row by its primary key.
+      try {
+        final deleted = await client
+            .from('race_results')
             .delete()
-            .eq('user_id', user.id)
-            .eq('distance', r.distance)
-            .eq('time_seconds', timeSeconds);
+            .eq('id', r.id)
+            .select();
+        print('DEBUG delete race_results by id (${r.id}): $deleted');
+      } catch (e) {
+        print('DEBUG error deleting race_results by id (${r.id}): $e');
+      }
+
+      // Also delete any matching entries by composite key for safety,
+      // and keep club_records in sync.
+      if (user != null && timeSeconds != null) {
+        try {
+          final deletedByComposite = await client
+              .from('race_results')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('distance', r.distance)
+              .eq('time_seconds', timeSeconds)
+              .select();
+          print(
+            'DEBUG delete race_results by composite key: $deletedByComposite',
+          );
+        } catch (e) {
+          print('DEBUG error deleting race_results by composite key: $e');
+        }
+
+        try {
+          // First, find any club_records rows that match this performance
+          final candidates = await client
+              .from('club_records')
+              .select('id, user_id, distance, time_seconds')
+              .eq('distance', r.distance)
+              .eq('time_seconds', timeSeconds);
+          print('DEBUG club_records candidates for deletion: $candidates');
+
+          // Then delete by id. RLS will ensure that only rows where
+          // user_id = auth.uid() are actually deletable for non-admins.
+          if (candidates is List) {
+            for (final row in candidates) {
+              final id = row['id'] as String?;
+              if (id == null) continue;
+              try {
+                final deletedClub = await client
+                    .from('club_records')
+                    .delete()
+                    .eq('id', id)
+                    .select();
+                print('DEBUG delete club_records by id ($id): $deletedClub');
+              } catch (e) {
+                print('DEBUG error deleting club_records by id ($id): $e');
+              }
+            }
+          }
+        } catch (e) {
+          print('DEBUG error selecting club_records candidates: $e');
+        }
       }
 
       await _fetchRaceHistory();
