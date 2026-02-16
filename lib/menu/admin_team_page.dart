@@ -83,6 +83,26 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _openMemberSelector(
+                    index,
+                    nameController,
+                    emailController,
+                  ),
+                  icon: const Icon(
+                    Icons.search,
+                    color: Color(0xFFFFD700),
+                    size: 18,
+                  ),
+                  label: const Text(
+                    'Search club members',
+                    style: TextStyle(color: Color(0xFFFFD700)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
@@ -127,6 +147,185 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _openMemberSelector(
+    int index,
+    TextEditingController nameController,
+    TextEditingController emailController,
+  ) {
+    if (!_isAdmin) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        final localSearchController = TextEditingController();
+        List<Map<String, dynamic>> results = [];
+        bool searching = false;
+
+        Future<void> doSearch(String term, StateSetter setModalState) async {
+          if (term.trim().length < 2) {
+            setModalState(() {
+              results = [];
+              searching = false;
+            });
+            return;
+          }
+
+          setModalState(() => searching = true);
+          try {
+            final data = await _supabase
+                .from('user_profiles')
+                .select('id, full_name, email, avatar_url, membership_type')
+                .or('full_name.ilike.%$term%,email.ilike.%$term%')
+                .limit(20);
+
+            setModalState(() {
+              results = List<Map<String, dynamic>>.from(data);
+            });
+          } catch (e) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
+          } finally {
+            setModalState(() => searching = false);
+          }
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 20,
+            right: 20,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.search, color: Color(0xFFFFD700)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Select member for ${_committee[index]['role']}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: localSearchController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or email',
+                      hintStyle: const TextStyle(color: Colors.white54),
+                      prefixIcon: const Icon(
+                        Icons.person_search,
+                        color: Colors.white70,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF151828),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.white24),
+                      ),
+                    ),
+                    onChanged: (value) => doSearch(value, setModalState),
+                  ),
+                  const SizedBox(height: 12),
+                  if (searching)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: CircularProgressIndicator(),
+                    )
+                  else if (results.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Start typing to search members',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 320,
+                      child: ListView.separated(
+                        itemCount: results.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(color: Colors.white12, height: 12),
+                        itemBuilder: (_, i) {
+                          final user = results[i];
+                          final avatarUrl =
+                              (user['avatar_url'] as String?) ?? '';
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: const Color(0xFF1E406A),
+                              backgroundImage: avatarUrl.isNotEmpty
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl.isEmpty
+                                  ? const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              user['full_name'] ?? 'Member',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            subtitle: Text(
+                              user['email'] ?? '',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _committee[index]['name'] =
+                                    (user['full_name'] ?? '') as String;
+                                _committee[index]['email'] =
+                                    (user['email'] ?? '') as String;
+                                _committee[index]['userId'] =
+                                    user['id'] as String;
+                                _committee[index]['avatarUrl'] = avatarUrl;
+                              });
+                              nameController.text =
+                                  _committee[index]['name'] ?? '';
+                              emailController.text =
+                                  _committee[index]['email'] ?? '';
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -926,6 +1125,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
               itemBuilder: (context, index) {
                 final member = _committee[index];
                 final hasEmail = (member['email'] ?? '').isNotEmpty;
+                final avatarUrl = member['avatarUrl'] ?? '';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -950,24 +1150,31 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF0055FF),
-                                    Color(0xFF0088FF),
-                                  ],
+                            if (avatarUrl.isNotEmpty)
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: const Color(0xFF1E406A),
+                                backgroundImage: NetworkImage(avatarUrl),
+                              )
+                            else
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF0055FF),
+                                      Color(0xFF0088FF),
+                                    ],
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 24,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Column(
