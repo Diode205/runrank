@@ -272,6 +272,13 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
     );
   }
 
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = (date.year % 100).toString().padLeft(2, '0');
+    return '$day/$month/$year';
+  }
+
   Widget _buildProductCard(KitProduct product) {
     final hasStock = product.stock.values.any((qty) => qty > 0);
 
@@ -339,13 +346,26 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                 ],
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Available Sizes:',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white70,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Available Sizes:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  if (product.updatedAt != null)
+                    Text(
+                      'Updated: ${_formatDate(product.updatedAt!)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               SingleChildScrollView(

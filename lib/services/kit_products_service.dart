@@ -7,6 +7,7 @@ class KitProduct {
   final double price;
   final String stripeUrl;
   final Map<String, int> stock; // Size -> quantity
+  final DateTime? updatedAt;
 
   KitProduct({
     required this.id,
@@ -15,6 +16,7 @@ class KitProduct {
     required this.price,
     required this.stripeUrl,
     required this.stock,
+    this.updatedAt,
   });
 
   factory KitProduct.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,9 @@ class KitProduct {
         'XL': json['stock_xl'] as int? ?? 0,
         'XXL': json['stock_xxl'] as int? ?? 0,
       },
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
     );
   }
 
@@ -60,17 +65,22 @@ class KitProductsService {
           .from('kit_products')
           .select()
           .eq('category', category)
-          .order('product_name', ascending: true);
+          .order('product_name', ascending: true)
+          .order('updated_at', ascending: false)
+          .order('created_at', ascending: false);
 
-      final products = (response as List)
-          .map((json) => KitProduct.fromJson(json))
-          .toList();
+      final rows = response as List;
+      final seenNames = <String>{};
+      final products = <KitProduct>[];
 
-      // Remove duplicates based on product name
-      final seen = <String>{};
-      return products
-          .where((product) => seen.add(product.productName))
-          .toList();
+      for (final row in rows) {
+        final product = KitProduct.fromJson(row as Map<String, dynamic>);
+        if (seenNames.add(product.productName)) {
+          products.add(product);
+        }
+      }
+
+      return products;
     } catch (e) {
       print('Error fetching products: $e');
       return [];
