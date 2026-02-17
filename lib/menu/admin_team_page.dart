@@ -17,8 +17,10 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _searching = false;
+  bool _committeeLoaded = false;
 
   final List<Map<String, String>> _committee = [
+    // Initial defaults; will be overridden by committee_roles table if present
     {'role': 'President', 'name': 'Noel Spruce', 'email': ''},
     {
       'role': 'Chairperson',
@@ -51,6 +53,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   void initState() {
     super.initState();
     _loadAdmin();
+    _loadCommitteeFromDb();
   }
 
   @override
@@ -62,6 +65,46 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadCommitteeFromDb() async {
+    try {
+      final data = await _supabase
+          .from('committee_roles')
+          .select('id, role, name, email, user_id, avatar_url')
+          .order('display_order', ascending: true);
+
+      if (!mounted) return;
+
+      if (data is List && data.isNotEmpty) {
+        setState(() {
+          _committee.clear();
+          for (final row in data) {
+            final map = row as Map<String, dynamic>;
+            _committee.add({
+              'id': (map['id'] ?? '').toString(),
+              'role': (map['role'] ?? '').toString(),
+              'name': (map['name'] ?? '').toString(),
+              'email': (map['email'] ?? '').toString(),
+              'userId': (map['user_id'] ?? '').toString(),
+              'avatarUrl': (map['avatar_url'] ?? '').toString(),
+            });
+          }
+          _committeeLoaded = true;
+        });
+      } else {
+        setState(() {
+          _committeeLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading committee roles: $e');
+      if (mounted) {
+        setState(() {
+          _committeeLoaded = true;
+        });
+      }
+    }
   }
 
   void _editMember(int index) {
@@ -132,12 +175,35 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              final newEmail = emailController.text.trim();
+
               setState(() {
-                _committee[index]['name'] = nameController.text.trim();
-                _committee[index]['email'] = emailController.text.trim();
+                _committee[index]['name'] = newName;
+                _committee[index]['email'] = newEmail;
               });
               Navigator.pop(context);
+
+              // Persist change to Supabase if this role exists in committee_roles
+              final id = _committee[index]['id'];
+              try {
+                if (id != null && id.isNotEmpty) {
+                  await _supabase
+                      .from('committee_roles')
+                      .update({
+                        'name': newName,
+                        'email': newEmail,
+                        'user_id': (_committee[index]['userId'] ?? '').isEmpty
+                            ? null
+                            : _committee[index]['userId'],
+                        'avatar_url': _committee[index]['avatarUrl'] ?? '',
+                      })
+                      .eq('id', id);
+                }
+              } catch (e) {
+                debugPrint('Error updating committee role: $e');
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFFD700),
@@ -1119,172 +1185,179 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: _committee.length,
-              itemBuilder: (context, index) {
-                final member = _committee[index];
-                final hasEmail = (member['email'] ?? '').isNotEmpty;
-                final avatarUrl = member['avatarUrl'] ?? '';
+            child: !_committeeLoaded
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: _committee.length,
+                    itemBuilder: (context, index) {
+                      final member = _committee[index];
+                      final hasEmail = (member['email'] ?? '').isNotEmpty;
+                      final avatarUrl = member['avatarUrl'] ?? '';
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.08),
-                        Colors.white.withOpacity(0.02),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFF0055FF).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.08),
+                              Colors.white.withOpacity(0.02),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFF0055FF).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Stack(
                           children: [
-                            if (avatarUrl.isNotEmpty)
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: const Color(0xFF1E406A),
-                                backgroundImage: NetworkImage(avatarUrl),
-                              )
-                            else
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF0055FF),
-                                      Color(0xFF0088FF),
-                                    ],
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    member['role'] ?? '',
-                                    style: const TextStyle(
-                                      color: Color(0xFF56D3FF),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    member['name'] ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  if (hasEmail)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Text(
-                                        member['email'] ?? '',
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12,
+                                  if (avatarUrl.isNotEmpty)
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: const Color(0xFF1E406A),
+                                      backgroundImage: NetworkImage(avatarUrl),
+                                    )
+                                  else
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF0055FF),
+                                            Color(0xFF0088FF),
+                                          ],
                                         ),
                                       ),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
                                     ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          member['role'] ?? '',
+                                          style: const TextStyle(
+                                            color: Color(0xFF56D3FF),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          member['name'] ?? '',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        if (hasEmail)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Text(
+                                              member['email'] ?? '',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    width: 40,
+                                  ), // Space for buttons
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 40), // Space for buttons
+                            // Edit button (top right corner)
+                            if (_isAdmin)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _editMember(index),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFFFFD700,
+                                        ).withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFFFFD700,
+                                          ).withOpacity(0.4),
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit,
+                                        color: Color(0xFFFFD700),
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            // Mail button (bottom right corner)
+                            if (hasEmail)
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _showContactForm(index),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF56D3FF,
+                                        ).withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFF56D3FF,
+                                          ).withOpacity(0.4),
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.send,
+                                        color: Color(0xFF56D3FF),
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                      ),
-                      // Edit button (top right corner)
-                      if (_isAdmin)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => _editMember(index),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFFFFD700,
-                                  ).withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(
-                                      0xFFFFD700,
-                                    ).withOpacity(0.4),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  color: Color(0xFFFFD700),
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Mail button (bottom right corner)
-                      if (hasEmail)
-                        Positioned(
-                          bottom: 8,
-                          right: 8,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => _showContactForm(index),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF56D3FF,
-                                  ).withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(
-                                      0xFF56D3FF,
-                                    ).withOpacity(0.4),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.send,
-                                  color: Color(0xFF56D3FF),
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
