@@ -101,19 +101,26 @@ class KitProductsService {
     }
   }
 
-  Future<bool> updateProductStock(String id, Map<String, int> stock) async {
+  Future<bool> updateProductStock(
+    String id,
+    Map<String, int> stock, {
+    double? price,
+  }) async {
     try {
-      await _supabase
-          .from('kit_products')
-          .update({
-            'stock_xs': stock['XS'] ?? 0,
-            'stock_s': stock['S'] ?? 0,
-            'stock_m': stock['M'] ?? 0,
-            'stock_l': stock['L'] ?? 0,
-            'stock_xl': stock['XL'] ?? 0,
-            'stock_xxl': stock['XXL'] ?? 0,
-          })
-          .eq('id', id);
+      final updateData = <String, dynamic>{
+        'stock_xs': stock['XS'] ?? 0,
+        'stock_s': stock['S'] ?? 0,
+        'stock_m': stock['M'] ?? 0,
+        'stock_l': stock['L'] ?? 0,
+        'stock_xl': stock['XL'] ?? 0,
+        'stock_xxl': stock['XXL'] ?? 0,
+      };
+
+      if (price != null) {
+        updateData['price'] = price;
+      }
+
+      await _supabase.from('kit_products').update(updateData).eq('id', id);
       return true;
     } catch (e) {
       print('Error updating stock: $e');

@@ -91,10 +91,14 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
       );
     }
 
+    final priceController = TextEditingController(
+      text: product.price.toStringAsFixed(2),
+    );
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D2E),
+        backgroundColor: const Color.fromARGB(255, 51, 75, 213),
         title: Text(
           'Edit ${product.productName}',
           style: const TextStyle(color: Color(0xFFFFD700)),
@@ -103,6 +107,20 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: TextField(
+                  controller: priceController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Price (£)',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
               ...controllers.entries.map(
                 (entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -135,9 +153,14 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                 updatedStock[size] = int.tryParse(controller.text) ?? 0;
               });
 
+              final rawPrice = priceController.text.trim().replaceAll('£', '');
+              double? newPrice = double.tryParse(rawPrice);
+              newPrice ??= product.price;
+
               final success = await _service.updateProductStock(
                 product.id,
                 updatedStock,
+                price: newPrice,
               );
               if (success && mounted) {
                 Navigator.pop(context);
@@ -408,10 +431,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                           Text(
                             '$qty',
                             style: TextStyle(
-                              fontSize: 10,
-                              color: inStock
-                                  ? const Color(0xFF0055FF)
-                                  : Colors.redAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: inStock ? Colors.white : Colors.redAccent,
                             ),
                           ),
                         ],
