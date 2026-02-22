@@ -34,9 +34,18 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // Image carousel
   late Timer _imageTimer;
   int _currentImageIndex = 0;
-  final List<String> _carouselImages = [
-    'assets/images/nrr1.png',
-    'assets/images/nrr2.png',
+  List<String> _carouselImages = [
+    'assets/images/pic1.png',
+    'assets/images/pic2.png',
+    'assets/images/pic3.png',
+    'assets/images/pic4.png',
+    'assets/images/pic5.png',
+    'assets/images/pic6.png',
+    'assets/images/pic7.png',
+    'assets/images/pic8.png',
+    'assets/images/pic9.png',
+    'assets/images/pic10.png',
+    'assets/images/pic11.png',
   ];
   late AnimationController _imageController;
   late Animation<double> _imageFadeAnimation;
@@ -206,6 +215,28 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         final club = row['club'] as String?;
         if (club != null && club.isNotEmpty) {
           _clubName = club;
+
+          final lowerClub = club.toLowerCase();
+          if (lowerClub.contains('norwich road runners')) {
+            _carouselImages = [
+              'assets/images/nrr1.png',
+              'assets/images/nrr2.png',
+            ];
+          } else {
+            _carouselImages = [
+              'assets/images/pic1.png',
+              'assets/images/pic2.png',
+              'assets/images/pic3.png',
+              'assets/images/pic4.png',
+              'assets/images/pic5.png',
+              'assets/images/pic6.png',
+              'assets/images/pic7.png',
+              'assets/images/pic8.png',
+              'assets/images/pic9.png',
+              'assets/images/pic10.png',
+              'assets/images/pic11.png',
+            ];
+          }
         }
       });
     } catch (e) {
@@ -1974,16 +2005,34 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             // TOP CLUB PHOTO (static)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/images/NRRmain.png',
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.center,
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                child: Builder(
+                  builder: (context) {
+                    final isNRR =
+                        _clubName != null &&
+                        _clubName!.toLowerCase().contains(
+                          'norwich road runners',
+                        );
+
+                    // Common container with rounded corners & clipping so
+                    // both clubs get visibly rounded images.
+                    return Container(
+                      height: isNRR ? 180 : 150,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.black,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        isNRR
+                            ? 'assets/images/NRRmain.png'
+                            : 'assets/images/nnbr_cover.png',
+                        width: double.infinity,
+                        fit: isNRR ? BoxFit.cover : BoxFit.contain,
+                        alignment: Alignment.center,
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -1991,7 +2040,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             // INPUT FORM
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -2069,70 +2118,40 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       bottomNavigationBar: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         color: Colors.black,
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD32F2F), // red background
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white70, width: 1.5),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black45,
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: ElevatedButton(
-                  onPressed: _onCalculate,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
+        child: Builder(
+          builder: (context) {
+            final isNRR =
+                _clubName != null &&
+                _clubName!.toLowerCase().contains('norwich road runners');
+
+            return Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isNRR
+                          ? const Color(0xFFD32F2F) // red for NRR
+                          : const Color(0xFFFFC107), // yellow for NNBR
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isNRR ? Colors.white70 : Colors.black87,
+                        width: 1.5,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
-                  ),
-                  child: const Text(
-                    'Check\nAchievement',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black87, width: 1.5),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => HistoryScreen()),
-                        );
-                      },
+                    child: ElevatedButton(
+                      onPressed: _onCalculate,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.black,
+                        foregroundColor: isNRR
+                            ? Colors.white
+                            : Colors.black, // text color
                         shadowColor: Colors.transparent,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -2140,7 +2159,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                       ),
                       child: const Text(
-                        'View My\nRace Records',
+                        'Check\nAchievement',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
@@ -2148,42 +2167,99 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                       ),
                     ),
-                    if (_showBadgeOnRecordsButton)
-                      Positioned(
-                        top: -6,
-                        right: -6,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                _levelColor(_awardLevel!),
-                                const Color(0xFF001133),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black54,
-                                blurRadius: 8,
-                                offset: Offset(0, 3),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isNRR
+                          ? Colors.white
+                          : const Color(0xFF0D47A1), // deeper blue for NNBR
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isNRR ? Colors.black87 : Colors.white70,
+                        width: 1.5,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => HistoryScreen(),
                               ),
-                            ],
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: isNRR
+                                ? Colors.black
+                                : Colors.white,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.emoji_events,
-                            size: 18,
-                            color: Colors.white,
+                          child: const Text(
+                            'View My\nRace Records',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                        if (_showBadgeOnRecordsButton)
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    _levelColor(_awardLevel!),
+                                    const Color(0xFF001133),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.emoji_events,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
