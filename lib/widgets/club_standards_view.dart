@@ -35,17 +35,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   late Timer _imageTimer;
   int _currentImageIndex = 0;
   final List<String> _carouselImages = [
-    'assets/images/pic1.png',
-    'assets/images/pic2.png',
-    'assets/images/pic3.png',
-    'assets/images/pic4.png',
-    'assets/images/pic5.png',
-    'assets/images/pic6.png',
-    'assets/images/pic7.png',
-    'assets/images/pic8.png',
-    'assets/images/pic9.png',
-    'assets/images/pic10.png',
-    'assets/images/pic11.png',
+    'assets/images/nrr1.png',
+    'assets/images/nrr2.png',
   ];
   late AnimationController _imageController;
   late Animation<double> _imageFadeAnimation;
@@ -94,6 +85,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   String _selectedDistance = '5K';
   String _selectedGender = 'M';
   String? _resultMessage;
+  String? _clubName;
 
   // Award / badge state
   bool _loadingAwardStatus = false;
@@ -180,7 +172,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       final row = await client
           .from('user_profiles')
-          .select('date_of_birth, gender')
+          .select('date_of_birth, gender, club')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -210,11 +202,55 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         if (rawGender != null && (rawGender == 'M' || rawGender == 'F')) {
           _selectedGender = rawGender;
         }
+
+        final club = row['club'] as String?;
+        if (club != null && club.isNotEmpty) {
+          _clubName = club;
+        }
       });
     } catch (e) {
       // ignore: avoid_print
       print('Error pre-filling age from profile: $e');
     }
+  }
+
+  String _clubStandardsDescription() {
+    final club = (_clubName ?? '').toLowerCase();
+
+    if (club.contains('norwich road runners')) {
+      return 'NRR Club Standards require members to achieve qualifying times '
+          'in five of seven races over a calendar year to earn an award.\n\n'
+          'Qualifying races are UKA licensed events. Parkruns and training runs do not count.\n\n'
+          'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
+          'Awards will be presented at the Annual Awards evening.';
+    }
+
+    // Default / NNBR wording
+    return 'NNBR Club Standards require members to achieve qualifying times '
+        'in four of six distances over a calendar year to earn an award.\n\n'
+        'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
+        'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
+        'Awards will be presented at the Annual Awards evening.';
+  }
+
+  String _clubStandardsUrl() {
+    final club = (_clubName ?? '').toLowerCase();
+
+    if (club.contains('norwich road runners')) {
+      return 'https://norwichroadrunners.co.uk/club-standards-1';
+    }
+
+    return 'https://www.northnorfolkbeachrunners.com/club-standards';
+  }
+
+  String _clubStandardsLinkLabel() {
+    final club = (_clubName ?? '').toLowerCase();
+
+    if (club.contains('norwich road runners')) {
+      return 'View full club standards on NRR website';
+    }
+
+    return 'View full club standards on NNBR website';
   }
 
   Future<void> _initAdminAndStatus() async {
@@ -1091,9 +1127,33 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // ---------------------------------------------------------
   Future<Map<String, List<String>>> _loadAllAwardsSnapshot() async {
     final client = Supabase.instance.client;
-    final rows = await client
-        .from('race_results')
-        .select('user_id, distance, level, raceDate');
+    // Restrict to the current admin's club if known
+    Set<String>? allowedUserIds;
+    final clubName = _clubName;
+    if (clubName != null && clubName.isNotEmpty) {
+      final profileRows = await client
+          .from('user_profiles')
+          .select('id')
+          .eq('club', clubName);
+
+      allowedUserIds = {
+        for (final p in profileRows)
+          if (p['id'] is String) p['id'] as String,
+      };
+
+      if (allowedUserIds.isEmpty) {
+        return {};
+      }
+    }
+
+    final rows = allowedUserIds == null
+        ? await client
+              .from('race_results')
+              .select('user_id, distance, level, raceDate')
+        : await client
+              .from('race_results')
+              .select('user_id, distance, level, raceDate')
+              .inFilter('user_id', allowedUserIds.toList());
 
     final Map<String, Map<String, String>> perUserBestByDistance = {};
 
@@ -1332,10 +1392,39 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   Future<String?> _buildAgeGradeTopsReport() async {
     final client = Supabase.instance.client;
-    final rows = await client
-        .from('race_results')
-        .select('user_id, race_name, distance, age_grade, level, raceDate')
-        .order('raceDate', ascending: false);
+    // Restrict to the current admin's club if known
+    Set<String>? allowedUserIds;
+    final clubName = _clubName;
+    if (clubName != null && clubName.isNotEmpty) {
+      final profileRows = await client
+          .from('user_profiles')
+          .select('id')
+          .eq('club', clubName);
+
+      allowedUserIds = {
+        for (final p in profileRows)
+          if (p['id'] is String) p['id'] as String,
+      };
+
+      if (allowedUserIds.isEmpty) {
+        return null;
+      }
+    }
+
+    final rows = allowedUserIds == null
+        ? await client
+              .from('race_results')
+              .select(
+                'user_id, race_name, distance, age_grade, level, raceDate',
+              )
+              .order('raceDate', ascending: false)
+        : await client
+              .from('race_results')
+              .select(
+                'user_id, race_name, distance, age_grade, level, raceDate',
+              )
+              .inFilter('user_id', allowedUserIds.toList())
+              .order('raceDate', ascending: false);
 
     if (rows.isEmpty) return null;
 
@@ -1453,14 +1542,43 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     );
     final weekEndDate = weekStartDate.add(const Duration(days: 7));
 
-    final rows = await client
-        .from('race_results')
-        .select(
-          'user_id, race_name, distance, age_grade, level, raceDate, time_seconds',
-        )
-        .gte('raceDate', weekStartDate.toIso8601String())
-        .lt('raceDate', weekEndDate.toIso8601String())
-        .order('raceDate', ascending: true);
+    // Restrict to the current admin's club if known
+    Set<String>? allowedUserIds;
+    final clubName = _clubName;
+    if (clubName != null && clubName.isNotEmpty) {
+      final profileRows = await client
+          .from('user_profiles')
+          .select('id')
+          .eq('club', clubName);
+
+      allowedUserIds = {
+        for (final p in profileRows)
+          if (p['id'] is String) p['id'] as String,
+      };
+
+      if (allowedUserIds.isEmpty) {
+        return null;
+      }
+    }
+
+    final rows = allowedUserIds == null
+        ? await client
+              .from('race_results')
+              .select(
+                'user_id, race_name, distance, age_grade, level, raceDate, time_seconds',
+              )
+              .gte('raceDate', weekStartDate.toIso8601String())
+              .lt('raceDate', weekEndDate.toIso8601String())
+              .order('raceDate', ascending: true)
+        : await client
+              .from('race_results')
+              .select(
+                'user_id, race_name, distance, age_grade, level, raceDate, time_seconds',
+              )
+              .inFilter('user_id', allowedUserIds.toList())
+              .gte('raceDate', weekStartDate.toIso8601String())
+              .lt('raceDate', weekEndDate.toIso8601String())
+              .order('raceDate', ascending: true);
 
     if (rows.isEmpty) return null;
 
@@ -1624,7 +1742,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             icon: const Icon(Icons.workspace_premium, size: 18),
             label: const Text('Latest Club Standard Awardees'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent.withValues(alpha: 0.85),
+              backgroundColor: Colors.pinkAccent,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1853,18 +1971,18 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               ),
             ),
 
-            // TOP NNBR PHOTO (static)
+            // TOP CLUB PHOTO (static)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.asset(
-                    'assets/images/nnbr_cover.png',
-                    height: 160,
+                    'assets/images/NRRmain.png',
+                    height: 180,
                     width: double.infinity,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.bottomRight,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
                   ),
                 ),
               ),
@@ -1916,14 +2034,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                 delegate: SliverChildListDelegate([
                   _buildInfoSection(
                     'Club Standards',
-                    'NNBR Club Standards require members to achieve qualifying times '
-                        'in four of six distances over a calendar year to earn an award.\n\n'
-                        'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
-                        'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
-                        'Awards will be presented at the Annual Awards evening.',
-                    url:
-                        'https://www.northnorfolkbeachrunners.com/club-standards',
-                    linkLabel: 'View full club standards on NNBR website',
+                    _clubStandardsDescription(),
+                    url: _clubStandardsUrl(),
+                    linkLabel: _clubStandardsLinkLabel(),
                   ),
                   _buildInfoSection(
                     'Age-Grading',
@@ -1961,12 +2074,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.yellow.withValues(alpha: 0.55),
+                  color: const Color(0xFFD32F2F), // red background
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white30, width: 1.5),
-                  boxShadow: [
+                  border: Border.all(color: Colors.white70, width: 1.5),
+                  boxShadow: const [
                     BoxShadow(
-                      color: Colors.yellow.withValues(alpha: 0.3),
+                      color: Colors.black45,
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -1976,7 +2089,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   onPressed: _onCalculate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     shadowColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -1995,12 +2108,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.blueAccent.withValues(alpha: 0.55),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white30, width: 1.5),
-                  boxShadow: [
+                  border: Border.all(color: Colors.black87, width: 1.5),
+                  boxShadow: const [
                     BoxShadow(
-                      color: Colors.blueAccent.withValues(alpha: 0.3),
+                      color: Colors.black26,
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -2019,7 +2132,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Colors.black,
                         shadowColor: Colors.transparent,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(

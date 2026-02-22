@@ -13,6 +13,17 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
   final TextEditingController _codeController = TextEditingController();
   String? _error;
 
+  static const Map<String, String> _clubVerificationCodes = {
+    // Format: first letters (capitalised) + 2026
+    'NNBR (North Norfolk Beach Runners)': 'NNBR2026',
+    'Generic Running Club': 'GRC2026',
+    'Aylsham Runners': 'AR2026',
+    'Norfolk Gazelles': 'NG2026',
+    'Norwich Road Runners': 'NRR2026',
+    'Runners-next-the-Sea': 'RNTS2026',
+    'Wymondham Athletic Club': 'WAC2026',
+  };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -44,7 +55,12 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                if (_codeController.text.trim() == "NNBR2025") {
+                final enteredCode = _codeController.text.trim().toUpperCase();
+                final expectedCode =
+                    _clubVerificationCodes[widget.selectedClub] ?? '';
+
+                if (enteredCode.isNotEmpty &&
+                    enteredCode == expectedCode.toUpperCase()) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(

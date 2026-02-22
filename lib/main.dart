@@ -13,6 +13,7 @@ import 'package:runrank/app_routes.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/painting.dart' as painting;
 import 'package:runrank/services/payment_service.dart';
+import 'package:runrank/services/club_config_service.dart';
 import 'dart:io';
 
 // Global RouteObserver to support auto-refresh on page resume
@@ -155,89 +156,97 @@ class _LifecycleProbeState extends State<LifecycleProbe>
   Widget build(BuildContext context) => widget.child;
 }
 
-class RunRankApp extends StatelessWidget {
+class RunRankApp extends StatefulWidget {
   const RunRankApp({super.key});
 
   @override
+  State<RunRankApp> createState() => _RunRankAppState();
+}
+
+class _RunRankAppState extends State<RunRankApp> {
+  ClubConfig? _clubConfig;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClubConfig();
+  }
+
+  Future<void> _loadClubConfig() async {
+    final config = await ClubConfigService.loadForCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      _clubConfig = config;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final primaryColor = _clubConfig?.primaryColor ?? const Color(0xFFFFD300);
+    final accentColor = _clubConfig?.accentColor ?? const Color(0xFF0057B7);
+    final backgroundColor = _clubConfig?.backgroundColor ?? Colors.black;
+
     return MaterialApp(
       title: 'RunRank',
       debugShowCheckedModeBanner: false,
-
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: backgroundColor,
         useMaterial3: true,
-
         colorScheme: ColorScheme.dark(
-          primary: Color(0xFFFFD300), // NNBR Yellow
-          secondary: Color(0xFF0057B7), // NNBR Blue
+          primary: primaryColor,
+          secondary: accentColor,
           surface: Colors.grey.shade900,
-          background: Colors.black,
+          background: backgroundColor,
         ),
-
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
+        appBarTheme: AppBarTheme(
+          backgroundColor: backgroundColor,
           foregroundColor: Colors.white,
           centerTitle: true,
           elevation: 0,
         ),
-
         textTheme: const TextTheme(
           bodyMedium: TextStyle(color: Colors.white),
           bodyLarge: TextStyle(color: Colors.white),
           titleLarge: TextStyle(color: Colors.white),
         ),
-
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: Colors.black,
-          indicatorColor: Color(0xFF0057B7).withOpacity(0.3),
-          labelTextStyle: const MaterialStatePropertyAll(
-            TextStyle(color: Color(0xFFFFD300)),
+          backgroundColor: backgroundColor,
+          indicatorColor: primaryColor.withOpacity(0.3),
+          labelTextStyle: MaterialStatePropertyAll(
+            TextStyle(color: accentColor),
           ),
-          iconTheme: const MaterialStatePropertyAll(
-            IconThemeData(color: Color(0xFFFFD300)),
+          iconTheme: MaterialStatePropertyAll(
+            IconThemeData(color: accentColor),
           ),
         ),
-
-        // ⭐ FINAL MERGED INPUT THEME (only one!)
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF1A1A1A),
-
           labelStyle: const TextStyle(color: Colors.white70),
           hintStyle: const TextStyle(color: Colors.white38),
-
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Colors.white24),
           ),
-
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF0057B7)), // Blue
+            borderSide: BorderSide(color: accentColor),
           ),
-
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: Color(0xFFFFD300), // Yellow
-              width: 2,
-            ),
+            borderSide: BorderSide(color: primaryColor, width: 2),
           ),
-
           errorBorder: const OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(14)),
             borderSide: BorderSide(color: Colors.redAccent),
           ),
-
           focusedErrorBorder: const OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(14)),
             borderSide: BorderSide(color: Colors.redAccent, width: 2),
           ),
         ),
       ),
-
       routes: AppRoutes.routes,
       navigatorObservers: [routeObserver],
       home: const SplashScreen(nextPage: AuthGate()),

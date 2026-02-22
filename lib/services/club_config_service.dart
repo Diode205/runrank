@@ -21,6 +21,7 @@ class ClubConfig {
   });
 
   ClubConfig copyWith({
+    String? name,
     Color? primaryColor,
     Color? accentColor,
     Color? backgroundColor,
@@ -29,7 +30,7 @@ class ClubConfig {
   }) {
     return ClubConfig(
       id: id,
-      name: name,
+      name: name ?? this.name,
       primaryColor: primaryColor ?? this.primaryColor,
       accentColor: accentColor ?? this.accentColor,
       backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -64,7 +65,7 @@ class ClubConfigService {
       final clubName = (profile?['club'] ?? '').toString();
       if (clubName.isEmpty) return _fallback;
 
-      final clubRow = await _supabase
+      final dynamic clubRowDynamic = await _supabase
           .from('app_clubs')
           .select(
             'id, name, primary_color, accent_color, background_color, logo_url, hero_image_url',
@@ -72,23 +73,25 @@ class ClubConfigService {
           .eq('name', clubName)
           .maybeSingle();
 
-      if (clubRow == null) {
+      if (clubRowDynamic == null) {
         return _fallback.copyWith(name: clubName);
       }
+
+      final clubRow = clubRowDynamic as Map<String, dynamic>;
 
       final id = (clubRow['id'] ?? '').toString();
       final name = (clubRow['name'] ?? clubName).toString();
 
       final primary = _parseColor(
-        clubRow['primary_color'] as String?,
+        clubRow['primary_color']?.toString(),
         _fallback.primaryColor,
       );
       final accent = _parseColor(
-        clubRow['accent_color'] as String?,
+        clubRow['accent_color']?.toString(),
         _fallback.accentColor,
       );
       final background = _parseColor(
-        clubRow['background_color'] as String?,
+        clubRow['background_color']?.toString(),
         _fallback.backgroundColor,
       );
 
@@ -98,8 +101,8 @@ class ClubConfigService {
         primaryColor: primary,
         accentColor: accent,
         backgroundColor: background,
-        logoUrl: clubRow['logo_url'] as String?,
-        heroImageUrl: clubRow['hero_image_url'] as String?,
+        logoUrl: clubRow['logo_url']?.toString(),
+        heroImageUrl: clubRow['hero_image_url']?.toString(),
       );
     } catch (e) {
       debugPrint('Error loading club config: $e');

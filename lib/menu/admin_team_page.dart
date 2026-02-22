@@ -15,6 +15,7 @@ class AdministrativeTeamPage extends StatefulWidget {
 class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   final _supabase = Supabase.instance.client;
   bool _isAdmin = false;
+  String? _adminClub;
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _searching = false;
@@ -54,8 +55,30 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   }
 
   Future<void> _loadAdmin() async {
-    _isAdmin = await UserService.isAdmin();
-    if (mounted) setState(() {});
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+          _adminClub = null;
+        });
+      }
+      return;
+    }
+
+    final row = await _supabase
+        .from('user_profiles')
+        .select('is_admin, club')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (mounted) {
+      setState(() {
+        _isAdmin = row != null && row['is_admin'] == true;
+        final club = row?['club'] as String?;
+        _adminClub = (club != null && club.isNotEmpty) ? club : null;
+      });
+    }
   }
 
   Future<void> _loadClubConfig() async {
@@ -245,9 +268,17 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
           setModalState(() => searching = true);
           try {
-            final data = await _supabase
+            final clubName = _adminClub;
+
+            var query = _supabase
                 .from('user_profiles')
-                .select('id, full_name, email, avatar_url, membership_type')
+                .select('id, full_name, email, avatar_url, membership_type');
+
+            if (clubName != null && clubName.isNotEmpty) {
+              query = query.eq('club', clubName);
+            }
+
+            final data = await query
                 .or('full_name.ilike.%$term%,email.ilike.%$term%')
                 .limit(20);
 
@@ -407,11 +438,19 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
     setModalState(() => _searching = true);
     try {
-      final data = await _supabase
+      final clubName = _adminClub;
+
+      var query = _supabase
           .from('user_profiles')
           .select(
-            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason',
-          )
+            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason, club',
+          );
+
+      if (clubName != null && clubName.isNotEmpty) {
+        query = query.eq('club', clubName);
+      }
+
+      final data = await query
           .or('full_name.ilike.%$term%,email.ilike.%$term%')
           .limit(20);
 

@@ -48,35 +48,4 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/club_history_runner.jpg
-    - assets/images/nnbr_logo.png
-    - assets/images/rank_logo.png
-    - assets/images/nnbr_cover.png
-    - assets/images/eaccl.jpg
-    - assets/images/firstclaim.png
-    - assets/images/secondclaim.png
-    - assets/images/socialclaim.png
-    - assets/images/fulleduc.png
-    - assets/images/holt10.png
-    - assets/images/worstead5m.png
-    - assets/images/chasetrain.jpg
-    - assets/images/nnbrdocs.png
-    - assets/images/pic1.png
-    - assets/images/pic2.png
-    - assets/images/pic3.png
-    - assets/images/pic4.png
-    - assets/images/pic5.png
-    - assets/images/pic6.png
-    - assets/images/pic7.png
-    - assets/images/pic8.png
-    - assets/images/pic9.png
-    - assets/images/pic10.png
-    - assets/images/pic11.png
-    - assets/images/malcolmball.png
-    - assets/images/app_icon_round.png
-    - assets/images/screenrank_logo.png
-    - assets/images/awards.png
-    - assets/images/handicappic.png
-    - assets/images/RNR26.png
-    - assets/images/rnr.png
-    - assets/images/ekidenpic.png
+    - assets/images/
