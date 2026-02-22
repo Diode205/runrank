@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/services/club_config_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdministrativeTeamPage extends StatefulWidget {
@@ -18,35 +19,24 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   List<Map<String, dynamic>> _searchResults = [];
   bool _searching = false;
   bool _committeeLoaded = false;
+  ClubConfig? _clubConfig;
 
   final List<Map<String, String>> _committee = [
-    // Initial defaults; will be overridden by committee_roles table if present
-    {'role': 'President', 'name': 'Noel Spruce', 'email': ''},
-    {
-      'role': 'Chairperson',
-      'name': 'Ness Dent',
-      'email': 'chairperson@nnbr.co.uk',
-    },
-    {'role': 'Vice-Chairperson', 'name': 'Richard West', 'email': ''},
-    {'role': 'Secretary', 'name': 'Gav Dent', 'email': 'secretary@nnbr.co.uk'},
-    {
-      'role': 'Treasurer',
-      'name': 'Peter Hill',
-      'email': 'treasurer@nnbr.co.uk',
-    },
-    {'role': 'Membership Secretary', 'name': 'Libby Ashton', 'email': ''},
-    {
-      'role': 'Minutes Secretary',
-      'name': 'Rachel Welch',
-      'email': 'minutes_secretary@nnbr.co.uk',
-    },
-    {'role': 'Clothing Manager', 'name': 'Sarah Morter', 'email': ''},
-    {'role': 'Club Head Coach', 'name': 'Karen Balcombe', 'email': ''},
-    {'role': 'Equipment Store Manager', 'name': 'Phil King', 'email': ''},
-    {'role': 'General Committee Member', 'name': 'Neil Adams', 'email': ''},
-    {'role': 'General Committee Member', 'name': 'Tony Witmond', 'email': ''},
-    {'role': 'Webmaster', 'name': 'John Fagan', 'email': ''},
-    {'role': 'Press Officer', 'name': 'John Worrall', 'email': ''},
+    // Initial roles only; names/emails left blank so clubs can configure their own holders
+    {'role': 'President', 'name': '', 'email': ''},
+    {'role': 'Chairperson', 'name': '', 'email': ''},
+    {'role': 'Vice-Chairperson', 'name': '', 'email': ''},
+    {'role': 'Secretary', 'name': '', 'email': ''},
+    {'role': 'Treasurer', 'name': '', 'email': ''},
+    {'role': 'Membership Secretary', 'name': '', 'email': ''},
+    {'role': 'Minutes Secretary', 'name': '', 'email': ''},
+    {'role': 'Clothing Manager', 'name': '', 'email': ''},
+    {'role': 'Club Head Coach', 'name': '', 'email': ''},
+    {'role': 'Equipment Store Manager', 'name': '', 'email': ''},
+    {'role': 'General Committee Member', 'name': '', 'email': ''},
+    {'role': 'General Committee Member', 'name': '', 'email': ''},
+    {'role': 'Webmaster', 'name': '', 'email': ''},
+    {'role': 'Press Officer', 'name': '', 'email': ''},
   ];
 
   @override
@@ -54,6 +44,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     super.initState();
     _loadAdmin();
     _loadCommitteeFromDb();
+    _loadClubConfig();
   }
 
   @override
@@ -65,6 +56,14 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadClubConfig() async {
+    final config = await ClubConfigService.loadForCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      _clubConfig = config;
+    });
   }
 
   Future<void> _loadCommitteeFromDb() async {
@@ -1145,17 +1144,19 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'The NNBR Team Committee',
-                              style: TextStyle(
+                              _clubConfig?.name.isNotEmpty == true
+                                  ? 'The ${_clubConfig!.name} Committee'
+                                  : 'Club Committee',
+                              style: const TextStyle(
                                 color: Color.fromARGB(255, 238, 228, 30),
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            SizedBox(height: 4),
-                            Text(
+                            const SizedBox(height: 4),
+                            const Text(
                               'For general enquiries, please contact The Chairperson or The Secretary via email.',
                               style: TextStyle(
                                 color: Colors.white70,
