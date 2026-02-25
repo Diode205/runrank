@@ -60,7 +60,34 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     loading = true;
     if (mounted) setState(() {});
 
-    final usersResponse = await supabase.from('user_profiles').select('id');
+    // Limit the "unanswered" default to members of the
+    // viewer's own club so multi-club setups do not mix
+    // headcounts between NNBR / NRR, etc.
+    String? clubName;
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser != null) {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('club')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+        final raw = (profile?['club'] as String?)?.trim();
+        clubName = (raw != null && raw.isNotEmpty) ? raw : null;
+      }
+    } catch (e) {
+      debugPrint(
+        'EventDetailsBaseNew: error resolving club for totalUsers: $e',
+      );
+    }
+
+    var usersQuery = supabase.from('user_profiles').select('id');
+    if (clubName != null) {
+      usersQuery = usersQuery.eq('club', clubName);
+    }
+
+    final usersResponse = await usersQuery;
     totalUsers = usersResponse.length;
 
     final rows = await supabase
