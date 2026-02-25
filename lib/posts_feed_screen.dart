@@ -18,6 +18,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
+  String? _clubName;
   Color _membershipColor(String? membershipType) {
     switch (membershipType) {
       case '1st Claim':
@@ -54,15 +55,22 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
     try {
       final profile = await supabase
           .from('user_profiles')
-          .select('is_admin')
+          .select('is_admin, club')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-      final adminStatus = profile['is_admin'] ?? false;
+      final adminStatus = profile?['is_admin'] ?? false;
+      final clubNameRaw = (profile?['club'] as String?)?.trim();
+      final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+          ? clubNameRaw
+          : null;
       debugPrint('PostsFeed: Admin status for ${user.id}: $adminStatus');
 
       if (mounted) {
-        setState(() => isAdmin = adminStatus);
+        setState(() {
+          isAdmin = adminStatus;
+          _clubName = clubName;
+        });
       }
     } catch (e) {
       debugPrint('Error checking admin status: $e');
@@ -76,22 +84,50 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
       final now = DateTime.now().toIso8601String();
       final user = supabase.auth.currentUser;
 
+      // Resolve all user IDs belonging to this club so posts can be
+      // restricted per club. If no club is set, fall back to legacy
+      // behaviour (no club filter).
+      Set<String> clubUserIds = {};
+      final clubName = _clubName;
+      if (clubName != null && clubName.isNotEmpty) {
+        try {
+          final rows = await supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              clubUserIds.add(id);
+            }
+          }
+        } catch (e) {
+          debugPrint('PostsFeed: error loading club user ids: $e');
+        }
+      }
+
       List data;
       if (isAdmin) {
         debugPrint('PostsFeed: Loading ALL posts (admin mode)');
         // Admins see ALL posts (approved + pending + their own)
-        data = await supabase
+        var query = supabase
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
               user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
               club_post_attachments(*)
             ''')
-            .gte('expiry_date', now)
-            .order('created_at', ascending: false);
+            .gte('expiry_date', now);
+
+        if (clubUserIds.isNotEmpty) {
+          query = query.inFilter('author_id', clubUserIds.toList());
+        }
+
+        data = await query.order('created_at', ascending: false);
       } else if (user != null) {
         // Non-admins see approved posts OR own posts (no join to avoid RLS issues)
-        final approved = await supabase
+        var approvedQuery = supabase
             .from('club_posts')
             .select('''
               id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
@@ -99,8 +135,19 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
               club_post_attachments(*)
             ''')
             .gte('expiry_date', now)
-            .eq('is_approved', true)
-            .order('created_at', ascending: false);
+            .eq('is_approved', true);
+
+        if (clubUserIds.isNotEmpty) {
+          approvedQuery = approvedQuery.inFilter(
+            'author_id',
+            clubUserIds.toList(),
+          );
+        }
+
+        final approved = await approvedQuery.order(
+          'created_at',
+          ascending: false,
+        );
 
         final mine = await supabase
             .from('club_posts')

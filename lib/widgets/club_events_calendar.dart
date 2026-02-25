@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,8 +26,14 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   bool _loading = true;
   String userRole = "reader"; // reader or admin
 
+  String? _clubName;
+  Set<String> _clubUserIds = {};
+
   // Track which event cards have been opened/seen locally
   Set<String> _seenEventIds = {};
+
+  RealtimeChannel? _eventsChannel;
+  Timer? _eventsPollTimer;
 
   Future<void> _loadSeenEvents() async {
     try {
@@ -72,6 +79,48 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     _loadRole();
     _loadEvents();
     _loadSeenEvents();
+
+    // Listen for club_events changes so multiple devices stay in sync
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      _eventsChannel = supabase
+          .channel('club_events_updates')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'club_events',
+            callback: (_) async {
+              debugPrint(
+                'ClubEventsCalendar: realtime club_events payload received, reloading events',
+              );
+              if (!mounted) return;
+              // Reload events with club-based filtering
+              await _loadEvents();
+              // Refresh unseen-event count so Club Hub badge updates
+              await NotificationService.refreshEventActivityCount();
+            },
+          )
+          .subscribe();
+    }
+
+    // Periodic fallback in case realtime updates are missed. This ensures
+    // new events created on another device appear here even if the
+    // realtime channel does not fire for some reason.
+    _eventsPollTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
+      if (!mounted) return;
+      debugPrint('ClubEventsCalendar: periodic poll -> reloading events');
+      await _loadEvents();
+      await NotificationService.refreshEventActivityCount();
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventsPollTimer?.cancel();
+    if (_eventsChannel != null) {
+      Supabase.instance.client.removeChannel(_eventsChannel!);
+    }
+    super.dispose();
   }
 
   Future<void> _loadRole() async {
@@ -102,13 +151,65 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     }
 
     try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            _events = [];
+            _loading = false;
+          });
+        }
+        return;
+      }
+
+      // Determine the current user's club (cached for this widget).
+      if (_clubName == null) {
+        try {
+          final profile = await supabase
+              .from('user_profiles')
+              .select('club')
+              .eq('id', user.id)
+              .maybeSingle();
+
+          final name = (profile?['club'] as String?)?.trim();
+          _clubName = (name != null && name.isNotEmpty) ? name : null;
+        } catch (e) {
+          debugPrint('Error loading user club for events: $e');
+        }
+      }
+
+      // Resolve all user IDs that belong to this club so we can
+      // restrict events to those created by members of the same club.
+      final clubName = _clubName;
+      if (_clubUserIds.isEmpty && clubName != null && clubName.isNotEmpty) {
+        try {
+          final rows = await supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          final ids = <String>{};
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              ids.add(id);
+            }
+          }
+          _clubUserIds = ids;
+        } catch (e) {
+          debugPrint('Error loading club user ids for events: $e');
+        }
+      }
+
       final rows = await supabase
           .from("club_events")
           .select("*")
           .order("date")
           .order("time");
 
-      debugPrint('ClubEventsCalendar: Fetched ${rows.length} total events');
+      debugPrint(
+        'ClubEventsCalendar: Fetched \\${rows.length} total events for club=\\${_clubName}, clubUserIds=\\${_clubUserIds.length}',
+      );
 
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -116,7 +217,15 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
       final parsed = (rows as List).map((e) => ClubEvent.fromSupabase(e)).where(
         (e) {
           final d = DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day);
-          return d.isAtSameMomentAs(today) || d.isAfter(today);
+          final inDateRange = d.isAtSameMomentAs(today) || d.isAfter(today);
+
+          // If we have a set of user IDs for this club, only keep events
+          // created by those users. Otherwise (legacy/NNBR), keep all.
+          final inClub = _clubUserIds.isEmpty
+              ? true
+              : (e.createdBy != null && _clubUserIds.contains(e.createdBy));
+
+          return inDateRange && inClub;
         },
       ).toList();
 

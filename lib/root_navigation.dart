@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/widgets/club_standards_view.dart';
 import 'package:runrank/widgets/club_events_calendar.dart';
 import 'package:runrank/posts_feed_facebook.dart';
@@ -28,6 +27,8 @@ class _RootNavigationState extends State<RootNavigation>
   StreamSubscription<int>? _unreadSubscription;
   StreamSubscription<int>? _eventActivitySubscription;
   Timer? _unreadPollTimer;
+  Timer? _eventPollTimer;
+  Timer? _postPollTimer;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -47,6 +48,7 @@ class _RootNavigationState extends State<RootNavigation>
 
     _loadInitialUnreadCount();
     _loadInitialEventActivityCount();
+    _loadInitialPostActivityCount();
 
     _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
       count,
@@ -64,7 +66,32 @@ class _RootNavigationState extends State<RootNavigation>
       }
     });
 
-    _setupPostActivityListener();
+    // Periodic fallback for event activity badge so that Club Hub
+    // counters stay in sync even if this client missed realtime
+    // updates (or hasn't opened the Club Hub tab yet).
+    _eventPollTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
+      if (!mounted) return;
+      final count = await NotificationService.unseenEventCount();
+      if (mounted) {
+        debugPrint(
+          'RootNavigation: event poll -> unseenEventCount=$count (was $_eventActivityCount)',
+        );
+        setState(() => _eventActivityCount = count);
+      }
+    });
+
+    // Periodic poll for post activity so the Posts badge highlights
+    // when there are newer posts for this club on any device.
+    _postPollTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
+      if (!mounted) return;
+      final count = await NotificationService.unseenPostActivityCount();
+      if (mounted) {
+        debugPrint(
+          'RootNavigation: post poll -> unseenPostActivityCount=$count (was $_postActivityCount)',
+        );
+        setState(() => _postActivityCount = count);
+      }
+    });
 
     // Watch for event activity (unseen events) to highlight Club Hub
     _eventActivitySubscription = NotificationService.watchEventActivityStream()
@@ -85,6 +112,8 @@ class _RootNavigationState extends State<RootNavigation>
     _unreadPollTimer?.cancel();
     _glowController.dispose();
     _eventActivitySubscription?.cancel();
+    _eventPollTimer?.cancel();
+    _postPollTimer?.cancel();
     super.dispose();
   }
 
@@ -98,31 +127,26 @@ class _RootNavigationState extends State<RootNavigation>
     if (mounted) setState(() => _eventActivityCount = count);
   }
 
+  Future<void> _loadInitialPostActivityCount() async {
+    final count = await NotificationService.unseenPostActivityCount();
+    if (mounted) {
+      debugPrint('RootNavigation: initial unseenPostActivityCount=$count');
+      setState(() => _postActivityCount = count);
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
       _activatedTabs[index] =
           true; // Activate the tab the first time it's clicked
-      if (index == 2) _postActivityCount = 0;
+      if (index == 2) {
+        _postActivityCount = 0;
+        // Mark posts as seen so subsequent polls don't
+        // immediately re-highlight the tab.
+        NotificationService.markPostsSeen();
+      }
     });
-  }
-
-  Future<void> _setupPostActivityListener() async {
-    final supabase = Supabase.instance.client;
-    // Simple listener for badges, much lighter than the full feed logic
-    supabase
-        .channel('public:club_posts')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'club_posts',
-          callback: (_) {
-            if (!mounted) return;
-            // Any new post (including your own) should highlight the Posts tab
-            setState(() => _postActivityCount++);
-          },
-        )
-        .subscribe();
   }
 
   @override

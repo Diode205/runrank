@@ -63,21 +63,111 @@ class ClubRecord {
 class ClubRecordsService {
   final _supabase = Supabase.instance.client;
 
+  String? _cachedClubName;
+  bool _clubLoaded = false;
+  Set<String>? _cachedClubUserIds;
+  bool _clubUserIdsLoaded = false;
+
+  Future<String?> _getCurrentUserClub() async {
+    if (_clubLoaded) return _cachedClubName;
+
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      _clubLoaded = true;
+      _cachedClubName = null;
+      return null;
+    }
+
+    try {
+      final row = await _supabase
+          .from('user_profiles')
+          .select('club')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final club = (row?['club'] as String?)?.trim();
+      _cachedClubName = (club != null && club.isNotEmpty) ? club : null;
+      _clubLoaded = true;
+      return _cachedClubName;
+    } catch (e) {
+      print('Error fetching current user club for club records: $e');
+      _clubLoaded = true;
+      _cachedClubName = null;
+      return null;
+    }
+  }
+
+  /// Returns the set of user IDs that belong to the current user's club.
+  ///
+  /// For the original NNBR club ("North Norfolk Beach Runners") we do not
+  /// filter, so this returns an empty set and callers should treat that as
+  /// "no club filter" to preserve existing behaviour.
+  Future<Set<String>> _getCurrentClubUserIds() async {
+    final club = await _getCurrentUserClub();
+    if (club == null) return {};
+
+    // Legacy behaviour: NNBR was the original single club, so its records
+    // are shared and don't need additional filtering.
+    if (club.toLowerCase().contains('north norfolk beach runners')) {
+      return {};
+    }
+
+    if (_clubUserIdsLoaded && _cachedClubUserIds != null) {
+      return _cachedClubUserIds!;
+    }
+
+    try {
+      final rows = await _supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('club', club);
+
+      final ids = <String>{};
+      for (final row in rows as List) {
+        final id = row['id'] as String?;
+        if (id != null && id.isNotEmpty) {
+          ids.add(id);
+        }
+      }
+
+      _cachedClubUserIds = ids;
+      _clubUserIdsLoaded = true;
+      return ids;
+    } catch (e) {
+      print('Error fetching user IDs for club $club: $e');
+      _clubUserIdsLoaded = true;
+      _cachedClubUserIds = {};
+      return {};
+    }
+  }
+
   /// Fetch top N records for a specific distance
   Future<List<ClubRecord>> getTopRecords(
     String distance, {
     int limit = 5,
   }) async {
     try {
+      final userIds = await _getCurrentClubUserIds();
+      final applyClubFilter = userIds.isNotEmpty;
+      final userIdList = userIds.toList();
+
       // 20M: accept common naming variants in the database
       // ("20M", "20m", "20 mile", "20 Mile").
       if (distance == '20M') {
-        final response = await _supabase
-            .from('club_records')
-            .select()
-            .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
-            .order('time_seconds', ascending: true)
-            .limit(limit);
+        final response = applyClubFilter
+            ? await _supabase
+                  .from('club_records')
+                  .select()
+                  .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
+                  .inFilter('user_id', userIdList)
+                  .order('time_seconds', ascending: true)
+                  .limit(limit)
+            : await _supabase
+                  .from('club_records')
+                  .select()
+                  .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
+                  .order('time_seconds', ascending: true)
+                  .limit(limit);
 
         return (response as List)
             .map((json) => ClubRecord.fromJson(json))
@@ -87,10 +177,16 @@ class ClubRecordsService {
       // Ultra records: rank by distance covered (parsed from race name),
       // not by time. For other distances, keep fastest-time order.
       if (distance == 'Ultra') {
-        final response = await _supabase
-            .from('club_records')
-            .select()
-            .eq('distance', distance);
+        final response = applyClubFilter
+            ? await _supabase
+                  .from('club_records')
+                  .select()
+                  .eq('distance', distance)
+                  .inFilter('user_id', userIdList)
+            : await _supabase
+                  .from('club_records')
+                  .select()
+                  .eq('distance', distance);
 
         final List<ClubRecord> all = (response as List)
             .map((json) => ClubRecord.fromJson(json))
@@ -111,12 +207,20 @@ class ClubRecordsService {
         return all;
       }
 
-      final response = await _supabase
-          .from('club_records')
-          .select()
-          .eq('distance', distance)
-          .order('time_seconds', ascending: true)
-          .limit(limit);
+      final response = applyClubFilter
+          ? await _supabase
+                .from('club_records')
+                .select()
+                .eq('distance', distance)
+                .inFilter('user_id', userIdList)
+                .order('time_seconds', ascending: true)
+                .limit(limit)
+          : await _supabase
+                .from('club_records')
+                .select()
+                .eq('distance', distance)
+                .order('time_seconds', ascending: true)
+                .limit(limit);
 
       return (response as List)
           .map((json) => ClubRecord.fromJson(json))

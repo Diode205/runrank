@@ -299,10 +299,50 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       final seenKey = 'events_seen_ids_${user.id}';
       final seenIds = prefs.getStringList(seenKey) ?? const <String>[];
+      // Resolve current user's club and all user IDs in that club so
+      // we only count events created within the same club.
+      Set<String> clubUserIds = {};
+
+      String? debugClubName;
+
+      try {
+        final profile = await _supabase
+            .from('user_profiles')
+            .select('club')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        final clubNameRaw = (profile?['club'] as String?)?.trim();
+        final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+            ? clubNameRaw
+            : null;
+
+        debugClubName = clubName;
+
+        if (clubName != null) {
+          final rows = await _supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              clubUserIds.add(id);
+            }
+          }
+        }
+      } catch (e) {
+        print('DEBUG: unseenEventCount club resolution error: $e');
+      }
+
+      print(
+        'DEBUG: unseenEventCount for user ${user.id}, club=$debugClubName, clubUserIds=${clubUserIds.length}',
+      );
 
       final rows = await _supabase
           .from('club_events')
-          .select('id, date, time')
+          .select('id, date, time, created_by')
           .order('date')
           .order('time');
 
@@ -326,11 +366,24 @@ class NotificationService {
         final d = DateTime(dt.year, dt.month, dt.day);
         if (d.isBefore(today)) continue;
 
+        // If we have a club-specific user set, only count events
+        // created by users in that set.
+        if (clubUserIds.isNotEmpty) {
+          final createdBy = row['created_by']?.toString();
+          if (createdBy == null || !clubUserIds.contains(createdBy)) {
+            continue;
+          }
+        }
+
         final id = row['id'].toString();
         if (!seenIds.contains(id)) {
           count++;
         }
       }
+
+      print(
+        'DEBUG: unseenEventCount final count=$count for user ${user.id}, club=$debugClubName',
+      );
 
       return count;
     } catch (e) {
@@ -350,5 +403,170 @@ class NotificationService {
   // and local "seen" state, so this is safe to call repeatedly.
   static Future<void> signalLocalEventActivityChanged() async {
     await refreshEventActivityCount();
+  }
+
+  // ---------------------------------------------------------------
+  // POST ACTIVITY (UNSEEN POSTS FOR POSTS TAB BADGE)
+  // ---------------------------------------------------------------
+
+  static Future<int> unseenPostActivityCount() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seenKey = 'posts_last_seen_${user.id}';
+      final lastSeenStr = prefs.getString(seenKey);
+      DateTime? lastSeen;
+      if (lastSeenStr != null) {
+        lastSeen = DateTime.tryParse(lastSeenStr);
+      }
+
+      // Resolve current user's club and all user IDs in that club so
+      // we only consider posts authored within the same club.
+      Set<String> clubUserIds = {};
+      String? debugClubName;
+
+      try {
+        final profile = await _supabase
+            .from('user_profiles')
+            .select('club')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        final clubNameRaw = (profile?['club'] as String?)?.trim();
+        final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+            ? clubNameRaw
+            : null;
+
+        debugClubName = clubName;
+
+        if (clubName != null) {
+          final rows = await _supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              clubUserIds.add(id);
+            }
+          }
+        }
+      } catch (e) {
+        print('DEBUG: unseenPostActivityCount club resolution error: $e');
+      }
+
+      final rows = await _supabase
+          .from('club_posts')
+          .select('created_at, author_id')
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      DateTime? latestForClub;
+      for (final row in rows as List) {
+        final authorId = row['author_id']?.toString();
+        if (authorId == null) continue;
+
+        if (clubUserIds.isNotEmpty && !clubUserIds.contains(authorId)) {
+          continue;
+        }
+
+        final createdAtStr = row['created_at'] as String?;
+        if (createdAtStr == null) continue;
+        final createdAt = DateTime.tryParse(createdAtStr);
+        if (createdAt == null) continue;
+        latestForClub = createdAt.toUtc();
+        break;
+      }
+
+      if (latestForClub == null) {
+        return 0;
+      }
+
+      if (lastSeen == null || latestForClub.isAfter(lastSeen.toUtc())) {
+        print(
+          'DEBUG: unseenPostActivityCount -> unseen (user=${user.id}, club=$debugClubName)',
+        );
+        return 1; // indicate at least one unseen post
+      }
+
+      return 0;
+    } catch (e) {
+      print('DEBUG: unseenPostActivityCount error: $e');
+      return 0;
+    }
+  }
+
+  static Future<void> markPostsSeen() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Find the latest post for this user's club so we can store
+      // its timestamp as the "last seen" marker.
+      Set<String> clubUserIds = {};
+
+      try {
+        final profile = await _supabase
+            .from('user_profiles')
+            .select('club')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        final clubNameRaw = (profile?['club'] as String?)?.trim();
+        final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+            ? clubNameRaw
+            : null;
+
+        if (clubName != null) {
+          final rows = await _supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              clubUserIds.add(id);
+            }
+          }
+        }
+      } catch (e) {
+        print('DEBUG: markPostsSeen club resolution error: $e');
+      }
+
+      final rows = await _supabase
+          .from('club_posts')
+          .select('created_at, author_id')
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      DateTime? latestForClub;
+      for (final row in rows as List) {
+        final authorId = row['author_id']?.toString();
+        if (authorId == null) continue;
+
+        if (clubUserIds.isNotEmpty && !clubUserIds.contains(authorId)) {
+          continue;
+        }
+
+        final createdAtStr = row['created_at'] as String?;
+        if (createdAtStr == null) continue;
+        final createdAt = DateTime.tryParse(createdAtStr);
+        if (createdAt == null) continue;
+        latestForClub = createdAt.toUtc();
+        break;
+      }
+
+      if (latestForClub != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final seenKey = 'posts_last_seen_${user.id}';
+        await prefs.setString(seenKey, latestForClub.toIso8601String());
+      }
+    } catch (e) {
+      print('DEBUG: markPostsSeen error: $e');
+    }
   }
 }

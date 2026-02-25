@@ -22,6 +22,8 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   bool loading = true;
   bool isAdmin = false;
 
+  String? _clubName;
+
   RealtimeChannel? _postChannel;
 
   // Cache for reactions and comments to avoid redundant fetches
@@ -34,7 +36,9 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   // Track which posts are currently fetching details to avoid duplicate calls
   final Set<String> _fetchingPostDetails = {};
 
-  static const List<String> availableEmojis = [
+  // Emoji palette for reactions (kept for reference by reaction UI)
+  // ignore: unused_field
+  static const List<String> _availableEmojis = [
     '👍',
     '❤️',
     '😂',
@@ -88,11 +92,21 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     try {
       final profile = await supabase
           .from('user_profiles')
-          .select('is_admin')
+          .select('is_admin, club')
           .eq('id', user.id)
           .maybeSingle();
+
+      final adminStatus = profile?['is_admin'] ?? false;
+      final clubNameRaw = (profile?['club'] as String?)?.trim();
+      final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+          ? clubNameRaw
+          : null;
+
       if (mounted) {
-        setState(() => isAdmin = profile?['is_admin'] ?? false);
+        setState(() {
+          isAdmin = adminStatus;
+          _clubName = clubName;
+        });
       }
     } catch (e) {
       debugPrint('Error checking admin status: $e');
@@ -102,17 +116,53 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   Future<void> _loadPosts() async {
     try {
       final now = DateTime.now().toIso8601String();
-      final user = supabase.auth.currentUser;
 
-      final response = await supabase
+      // Resolve club user IDs for current club; if none, fall back to
+      // legacy behaviour (no club filter).
+      Set<String> clubUserIds = {};
+      final clubName = _clubName;
+      if (clubName != null && clubName.isNotEmpty) {
+        try {
+          final rows = await supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('club', clubName);
+
+          for (final row in rows as List) {
+            final id = row['id'] as String?;
+            if (id != null && id.isNotEmpty) {
+              clubUserIds.add(id);
+            }
+          }
+        } catch (e) {
+          debugPrint('PostsFeedFacebook: error loading club user ids: $e');
+        }
+      }
+
+      var query = supabase
           .from('club_posts')
           .select('''
             id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
             user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
             club_post_attachments(*)
           ''')
-          .gte('expiry_date', now)
-          .order('created_at', ascending: false);
+          .gte('expiry_date', now);
+
+      // Non-admins: restrict to approved posts from this club, plus
+      // their own posts regardless of club if necessary.
+      if (!isAdmin) {
+        query = query.eq('is_approved', true);
+        if (clubUserIds.isNotEmpty) {
+          query = query.inFilter('author_id', clubUserIds.toList());
+        }
+      } else {
+        // Admins: restrict to this club's posts when clubUserIds is set.
+        if (clubUserIds.isNotEmpty) {
+          query = query.inFilter('author_id', clubUserIds.toList());
+        }
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       if (mounted) {
         setState(() {

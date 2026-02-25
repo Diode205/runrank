@@ -179,7 +179,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _fetchClubRecords() async {
     try {
       for (final distance in _distances) {
-        final record = await _clubRecordsService.getClubRecordHolder(distance);
+        var record = await _clubRecordsService.getClubRecordHolder(distance);
+
+        // If there is no official club record yet for this distance but the
+        // current user has results recorded, automatically ensure a
+        // club_records entry using their best time. This is especially
+        // important for new clubs (like NRR) so the first race becomes the
+        // initial club record.
+        if (record == null) {
+          final recordsForDistance = _byDistance[distance] ?? const [];
+          if (recordsForDistance.isNotEmpty && _currentUserId != null) {
+            // Find the fastest finish time among the user's results.
+            final best = recordsForDistance
+                .where((r) => (r.finishSeconds ?? 0) > 0)
+                .reduce(
+                  (a, b) =>
+                      (a.finishSeconds ?? 0) <= (b.finishSeconds ?? 0) ? a : b,
+                );
+
+            await _clubRecordsService.ensureRecordForResult(
+              userId: _currentUserId!,
+              distance: distance,
+              timeSeconds: best.finishSeconds ?? 0,
+              raceName: best.raceName,
+              raceDate: best.raceDate,
+            );
+
+            // Re-fetch after ensuring the record so UI reflects it.
+            record = await _clubRecordsService.getClubRecordHolder(distance);
+          }
+        }
+
         if (mounted) {
           setState(() {
             _clubRecords[distance] = record;
