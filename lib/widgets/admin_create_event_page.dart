@@ -132,12 +132,37 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   Future<void> _loadHosts() async {
     try {
-      final rows = await supabase
-          .from('user_profiles')
-          .select('id, full_name, is_admin')
-          .order('full_name');
-
       final currentUserId = supabase.auth.currentUser?.id;
+
+      // Resolve the current user's club so that the Host/Director
+      // dropdown only shows members (and admins) from the same club.
+      String? clubName;
+      if (currentUserId != null) {
+        try {
+          final profile = await supabase
+              .from('user_profiles')
+              .select('club')
+              .eq('id', currentUserId)
+              .maybeSingle();
+
+          final raw = (profile?['club'] as String?)?.trim();
+          clubName = (raw != null && raw.isNotEmpty) ? raw : null;
+        } catch (e) {
+          debugPrint(
+            'AdminCreateEventPage: error loading current user club: $e',
+          );
+        }
+      }
+
+      var query = supabase
+          .from('user_profiles')
+          .select('id, full_name, is_admin');
+
+      if (clubName != null) {
+        query = query.eq('club', clubName);
+      }
+
+      final rows = await query.order('full_name');
 
       setState(() {
         _hosts = rows
