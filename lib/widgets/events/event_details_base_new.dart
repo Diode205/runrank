@@ -447,12 +447,15 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
     try {
       String dbType;
+      String action;
       switch (type) {
         case 'run':
           dbType = 'running';
+          action = 'joined';
           break;
         case 'volunteer':
           dbType = 'marshalling';
+          action = 'volunteered to marshal';
           break;
         case 'support':
           // Preserve primary response_type when adding support roles
@@ -462,12 +465,15 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           } else {
             dbType = 'supporting';
           }
+          action = 'offered support for';
           break;
         case 'unavailable':
           dbType = 'unavailable';
+          action = 'marked unavailable for';
           break;
         default:
           dbType = type;
+          action = 'responded to';
       }
 
       await supabase.from('club_event_responses').upsert({
@@ -488,8 +494,12 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         'expected_time_seconds': predictedTimeSeconds,
       }, onConflict: 'event_id,user_id');
 
-      // Notify event creator about new response
-      if (event.createdBy != null && event.createdBy!.isNotEmpty) {
+      // Notify event creator about new response (but avoid
+      // sending a duplicate "user has joined" message to
+      // the same person who just responded).
+      if (event.createdBy != null &&
+          event.createdBy!.isNotEmpty &&
+          event.createdBy != user.id) {
         final userProfile = await supabase
             .from('user_profiles')
             .select('full_name')
@@ -497,23 +507,6 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             .single();
 
         final userName = userProfile['full_name'] ?? 'A member';
-        String action;
-        switch (dbType) {
-          case 'running':
-            action = 'joined';
-            break;
-          case 'marshalling':
-            action = 'volunteered to marshal';
-            break;
-          case 'supporting':
-            action = 'offered support for';
-            break;
-          case 'unavailable':
-            action = 'marked unavailable for';
-            break;
-          default:
-            action = 'responded to';
-        }
 
         await NotificationService.notifyEventCreator(
           eventId: event.id,
@@ -522,16 +515,23 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           body: '$userName has $action ${event.title}',
         );
 
-        // Scope alerts: creator + actor only (no broadcast to all participants)
-
-        // Also notify the responding user so their Alerts badge updates
-        await NotificationService.notifyUser(
-          userId: user.id,
-          title: 'Response Saved',
-          body: 'You have $action ${event.title}',
+        // Also notify other participants (excluding the responder) so
+        // everyone who has responded to this event sees updates.
+        await NotificationService.notifyEventParticipants(
           eventId: event.id,
+          title: 'Event Response',
+          body: '$userName has $action ${event.title}',
+          excludeUserId: user.id,
         );
       }
+
+      // Always notify the responding user so their Alerts badge updates
+      await NotificationService.notifyUser(
+        userId: user.id,
+        title: 'Response Saved',
+        body: 'You have $action ${event.title}',
+        eventId: event.id,
+      );
 
       loadResponses();
     } catch (e) {
@@ -779,8 +779,12 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
       final eventTitle = event.title ?? 'an event';
 
-      // Notify the event creator, if any.
-      if (event.createdBy != null && event.createdBy!.isNotEmpty) {
+      // Notify the event creator, if any, but avoid sending a
+      // duplicate "New comment" alert to the commenter when
+      // they are also the creator.
+      if (event.createdBy != null &&
+          event.createdBy!.isNotEmpty &&
+          event.createdBy != user.id) {
         await NotificationService.notifyEventCreator(
           eventId: event.id,
           creatorId: event.createdBy!,

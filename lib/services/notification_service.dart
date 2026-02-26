@@ -107,25 +107,46 @@ class NotificationService {
     print(
       "DEBUG: notifyEventParticipants called - eventId: $eventId, title: $title",
     );
-    final responses = await _supabase
-        .from('club_event_responses')
-        .select('user_id')
-        .eq('event_id', eventId);
+    try {
+      final responses = await _supabase
+          .from('club_event_responses')
+          .select('user_id')
+          .eq('event_id', eventId);
 
-    print("DEBUG: Found ${responses.length} participants for event $eventId");
-    for (final response in responses) {
-      final userId = response['user_id'] as String;
-      if (excludeUserId != null && userId == excludeUserId) {
-        print("DEBUG: Skipping user $userId (excluded)");
-        continue;
-      }
-
-      await notifyUser(
-        userId: userId,
-        title: title,
-        body: body,
-        eventId: eventId,
+      final currentUser = _supabase.auth.currentUser;
+      print(
+        "DEBUG: notifyEventParticipants fetched ${responses.length} participants for event $eventId (caller=${currentUser?.id})",
       );
+
+      for (final response in responses) {
+        final userId = response['user_id'] as String?;
+        if (userId == null || userId.isEmpty) continue;
+
+        if (excludeUserId != null && userId == excludeUserId) {
+          print(
+            "DEBUG: notifyEventParticipants skipping user $userId (excluded)",
+          );
+          continue;
+        }
+
+        try {
+          print(
+            'DEBUG: notifyEventParticipants sending notification to user $userId for event $eventId',
+          );
+          await notifyUser(
+            userId: userId,
+            title: title,
+            body: body,
+            eventId: eventId,
+          );
+        } catch (e) {
+          print(
+            'DEBUG: notifyEventParticipants error notifying user $userId for event $eventId: $e',
+          );
+        }
+      }
+    } catch (e) {
+      print('DEBUG: notifyEventParticipants error loading participants: $e');
     }
   }
 
