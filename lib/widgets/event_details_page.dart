@@ -14,8 +14,13 @@ import 'package:runrank/widgets/events/event_details_relay.dart';
 /// - Group 3 (Relay): Relay
 class EventDetailsPage extends StatelessWidget {
   final ClubEvent event;
+  final bool openHostChat;
 
-  const EventDetailsPage({super.key, required this.event});
+  const EventDetailsPage({
+    super.key,
+    required this.event,
+    this.openHostChat = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +34,13 @@ class EventDetailsPage extends StatelessWidget {
       case 'meet_&_drink':
       case 'swim_or_cycle':
       case 'others':
-        return SimpleEventDetailsPage(event: event);
+        return SimpleEventDetailsPage(event: event, openHostChat: openHostChat);
       case 'race':
       case 'cross_country':
       case 'handicap_series':
-        return RaceEventDetailsPage(event: event);
+        return RaceEventDetailsPage(event: event, openHostChat: openHostChat);
       case 'relay':
-        return RelayEventDetailsPage(event: event);
+        return RelayEventDetailsPage(event: event, openHostChat: openHostChat);
       default:
         return Scaffold(
           appBar: AppBar(title: const Text('Event Details')),

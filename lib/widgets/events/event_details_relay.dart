@@ -14,8 +14,13 @@ import 'package:runrank/widgets/events/event_venue_preview.dart';
 /// Group 3: Relay with multi-stage selection, pacing, and support roles
 class RelayEventDetailsPage extends StatefulWidget {
   final ClubEvent event;
+  final bool openHostChat;
 
-  const RelayEventDetailsPage({super.key, required this.event});
+  const RelayEventDetailsPage({
+    super.key,
+    required this.event,
+    this.openHostChat = false,
+  });
 
   @override
   State<RelayEventDetailsPage> createState() => _RelayEventDetailsPageState();
@@ -81,6 +86,16 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     {'stage': 5, 'distance': '10K', 'details': 'Leg 5 – 4 laps'},
     {'stage': 6, 'distance': '5K', 'details': 'Leg 6 – 2 laps'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.openHostChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _contactHost();
+      });
+    }
+  }
 
   @override
   ClubEvent get event => widget.event;
@@ -1692,6 +1707,14 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       return;
     }
 
+    final currentUserId = supabase.auth.currentUser?.id;
+    final isHost = currentUserId != null && currentUserId == hostUserId;
+    final chatPartnerName = isHost
+        ? 'Club Member'
+        : (widget.event.hostOrDirector.isNotEmpty
+              ? widget.event.hostOrDirector
+              : 'Host / Coach');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1699,9 +1722,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       builder: (_) => HostChatSheet(
         event: widget.event,
         hostUserId: hostUserId,
-        hostDisplayName: widget.event.hostOrDirector.isNotEmpty
-            ? widget.event.hostOrDirector
-            : "Host / Coach",
+        hostDisplayName: chatPartnerName,
         messageController: messageController,
         loadMessages: getHostMessagesWithNames,
         sendMessage: sendHostMessage,

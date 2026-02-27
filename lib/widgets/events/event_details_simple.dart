@@ -9,8 +9,13 @@ import 'package:runrank/widgets/events/event_venue_preview.dart';
 /// Group 1: Training_1/2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
 class SimpleEventDetailsPage extends StatefulWidget {
   final ClubEvent event;
+  final bool openHostChat;
 
-  const SimpleEventDetailsPage({super.key, required this.event});
+  const SimpleEventDetailsPage({
+    super.key,
+    required this.event,
+    this.openHostChat = false,
+  });
 
   @override
   State<SimpleEventDetailsPage> createState() => _SimpleEventDetailsPageState();
@@ -20,6 +25,16 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     with EventDetailsBaseMixin<SimpleEventDetailsPage> {
   @override
   ClubEvent get event => widget.event;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.openHostChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _contactHost();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -545,6 +560,14 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
       return;
     }
 
+    final currentUserId = supabase.auth.currentUser?.id;
+    final isHost = currentUserId != null && currentUserId == hostUserId;
+    final chatPartnerName = isHost
+        ? 'Club Member'
+        : (widget.event.hostOrDirector.isNotEmpty
+              ? widget.event.hostOrDirector
+              : 'Host / Coach');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -552,9 +575,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
       builder: (_) => HostChatSheet(
         event: widget.event,
         hostUserId: hostUserId,
-        hostDisplayName: widget.event.hostOrDirector.isNotEmpty
-            ? widget.event.hostOrDirector
-            : "Host / Coach",
+        hostDisplayName: chatPartnerName,
         messageController: messageController,
         loadMessages: getHostMessagesWithNames,
         sendMessage: sendHostMessage,

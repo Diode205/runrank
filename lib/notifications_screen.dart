@@ -262,9 +262,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     }
 
-    // Navigate to event if eventId exists
+    // Navigate to event if eventId exists. For host/coach messages,
+    // deep-link straight into the private chat sheet.
     if (eventId != null && eventId.isNotEmpty) {
-      await _navigateToEvent(eventId);
+      final isHostMessage = title.toLowerCase().startsWith('new message about');
+      await _navigateToEvent(eventId, openHostChat: isHostMessage);
       return;
     }
 
@@ -294,7 +296,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  Future<void> _navigateToEvent(String eventId) async {
+  Future<void> _navigateToEvent(
+    String eventId, {
+    bool openHostChat = false,
+  }) async {
     try {
       final supabase = Supabase.instance.client;
       final eventData = await supabase
@@ -309,7 +314,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)),
+        MaterialPageRoute(
+          builder: (_) =>
+              EventDetailsPage(event: event, openHostChat: openHostChat),
+        ),
       ).then((_) {
         // Refresh when coming back
         loadData();

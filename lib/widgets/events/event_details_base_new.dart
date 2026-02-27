@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -41,10 +42,18 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   Map<String, Map<String, List<String>>> commentReactions = {};
   bool _commentReactionsMissing = false;
 
+  // Live comments: realtime channel + periodic fallback
+  RealtimeChannel? _commentsChannel;
+  Timer? _commentsPollTimer;
+
   ClubEvent get event;
 
   @override
   void dispose() {
+    _commentsPollTimer?.cancel();
+    if (_commentsChannel != null) {
+      Supabase.instance.client.removeChannel(_commentsChannel!);
+    }
     commentController.dispose();
     messageController.dispose();
     super.dispose();
@@ -54,6 +63,34 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   void initState() {
     super.initState();
     loadResponses();
+    // Also load existing comments at first open.
+    loadComments();
+
+    // Subscribe to realtime updates for this event's comments so
+    // conversation stays live while both users are on the page.
+    _commentsChannel = supabase
+        .channel('event_comments_${event.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'event_comments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'event_id',
+            value: event.id,
+          ),
+          callback: (_) async {
+            if (!mounted) return;
+            await loadComments();
+          },
+        )
+        .subscribe();
+
+    // Periodic fallback in case realtime misses an update.
+    _commentsPollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (!mounted) return;
+      await loadComments();
+    });
   }
 
   Future<void> loadResponses() async {
@@ -586,20 +623,21 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   Future<void> sendHostMessage(String hostUserId, String message) async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
+    final senderId = user.id;
+    final isHost = senderId == hostUserId;
 
     await supabase.from('event_host_messages').insert({
       'event_id': event.id,
-      'sender_id': user.id,
+      'sender_id': senderId,
       'receiver_id': hostUserId,
       'message': message,
     });
 
-    // Notify the host that a new message has arrived.
     try {
       final profile = await supabase
           .from('user_profiles')
           .select('full_name')
-          .eq('id', user.id)
+          .eq('id', senderId)
           .maybeSingle();
 
       final senderName = (profile != null && profile['full_name'] != null)
@@ -608,14 +646,41 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
       final eventTitle = event.title ?? 'an event';
 
-      await NotificationService.notifyUser(
-        userId: hostUserId,
-        title: 'New message about $eventTitle',
-        body: '$senderName sent you a message about $eventTitle',
-        eventId: event.id,
-      );
+      if (!isHost) {
+        // Participant -> host: notify the host only.
+        await NotificationService.notifyUser(
+          userId: hostUserId,
+          title: 'New message about $eventTitle',
+          body: '$senderName sent you a message about $eventTitle',
+          eventId: event.id,
+        );
+      } else {
+        // Host -> participants: notify all members who have messaged about
+        // this event (excluding the host).
+        final rows = await supabase
+            .from('event_host_messages')
+            .select('sender_id')
+            .eq('event_id', event.id);
+
+        final targetIds = <String>{};
+        for (final row in rows) {
+          final id = row['sender_id'] as String?;
+          if (id != null && id.isNotEmpty && id != senderId) {
+            targetIds.add(id);
+          }
+        }
+
+        for (final targetId in targetIds) {
+          await NotificationService.notifyUser(
+            userId: targetId,
+            title: 'New message about $eventTitle',
+            body: '$senderName sent you a message about $eventTitle',
+            eventId: event.id,
+          );
+        }
+      }
     } catch (e) {
-      debugPrint('❌ Error notifying host about new message: $e');
+      debugPrint('❌ Error notifying users about host message: $e');
     }
   }
 
@@ -908,6 +973,13 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         final emojiMap =
             commentReactions[commentId] ?? const <String, List<String>>{};
 
+        final currentUserId = supabase.auth.currentUser?.id;
+        final commentUserId = c['userId'] as String?;
+        final isMe =
+            currentUserId != null &&
+            commentUserId != null &&
+            currentUserId == commentUserId;
+
         final initials = name.isNotEmpty
             ? name.trim().split(' ').map((p) => p.isNotEmpty ? p[0] : '').join()
             : 'M';
@@ -918,20 +990,25 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             margin: const EdgeInsets.only(bottom: 10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: isMe
+                  ? MainAxisAlignment.end
+                  : MainAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.white12,
-                  child: Text(
-                    initials.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                if (!isMe) ...[
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white12,
+                    child: Text(
+                      initials.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -939,16 +1016,22 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade900.withValues(alpha: 0.5),
+                      color: isMe
+                          ? const Color(0xFF0057B7).withValues(alpha: 0.8)
+                          : Colors.grey.shade900.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: Colors.white12),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: isMe
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
                       children: [
                         if (ts != null)
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: isMe
+                                ? MainAxisAlignment.start
+                                : MainAxisAlignment.end,
                             children: [
                               Text(
                                 formatCommentTimestamp(ts),
@@ -963,7 +1046,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
                         Text(
                           text,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: Colors.white,
                             fontSize: 14,
                           ),
                         ),
@@ -1009,6 +1092,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
                     ),
                   ),
                 ),
+                if (isMe) const SizedBox(width: 8),
               ],
             ),
           ),
