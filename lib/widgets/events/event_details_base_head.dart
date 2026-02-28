@@ -495,13 +495,54 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   Future<void> sendHostMessage(String hostUserId, String message) async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
+    final senderId = user.id;
+    final isHost = senderId == hostUserId;
 
-    await supabase.from("event_host_messages").insert({
-      "event_id": event.id,
-      "sender_id": user.id,
-      "receiver_id": hostUserId,
-      "message": message,
-    });
+    // Align storage with other bases: member messages are addressed to
+    // the host; host replies are fanned out so each member sees them.
+
+    if (!isHost) {
+      await supabase.from('event_host_messages').insert({
+        'event_id': event.id,
+        'sender_id': senderId,
+        'receiver_id': hostUserId,
+        'message': message,
+      });
+    } else {
+      final rows = await supabase
+          .from('event_host_messages')
+          .select('sender_id')
+          .eq('event_id', event.id);
+
+      final targetIds = <String>{};
+      for (final row in rows) {
+        final id = row['sender_id'] as String?;
+        if (id != null && id.isNotEmpty && id != senderId) {
+          targetIds.add(id);
+        }
+      }
+
+      if (targetIds.isEmpty) {
+        await supabase.from('event_host_messages').insert({
+          'event_id': event.id,
+          'sender_id': senderId,
+          'receiver_id': hostUserId,
+          'message': message,
+        });
+      } else {
+        final payloads = [
+          for (final targetId in targetIds)
+            {
+              'event_id': event.id,
+              'sender_id': senderId,
+              'receiver_id': targetId,
+              'message': message,
+            },
+        ];
+
+        await supabase.from('event_host_messages').insert(payloads);
+      }
+    }
   }
 
   Future<void> cancelMyPlan() async {

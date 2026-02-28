@@ -431,6 +431,12 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     final hasResponse = myResponse != null;
     if (widget.event.isCancelled) return const SizedBox.shrink();
 
+    final clubName = viewerClubName ?? '';
+    final isNRR = clubName.toLowerCase().contains('norwich road runners');
+    final eventType = widget.event.eventType.toLowerCase();
+    final isTraining = eventType.startsWith('training');
+    final useWhiteDecline = isNRR && isTraining;
+
     if (hasResponse) {
       return Card(
         margin: const EdgeInsets.only(top: 16),
@@ -475,6 +481,12 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
           child: const Text("✅ Attending"),
         ),
         FilledButton(
+          style: useWhiteDecline
+              ? FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                )
+              : null,
           onPressed: () => submitResponse(type: "unavailable"),
           child: const Text("❌ Decline"),
         ),
@@ -562,11 +574,43 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
 
     final currentUserId = supabase.auth.currentUser?.id;
     final isHost = currentUserId != null && currentUserId == hostUserId;
-    final chatPartnerName = isHost
-        ? 'Club Member'
-        : (widget.event.hostOrDirector.isNotEmpty
-              ? widget.event.hostOrDirector
-              : 'Host / Coach');
+
+    String chatPartnerName;
+    if (!isHost) {
+      // Member view: always show the host/coach name.
+      chatPartnerName = widget.event.hostOrDirector.isNotEmpty
+          ? widget.event.hostOrDirector
+          : 'Host / Coach';
+    } else {
+      // Host view: show the latest member who messaged about this event,
+      // otherwise fall back to a generic label.
+      try {
+        final rows = await supabase
+            .from('event_host_messages')
+            .select('sender_id')
+            .eq('event_id', widget.event.id)
+            .neq('sender_id', hostUserId)
+            .order('created_at', ascending: false)
+            .limit(1);
+
+        if (rows.isNotEmpty && rows.first['sender_id'] != null) {
+          final partnerId = rows.first['sender_id'] as String;
+          final profile = await supabase
+              .from('user_profiles')
+              .select('full_name')
+              .eq('id', partnerId)
+              .maybeSingle();
+
+          chatPartnerName = (profile != null && profile['full_name'] != null)
+              ? profile['full_name'] as String
+              : 'Club Member';
+        } else {
+          chatPartnerName = 'Club Member';
+        }
+      } catch (_) {
+        chatPartnerName = 'Club Member';
+      }
+    }
 
     showModalBottomSheet(
       context: context,

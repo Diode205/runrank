@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
-import 'package:runrank/services/user_service.dart';
 import 'package:runrank/services/club_config_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,7 +21,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   bool _committeeLoaded = false;
   ClubConfig? _clubConfig;
 
-  final List<Map<String, String>> _committee = [
+  final List<Map<String, dynamic>> _committee = [
     // Initial roles only; names/emails left blank so clubs can configure their own holders
     {'role': 'President', 'name': '', 'email': ''},
     {'role': 'Chairperson', 'name': '', 'email': ''},
@@ -57,75 +56,99 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   Future<void> _loadAdmin() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _adminClub = null;
-        });
-      }
+      setState(() {
+        _isAdmin = false;
+        _adminClub = null;
+      });
       return;
     }
 
-    final row = await _supabase
-        .from('user_profiles')
-        .select('is_admin, club')
-        .eq('id', user.id)
-        .maybeSingle();
+    try {
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('is_admin, club')
+          .eq('id', user.id)
+          .maybeSingle();
 
-    if (mounted) {
+      final isAdmin = (profile?['is_admin'] ?? false) as bool;
+      final club = profile?['club']?.toString();
+
+      if (!mounted) return;
       setState(() {
-        _isAdmin = row != null && row['is_admin'] == true;
-        final club = row?['club'] as String?;
-        _adminClub = (club != null && club.isNotEmpty) ? club : null;
+        _isAdmin = isAdmin;
+        _adminClub = club;
+      });
+    } catch (e) {
+      debugPrint('Error loading admin profile: $e');
+      if (!mounted) return;
+      setState(() {
+        _isAdmin = false;
+      });
+    }
+  }
+
+  Future<void> _loadCommitteeFromDb() async {
+    try {
+      final club = _adminClub;
+      if (club == null || club.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _committeeLoaded = true;
+        });
+        return;
+      }
+
+      final data = await _supabase
+          .from('committee_roles')
+          .select('id, role, name, email, user_id, avatar_url')
+          .eq('club', club)
+          .order('display_order');
+
+      if (!mounted) return;
+
+      final rows = List<Map<String, dynamic>>.from(data as List);
+      if (rows.isEmpty) {
+        setState(() {
+          _committeeLoaded = true;
+        });
+        return;
+      }
+
+      setState(() {
+        _committee
+          ..clear()
+          ..addAll(
+            rows.map(
+              (row) => {
+                'id': row['id']?.toString(),
+                'role': row['role']?.toString() ?? '',
+                'name': row['name']?.toString() ?? '',
+                'email': row['email']?.toString() ?? '',
+                'userId': row['user_id']?.toString() ?? '',
+                'avatarUrl': row['avatar_url']?.toString() ?? '',
+              },
+            ),
+          );
+        _committeeLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Error loading committee from DB: $e');
+      if (!mounted) return;
+      setState(() {
+        _committeeLoaded = true;
       });
     }
   }
 
   Future<void> _loadClubConfig() async {
-    final config = await ClubConfigService.loadForCurrentUser();
-    if (!mounted) return;
-    setState(() {
-      _clubConfig = config;
-    });
-  }
-
-  Future<void> _loadCommitteeFromDb() async {
     try {
-      final data = await _supabase
-          .from('committee_roles')
-          .select('id, role, name, email, user_id, avatar_url')
-          .order('display_order', ascending: true);
-
+      final config = await ClubConfigService.loadForCurrentUser();
       if (!mounted) return;
-
-      if (data is List && data.isNotEmpty) {
-        setState(() {
-          _committee.clear();
-          for (final row in data) {
-            final map = row as Map<String, dynamic>;
-            _committee.add({
-              'id': (map['id'] ?? '').toString(),
-              'role': (map['role'] ?? '').toString(),
-              'name': (map['name'] ?? '').toString(),
-              'email': (map['email'] ?? '').toString(),
-              'userId': (map['user_id'] ?? '').toString(),
-              'avatarUrl': (map['avatar_url'] ?? '').toString(),
-            });
-          }
-          _committeeLoaded = true;
-        });
-      } else {
-        setState(() {
-          _committeeLoaded = true;
-        });
-      }
+      setState(() {
+        _clubConfig = config;
+      });
     } catch (e) {
-      debugPrint('Error loading committee roles: $e');
-      if (mounted) {
-        setState(() {
-          _committeeLoaded = true;
-        });
-      }
+      debugPrint('Error loading club config for admin page: $e');
     }
   }
 
@@ -133,8 +156,11 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     if (!_isAdmin) return;
 
     final member = _committee[index];
-    final nameController = TextEditingController(text: member['name']);
-    final emailController = TextEditingController(text: member['email']);
+
+    // Admins don't need to backspace to replace someone: fields start blank
+    // with the current holder shown as a hint.
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
 
     showDialog(
       context: context,
@@ -148,32 +174,26 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _openMemberSelector(
-                    index,
-                    nameController,
-                    emailController,
-                  ),
-                  icon: const Icon(
-                    Icons.search,
-                    color: Color(0xFFFFD700),
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Search club members',
-                    style: TextStyle(color: Color(0xFFFFD700)),
-                  ),
-                ),
-              ),
               const SizedBox(height: 4),
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Name',
-                  labelStyle: TextStyle(color: Colors.white70),
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  hintText: (member['name'] ?? '').toString().isNotEmpty
+                      ? member['name']?.toString()
+                      : null,
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  suffixIcon: IconButton(
+                    tooltip: 'Search club members',
+                    icon: const Icon(Icons.search, color: Color(0xFFFFD700)),
+                    onPressed: () => _openMemberSelector(
+                      index,
+                      nameController,
+                      emailController,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -203,26 +223,37 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
               setState(() {
                 _committee[index]['name'] = newName;
-                _committee[index]['email'] = newEmail;
+                if (newName.isEmpty) {
+                  _committee[index]['email'] = '';
+                  _committee[index]['userId'] = '';
+                  _committee[index]['avatarUrl'] = '';
+                } else {
+                  _committee[index]['email'] = newEmail;
+                }
               });
               Navigator.pop(context);
 
-              // Persist change to Supabase if this role exists in committee_roles
-              final id = _committee[index]['id'];
+              final id = _committee[index]['id']?.toString();
+              if (id == null || id.isEmpty) return;
+
               try {
-                if (id != null && id.isNotEmpty) {
-                  await _supabase
-                      .from('committee_roles')
-                      .update({
-                        'name': newName,
-                        'email': newEmail,
-                        'user_id': (_committee[index]['userId'] ?? '').isEmpty
-                            ? null
-                            : _committee[index]['userId'],
-                        'avatar_url': _committee[index]['avatarUrl'] ?? '',
-                      })
-                      .eq('id', id);
-                }
+                await _supabase
+                    .from('committee_roles')
+                    .update({
+                      'name': newName,
+                      'email': newName.isEmpty ? '' : newEmail,
+                      'user_id': newName.isEmpty
+                          ? null
+                          : (_committee[index]['userId'] ?? '')
+                                .toString()
+                                .isEmpty
+                          ? null
+                          : _committee[index]['userId'],
+                      'avatar_url': newName.isEmpty
+                          ? ''
+                          : (_committee[index]['avatarUrl'] ?? '').toString(),
+                    })
+                    .eq('id', id);
               } catch (e) {
                 debugPrint('Error updating committee role: $e');
               }
@@ -1172,37 +1203,79 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                       width: 1,
                     ),
                   ),
-                  child: Row(
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      const Icon(
-                        Icons.people,
-                        color: Color(0xFFFFD700),
-                        size: 28,
+                      // Centered title + description
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Builder(
+                            builder: (context) {
+                              final name = _clubConfig?.name ?? '';
+                              String display;
+                              if (name.isEmpty) {
+                                display = 'Club Committee';
+                              } else {
+                                // Use simple initials (e.g. "NNBR", "NRR")
+                                // to avoid overlapping the admin icon.
+                                final lower = name.toLowerCase();
+                                String initials;
+                                if (lower.contains('norwich road runners')) {
+                                  initials = 'NRR';
+                                } else if (lower.contains(
+                                      'north norfolk beach runners',
+                                    ) ||
+                                    lower.contains('nnbr')) {
+                                  initials = 'NNBR';
+                                } else {
+                                  final buffer = StringBuffer();
+                                  for (final raw in name.split(' ')) {
+                                    final letters = raw
+                                        .replaceAll(RegExp(r'[^A-Za-z]'), '')
+                                        .trim();
+                                    if (letters.isNotEmpty) {
+                                      buffer.write(letters[0].toUpperCase());
+                                    }
+                                  }
+                                  initials = buffer.isEmpty
+                                      ? name
+                                      : buffer.toString();
+                                }
+                                display = '$initials Committee';
+                              }
+
+                              return Text(
+                                display,
+                                style: const TextStyle(
+                                  color: Color.fromARGB(255, 238, 228, 30),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                textAlign: TextAlign.center,
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'For general enquiries, please contact The Chairperson or The Secretary via email.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _clubConfig?.name.isNotEmpty == true
-                                  ? 'The ${_clubConfig!.name} Committee'
-                                  : 'Club Committee',
-                              style: const TextStyle(
-                                color: Color.fromARGB(255, 238, 228, 30),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'For general enquiries, please contact The Chairperson or The Secretary via email.',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
+                      // Left icon decorative only; aligned with header text
+                      const Positioned(
+                        top: 4,
+                        left: 12,
+                        child: Icon(
+                          Icons.people,
+                          color: Color(0xFFFFD700),
+                          size: 28,
                         ),
                       ),
                     ],

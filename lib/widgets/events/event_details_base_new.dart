@@ -625,15 +625,53 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     if (user == null) return;
     final senderId = user.id;
     final isHost = senderId == hostUserId;
-
-    await supabase.from('event_host_messages').insert({
-      'event_id': event.id,
-      'sender_id': senderId,
-      'receiver_id': hostUserId,
-      'message': message,
-    });
+    final targetIds = <String>{};
 
     try {
+      if (!isHost) {
+        await supabase.from('event_host_messages').insert({
+          'event_id': event.id,
+          'sender_id': senderId,
+          'receiver_id': hostUserId,
+          'message': message,
+        });
+      } else {
+        // Host -> participants: find all members who have ever messaged
+        // about this event (excluding the host).
+        final rows = await supabase
+            .from('event_host_messages')
+            .select('sender_id')
+            .eq('event_id', event.id);
+
+        for (final row in rows) {
+          final id = row['sender_id'] as String?;
+          if (id != null && id.isNotEmpty && id != senderId) {
+            targetIds.add(id);
+          }
+        }
+
+        if (targetIds.isEmpty) {
+          await supabase.from('event_host_messages').insert({
+            'event_id': event.id,
+            'sender_id': senderId,
+            'receiver_id': hostUserId,
+            'message': message,
+          });
+        } else {
+          final payloads = [
+            for (final targetId in targetIds)
+              {
+                'event_id': event.id,
+                'sender_id': senderId,
+                'receiver_id': targetId,
+                'message': message,
+              },
+          ];
+
+          await supabase.from('event_host_messages').insert(payloads);
+        }
+      }
+
       final profile = await supabase
           .from('user_profiles')
           .select('full_name')
@@ -655,21 +693,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           eventId: event.id,
         );
       } else {
-        // Host -> participants: notify all members who have messaged about
-        // this event (excluding the host).
-        final rows = await supabase
-            .from('event_host_messages')
-            .select('sender_id')
-            .eq('event_id', event.id);
-
-        final targetIds = <String>{};
-        for (final row in rows) {
-          final id = row['sender_id'] as String?;
-          if (id != null && id.isNotEmpty && id != senderId) {
-            targetIds.add(id);
-          }
-        }
-
+        // Host -> participants: notify all known member senders.
         for (final targetId in targetIds) {
           await NotificationService.notifyUser(
             userId: targetId,
@@ -680,7 +704,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error notifying users about host message: $e');
+      debugPrint('❌ Error sending or notifying host message: $e');
     }
   }
 

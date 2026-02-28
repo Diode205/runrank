@@ -645,11 +645,40 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
 
     final currentUserId = supabase.auth.currentUser?.id;
     final isHost = currentUserId != null && currentUserId == hostUserId;
-    final chatPartnerName = isHost
-        ? 'Club Member'
-        : (widget.event.hostOrDirector.isNotEmpty
-              ? widget.event.hostOrDirector
-              : 'Host / Coach');
+
+    String chatPartnerName;
+    if (!isHost) {
+      chatPartnerName = widget.event.hostOrDirector.isNotEmpty
+          ? widget.event.hostOrDirector
+          : 'Host / Coach';
+    } else {
+      try {
+        final rows = await supabase
+            .from('event_host_messages')
+            .select('sender_id')
+            .eq('event_id', widget.event.id)
+            .neq('sender_id', hostUserId)
+            .order('created_at', ascending: false)
+            .limit(1);
+
+        if (rows.isNotEmpty && rows.first['sender_id'] != null) {
+          final partnerId = rows.first['sender_id'] as String;
+          final profile = await supabase
+              .from('user_profiles')
+              .select('full_name')
+              .eq('id', partnerId)
+              .maybeSingle();
+
+          chatPartnerName = (profile != null && profile['full_name'] != null)
+              ? profile['full_name'] as String
+              : 'Club Member';
+        } else {
+          chatPartnerName = 'Club Member';
+        }
+      } catch (_) {
+        chatPartnerName = 'Club Member';
+      }
+    }
 
     showModalBottomSheet(
       context: context,

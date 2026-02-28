@@ -46,6 +46,9 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   RealtimeChannel? _commentsChannel;
   Timer? _commentsPollTimer;
 
+  // Viewer club name (NNBR, NRR, etc.) for per-club UI tweaks.
+  String? viewerClubName;
+
   ClubEvent get event;
 
   @override
@@ -112,6 +115,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
         final raw = (profile?['club'] as String?)?.trim();
         clubName = (raw != null && raw.isNotEmpty) ? raw : null;
+        viewerClubName = clubName;
       }
     } catch (e) {
       debugPrint('EventDetailsBase: error resolving club for totalUsers: $e');
@@ -663,15 +667,61 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     if (user == null) return;
     final senderId = user.id;
     final isHost = senderId == hostUserId;
+    // When the member sends, we store a single row addressed to the host.
+    // When the host replies, we fan out rows per member so that
+    // each participant sees the reply under typical RLS
+    // (sender_id = auth.uid() OR receiver_id = auth.uid()).
 
-    await supabase.from('event_host_messages').insert({
-      'event_id': event.id,
-      'sender_id': senderId,
-      'receiver_id': hostUserId,
-      'message': message,
-    });
+    final targetIds = <String>{};
 
     try {
+      if (!isHost) {
+        await supabase.from('event_host_messages').insert({
+          'event_id': event.id,
+          'sender_id': senderId,
+          'receiver_id': hostUserId,
+          'message': message,
+        });
+      } else {
+        // Host -> participants: find all members who have ever messaged
+        // about this event (excluding the host).
+        final rows = await supabase
+            .from('event_host_messages')
+            .select('sender_id')
+            .eq('event_id', event.id);
+
+        for (final row in rows) {
+          final id = row['sender_id'] as String?;
+          if (id != null && id.isNotEmpty && id != senderId) {
+            targetIds.add(id);
+          }
+        }
+
+        if (targetIds.isEmpty) {
+          // No known recipients yet – store a self-addressed copy so
+          // the host still sees their own message thread.
+          await supabase.from('event_host_messages').insert({
+            'event_id': event.id,
+            'sender_id': senderId,
+            'receiver_id': hostUserId,
+            'message': message,
+          });
+        } else {
+          final payloads = [
+            for (final targetId in targetIds)
+              {
+                'event_id': event.id,
+                'sender_id': senderId,
+                'receiver_id': targetId,
+                'message': message,
+              },
+          ];
+
+          await supabase.from('event_host_messages').insert(payloads);
+        }
+      }
+
+      // Shared notification payload
       final profile = await supabase
           .from('user_profiles')
           .select('full_name')
@@ -693,21 +743,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           eventId: event.id,
         );
       } else {
-        // Host -> participants: notify all members who have messaged about
-        // this event (excluding the host).
-        final rows = await supabase
-            .from('event_host_messages')
-            .select('sender_id')
-            .eq('event_id', event.id);
-
-        final targetIds = <String>{};
-        for (final row in rows) {
-          final id = row['sender_id'] as String?;
-          if (id != null && id.isNotEmpty && id != senderId) {
-            targetIds.add(id);
-          }
-        }
-
+        // Host -> participants: notify all known member senders.
         for (final targetId in targetIds) {
           await NotificationService.notifyUser(
             userId: targetId,
@@ -718,7 +754,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error notifying users about host message: $e');
+      debugPrint('❌ Error sending or notifying host message: $e');
     }
   }
 

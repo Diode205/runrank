@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -224,15 +225,68 @@ class HostChatSheetState extends State<HostChatSheet> {
   // messageId -> { emoji -> [userIds] }
   Map<String, Map<String, List<String>>> _messageReactions = {};
   ScrollController? _listController;
+  RealtimeChannel? _hostMessagesChannel;
+  Timer? _hostMessagesPollTimer;
+  String? _currentUserId;
+  bool _isOtherTyping = false;
+  DateTime? _otherLastActiveAt;
+  bool _iAmTyping = false;
+  Timer? _typingDebounce;
 
   @override
   void initState() {
     super.initState();
+    _currentUserId = _supabase.auth.currentUser?.id;
     _refresh();
+
+    // Live updates: subscribe to event_host_messages changes
+    _hostMessagesChannel = _supabase
+        .channel('event_host_messages_${widget.event.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'event_host_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'event_id',
+            value: widget.event.id,
+          ),
+          callback: (_) async {
+            if (!mounted) return;
+            await _refresh();
+          },
+        )
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload, {ref}) {
+            final userId = payload['user_id'] as String?;
+            final isTyping = payload['is_typing'] as bool? ?? false;
+            if (userId == null || userId == _currentUserId) return;
+            if (!mounted) return;
+            setState(() {
+              _isOtherTyping = isTyping;
+              _otherLastActiveAt = DateTime.now();
+            });
+          },
+        )
+        .subscribe();
+
+    // Fallback poll in case realtime misses an update
+    _hostMessagesPollTimer = Timer.periodic(const Duration(seconds: 15), (
+      _,
+    ) async {
+      if (!mounted) return;
+      await _refresh();
+    });
   }
 
   @override
   void dispose() {
+    _hostMessagesPollTimer?.cancel();
+    _typingDebounce?.cancel();
+    if (_hostMessagesChannel != null) {
+      _supabase.removeChannel(_hostMessagesChannel!);
+    }
     _listController = null;
     super.dispose();
   }
@@ -244,6 +298,7 @@ class HostChatSheetState extends State<HostChatSheet> {
       final data = await widget.loadMessages(widget.event.id);
       if (!mounted) return;
       _messages = data;
+      _updateLastActiveFromMessages();
       _loading = false;
       if (mounted) setState(() {});
       _scrollToBottom();
@@ -258,6 +313,25 @@ class HostChatSheetState extends State<HostChatSheet> {
           context,
         ).showSnackBar(SnackBar(content: Text('Unable to load messages: $e')));
       }
+    }
+  }
+
+  void _updateLastActiveFromMessages() {
+    if (_currentUserId == null) return;
+    DateTime? last;
+    for (final m in _messages) {
+      if (m['sender_id'] == _currentUserId) continue;
+      final createdAt = m['created_at'] as String?;
+      if (createdAt == null) continue;
+      try {
+        final dt = DateTime.parse(createdAt).toLocal();
+        if (last == null || dt.isAfter(last)) {
+          last = dt;
+        }
+      } catch (_) {}
+    }
+    if (last != null) {
+      _otherLastActiveAt = last;
     }
   }
 
@@ -465,6 +539,21 @@ class HostChatSheetState extends State<HostChatSheet> {
     }
   }
 
+  String _formatLastSeen(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds <= 30) return 'Online now';
+    if (diff.inMinutes < 1) return 'Last seen just now';
+    if (diff.inMinutes < 60) return 'Last seen ${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return 'Last seen ${diff.inHours} h ago';
+
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return 'Last seen $d/$m $h:$min';
+  }
+
   Future<void> _handleSend() async {
     final text = widget.messageController.text.trim();
     if (text.isEmpty || _sending) return;
@@ -475,6 +564,8 @@ class HostChatSheetState extends State<HostChatSheet> {
       await widget.sendMessage(widget.hostUserId, text);
       if (!mounted) return;
       widget.messageController.clear();
+      _iAmTyping = false;
+      _sendTyping(false);
       await _refresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -495,9 +586,40 @@ class HostChatSheetState extends State<HostChatSheet> {
     }
   }
 
+  void _sendTyping(bool isTyping) {
+    // Typing broadcasts are currently a no-op until
+    // Realtime broadcast support is available in the client.
+    if (_currentUserId == null || _hostMessagesChannel == null) return;
+  }
+
+  void _handleTypingChanged(String text) {
+    final hasText = text.trim().isNotEmpty;
+
+    if (hasText && !_iAmTyping) {
+      _iAmTyping = true;
+      _sendTyping(true);
+    }
+
+    _typingDebounce?.cancel();
+
+    if (!hasText && _iAmTyping) {
+      _iAmTyping = false;
+      _sendTyping(false);
+      return;
+    }
+
+    if (hasText) {
+      _typingDebounce = Timer(const Duration(seconds: 4), () {
+        if (!_iAmTyping) return;
+        _iAmTyping = false;
+        _sendTyping(false);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final currentUserId = _currentUserId;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -591,6 +713,23 @@ class HostChatSheetState extends State<HostChatSheet> {
                                       color: Colors.white70,
                                     ),
                                   ),
+                                  const SizedBox(height: 2),
+                                  if (_isOtherTyping)
+                                    const Text(
+                                      'Typing…',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF8BC34A),
+                                      ),
+                                    )
+                                  else if (_otherLastActiveAt != null)
+                                    Text(
+                                      _formatLastSeen(_otherLastActiveAt!),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white54,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -856,6 +995,7 @@ class HostChatSheetState extends State<HostChatSheet> {
                                   maxLines: null,
                                   textInputAction: TextInputAction.newline,
                                   style: const TextStyle(color: Colors.white),
+                                  onChanged: _handleTypingChanged,
                                   decoration: const InputDecoration(
                                     hintText: 'Type a message...',
                                     hintStyle: TextStyle(color: Colors.white38),
