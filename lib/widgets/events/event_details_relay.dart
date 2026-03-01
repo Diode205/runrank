@@ -259,47 +259,68 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                       ),
                       const Divider(height: 32, color: Colors.white12),
 
-                      // Relay type chip (RNR vs Ekiden)
+                      // Relay type chip (RNR vs Ekiden) + optional team name
                       if (e.relayTeam != null && e.relayTeam!.trim().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _isEkidenRelay
-                                  ? const Color(0x3322C55E)
-                                  : const Color(0x334A90E2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _isEkidenRelay
-                                    ? const Color(0xFF22C55E)
-                                    : const Color(0xFF4A90E2),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _isEkidenRelay ? Icons.groups_2 : Icons.route,
-                                  size: 16,
-                                  color: _isEkidenRelay
-                                      ? const Color(0xFF22C55E)
-                                      : const Color(0xFF4A90E2),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _isEkidenRelay ? 'Ekiden Relay' : 'RNR Relay',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                decoration: BoxDecoration(
+                                  color: _isEkidenRelay
+                                      ? const Color(0x3322C55E)
+                                      : const Color(0x334A90E2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: _isEkidenRelay
+                                        ? const Color(0xFF22C55E)
+                                        : const Color(0xFF4A90E2),
                                   ),
                                 ),
-                              ],
-                            ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _isEkidenRelay
+                                          ? Icons.groups_2
+                                          : Icons.route,
+                                      size: 16,
+                                      color: _isEkidenRelay
+                                          ? const Color(0xFF22C55E)
+                                          : const Color(0xFF4A90E2),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _isEkidenRelay
+                                          ? 'Ekiden Relay'
+                                          : 'RNR Relay',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Team: ${e.relayTeam}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
 
