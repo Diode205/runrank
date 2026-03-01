@@ -46,9 +46,13 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         title: Text(
           e.title ?? "Event Details",
           style: const TextStyle(fontWeight: FontWeight.bold),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -435,7 +439,13 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     final isNRR = clubName.toLowerCase().contains('norwich road runners');
     final eventType = widget.event.eventType.toLowerCase();
     final isTraining = eventType.startsWith('training');
-    final useWhiteDecline = isNRR && isTraining;
+    final isSpecial = eventType == 'special_event';
+    final isSocial =
+        eventType == 'social_run' ||
+        eventType == 'meet_&_drink' ||
+        eventType == 'swim_or_cycle' ||
+        eventType == 'others';
+    final useWhiteDecline = isNRR && (isTraining || isSpecial || isSocial);
 
     if (hasResponse) {
       return Card(

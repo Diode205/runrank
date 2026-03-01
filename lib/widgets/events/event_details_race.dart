@@ -51,9 +51,13 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         title: Text(
           e.title ?? "Event Details",
           style: const TextStyle(fontWeight: FontWeight.bold),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -396,10 +400,21 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final hasResponse = myResponse != null;
     if (widget.event.isCancelled) return const SizedBox.shrink();
 
+    final clubName = viewerClubName ?? '';
+    final isNRR = clubName.toLowerCase().contains('norwich road runners');
+
     final isCrossCountry =
         widget.event.eventType.toLowerCase() == 'cross_country';
     final isCromerCrossCountry =
         isCrossCountry && widget.event.venue.toLowerCase().contains('cromer');
+
+    final raceName = widget.event.raceName?.toLowerCase() ?? '';
+    final isBroadlandXC =
+        isCrossCountry &&
+        raceName.contains('broadland') &&
+        raceName.contains('country') &&
+        raceName.contains('park');
+    final treatAsRaceStyleXC = isCromerCrossCountry || isBroadlandXC;
 
     if (hasResponse) {
       return Card(
@@ -449,8 +464,21 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final isHandicap =
         widget.event.eventType.toLowerCase() == "handicap_series";
 
-    // Cross Country (non-Cromer): running only, no marshal/unavailable buttons
-    if (isCrossCountry && !isCromerCrossCountry) {
+    // For NRR races (including Broadland XC treated as race-style),
+    // use white buttons for running and unavailable.
+    final bool useWhiteButtons =
+        isNRR && (!isCrossCountry || treatAsRaceStyleXC);
+    final ButtonStyle? whiteButtonStyle = useWhiteButtons
+        ? FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+          )
+        : null;
+
+    // Cross Country that is not part of the Broadland XC series (or other
+    // explicit race-style XC like Cromer): running only, no marshal or
+    // unavailable buttons. This keeps the simple EACCL-style page unchanged.
+    if (isCrossCountry && !treatAsRaceStyleXC) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -477,6 +505,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
           children: [
             // Run button (with time input for handicap)
             FilledButton(
+              style: whiteButtonStyle,
               onPressed: isHandicap
                   ? () => _showHandicapFinishTimeDialog()
                   : () => submitResponse(type: "run"),
@@ -500,6 +529,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
             ),
             // Unavailable button
             FilledButton(
+              style: whiteButtonStyle,
               onPressed: () => submitResponse(type: "unavailable"),
               child: const Text("❌", style: TextStyle(fontSize: 24)),
             ),

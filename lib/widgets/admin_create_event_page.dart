@@ -39,6 +39,12 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   late List<String> adminTypes;
   late List<String> socialTypes;
+  late List<String> raceNames;
+
+  String? _clubName;
+  bool get _isNRRClub =>
+      _clubName != null &&
+      _clubName!.toLowerCase().contains('norwich road runners');
 
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
@@ -59,6 +65,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     ];
 
     socialTypes = ["Social Run", "Meet & Drink", "Swim or Cycle", "Others"];
+
+    // Default NNBR race list; this may be overridden once we know the club.
+    raceNames = ["Holt 10K", "Worstead 5M", "Chase The Train"];
 
     selectedCategory = widget.userRole == "admin" ? "admin" : "social";
     selectedEventType = selectedCategory == "admin"
@@ -126,9 +135,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   // Relay team name (free text, e.g. "RNR Team X")
   final relayTeamCtrl = TextEditingController();
 
-  // RACE LIST
-  final raceNames = const ["Holt 10K", "Worstead 5M", "Chase The Train"];
+  // RACE LIST (defaults for NNBR; overridden for NRR once club is known)
   String? selectedRace;
+
+  // NRR-specific Cross Country series races
+  static const List<String> _nrrCrossCountryRaces = <String>[
+    'Broadland Country Park Race 1',
+    'Broadland Country Park Race 2',
+    'Broadland Country Park Race 3',
+  ];
 
   Future<void> _loadHosts() async {
     try {
@@ -165,6 +180,37 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       final rows = await query.order('full_name');
 
       setState(() {
+        _clubName = clubName;
+
+        // Adjust admin event types and race list based on club.
+        if (_isNRRClub) {
+          // For NRR: keep all admin event types except Handicap Series.
+          adminTypes = [
+            "Training 1",
+            "Training 2",
+            "Race",
+            "Cross Country",
+            "Relay",
+            "Special Event",
+          ];
+
+          // NRR signature races for the Race dropdown.
+          raceNames = ["Royal Norwich HM", "Dinosaur Dash", "Wroxham 5K"];
+        } else {
+          // Default (NNBR and other clubs).
+          adminTypes = [
+            "Training 1",
+            "Training 2",
+            "Race",
+            "Cross Country",
+            "Handicap Series",
+            "Relay",
+            "Special Event",
+          ];
+
+          raceNames = ["Holt 10K", "Worstead 5M", "Chase The Train"];
+        }
+
         _hosts = rows
             .map<Map<String, dynamic>>(
               (r) => {
@@ -507,11 +553,56 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               if (selectedEventType == "Cross Country")
                 _section(
                   "Race Name",
-                  TextFormField(
-                    controller: crossCountryRaceNameCtrl,
-                    decoration: const InputDecoration(labelText: "Race Name"),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? "Required" : null,
+                  Builder(
+                    builder: (context) {
+                      final current = crossCountryRaceNameCtrl.text.trim();
+                      final bool isSeriesRace = _nrrCrossCountryRaces.contains(
+                        current,
+                      );
+
+                      // For NRR: only use the dropdown when the current value
+                      // is one of the Broadland XC races or when blank.
+                      final bool useDropdown =
+                          _isNRRClub && (current.isEmpty || isSeriesRace);
+
+                      if (!useDropdown) {
+                        // Fallback to free-text for non-series races
+                        // (e.g., EACCL Race 10).
+                        return TextFormField(
+                          controller: crossCountryRaceNameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: "Race Name",
+                          ),
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? "Required" : null,
+                        );
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        value: current.isNotEmpty && isSeriesRace
+                            ? current
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: "Race Name",
+                        ),
+                        items: _nrrCrossCountryRaces
+                            .map(
+                              (e) => DropdownMenuItem<String>(
+                                value: e,
+                                child: Text(e),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            crossCountryRaceNameCtrl.text = v;
+                          });
+                        },
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? "Required" : null,
+                      );
+                    },
                   ),
                 ),
 
