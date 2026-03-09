@@ -225,7 +225,26 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
               ? true
               : (e.createdBy != null && _clubUserIds.contains(e.createdBy));
 
-          return inDateRange && inClub;
+          if (!(inDateRange && inClub)) {
+            return false;
+          }
+
+          // For cancelled events, only show them on the calendar for up to
+          // 24 hours after the time they were cancelled.
+          if (e.isCancelled) {
+            final cancelledAt = e.cancelledAt ?? e.createdAt;
+            if (cancelledAt == null) {
+              // If we have no timestamp at all, treat as already expired.
+              return false;
+            }
+
+            final expiry = cancelledAt.add(const Duration(hours: 24));
+            if (expiry.isBefore(now)) {
+              return false;
+            }
+          }
+
+          return true;
         },
       ).toList();
 
@@ -494,6 +513,9 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                                         'is_cancelled': true,
                                         'cancel_reason': reasonController.text
                                             .trim(),
+                                        'cancelled_at': DateTime.now()
+                                            .toUtc()
+                                            .toIso8601String(),
                                       })
                                       .eq('id', e.id);
 

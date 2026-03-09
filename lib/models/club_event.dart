@@ -28,6 +28,7 @@ class ClubEvent {
   final String? relayTeam;
   final bool isCancelled;
   final String? cancelReason;
+  final DateTime? cancelledAt;
 
   final List<Map<String, dynamic>>? relayStages; // parsed JSON
   final bool expectedTimeRequired;
@@ -53,6 +54,7 @@ class ClubEvent {
     required this.relayTeam,
     required this.isCancelled,
     required this.cancelReason,
+    required this.cancelledAt,
     required this.relayStages,
     required this.expectedTimeRequired,
   });
@@ -103,6 +105,9 @@ class ClubEvent {
       relayTeam: row['relay_team'],
       isCancelled: row['is_cancelled'] ?? false,
       cancelReason: row['cancel_reason'],
+      cancelledAt: row['cancelled_at'] == null
+          ? null
+          : DateTime.parse(row['cancelled_at']),
       relayStages: stages,
       expectedTimeRequired: row['expected_time_required'] ?? false,
     );

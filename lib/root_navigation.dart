@@ -190,7 +190,7 @@ class _RootNavigationState extends State<RootNavigation>
               _eventActivityCount,
               const Color(0xFF0057B7),
             ),
-            label: 'Club Hub',
+            label: 'ClubHub',
           ),
           NavigationDestination(
             icon: _buildBadgeIcon(
