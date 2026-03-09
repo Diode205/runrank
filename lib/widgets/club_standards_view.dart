@@ -35,17 +35,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   late Timer _imageTimer;
   int _currentImageIndex = 0;
   List<String> _carouselImages = [
-    'assets/images/pic1.png',
-    'assets/images/pic2.png',
-    'assets/images/pic3.png',
-    'assets/images/pic4.png',
-    'assets/images/pic5.png',
-    'assets/images/pic6.png',
-    'assets/images/pic7.png',
-    'assets/images/pic8.png',
-    'assets/images/pic9.png',
-    'assets/images/pic10.png',
-    'assets/images/pic11.png',
+    // Neutral default while club is loading
+    'assets/images/rank_logo.png',
   ];
   late AnimationController _imageController;
   late Animation<double> _imageFadeAnimation;
@@ -95,6 +86,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   String _selectedGender = 'M';
   String? _resultMessage;
   String? _clubName;
+
+  // Whether we've finished loading the user's profile/club info
+  bool _profileLoaded = false;
 
   // Award / badge state
   bool _loadingAwardStatus = false;
@@ -222,7 +216,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               'assets/images/nrr1.png',
               'assets/images/nrr2.png',
             ];
-          } else {
+          } else if (lowerClub.contains('north norfolk beach runners')) {
             _carouselImages = [
               'assets/images/pic1.png',
               'assets/images/pic2.png',
@@ -236,12 +230,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               'assets/images/pic10.png',
               'assets/images/pic11.png',
             ];
+          } else {
+            // Other clubs get a neutral carousel until bespoke images exist
+            _carouselImages = ['assets/images/rank_logo.png'];
           }
         }
       });
     } catch (e) {
       // ignore: avoid_print
       print('Error pre-filling age from profile: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _profileLoaded = true;
+      });
     }
   }
 
@@ -256,12 +258,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           'Awards will be presented at the Annual Awards evening.';
     }
 
-    // Default / NNBR wording
-    return 'NNBR Club Standards require members to achieve qualifying times '
-        'in four of six distances over a calendar year to earn an award.\n\n'
-        'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
+    if (club.contains('north norfolk beach runners')) {
+      return 'NNBR Club Standards require members to achieve qualifying times '
+          'in four of six distances over a calendar year to earn an award.\n\n'
+          'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
+          'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
+          'Awards will be presented at the Annual Awards evening.';
+    }
+
+    // Generic wording while club is loading / for unknown clubs
+    return 'Club Standards require members to achieve qualifying performances '
+        'over key distances within a calendar year to earn an award.\n\n'
+        'Qualifying races are typically UKA licensed events and official club handicaps. Training runs do not count.\n\n'
         'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
-        'Awards will be presented at the Annual Awards evening.';
+        'Awards are usually presented at the Annual Awards evening.';
   }
 
   String _clubStandardsUrl() {
@@ -271,7 +281,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       return 'https://norwichroadrunners.co.uk/club-standards-1';
     }
 
-    return 'https://www.northnorfolkbeachrunners.com/club-standards';
+    if (club.contains('north norfolk beach runners')) {
+      return 'https://www.northnorfolkbeachrunners.com/club-standards';
+    }
+
+    // Neutral default link if club is unknown/loading
+    return 'https://norwichroadrunners.co.uk/club-standards-1';
   }
 
   String _clubStandardsLinkLabel() {
@@ -281,7 +296,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       return 'View full club standards on NRR website';
     }
 
-    return 'View full club standards on NNBR website';
+    if (club.contains('north norfolk beach runners')) {
+      return 'View full club standards on NNBR website';
+    }
+
+    return 'View full club standards on club website';
   }
 
   Future<void> _initAdminAndStatus() async {
@@ -875,38 +894,44 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         const SizedBox(height: 16),
 
         // --------------------------------------
-        // IMAGE CAROUSEL
+        // IMAGE CAROUSEL (only once club is known)
         // --------------------------------------
-        FadeTransition(
-          opacity: _imageFadeAnimation,
-          child: Container(
-            height: 200,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0055FF), width: 2),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                _carouselImages[_currentImageIndex],
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey.shade800,
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: Colors.white38,
-                        size: 48,
-                      ),
+        if (_clubName != null)
+          FadeTransition(
+            opacity: _imageFadeAnimation,
+            child: Builder(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.primary, width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      _carouselImages[_currentImageIndex],
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey.shade800,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.white38,
+                              size: 48,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
-        ),
       ],
     );
   }
@@ -1912,6 +1937,22 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    // Avoid showing a partial layout while we don't yet know the
+    // user's club/profile; once loaded, the full UI appears in
+    // one go instead of elements popping in.
+    if (!_profileLoaded) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: SizedBox(
+            height: 28,
+            width: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -2008,11 +2049,15 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                 padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
                 child: Builder(
                   builder: (context) {
-                    final isNRR =
-                        _clubName != null &&
-                        _clubName!.toLowerCase().contains(
-                          'norwich road runners',
-                        );
+                    final club = (_clubName ?? '').toLowerCase();
+                    final isNRR = club.contains('norwich road runners');
+                    final isNNBR = club.contains('north norfolk beach runners');
+
+                    // While club is unknown/loading, don't show a club hero at all
+                    // to avoid a noticeable flash before the club-specific UI.
+                    if (_clubName == null || (!isNRR && !isNNBR)) {
+                      return const SizedBox.shrink();
+                    }
 
                     // Common container with rounded corners & clipping so
                     // both clubs get visibly rounded images.

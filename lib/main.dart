@@ -182,9 +182,16 @@ class _RunRankAppState extends State<RunRankApp> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = _clubConfig?.primaryColor ?? const Color(0xFFFFD300);
-    final accentColor = _clubConfig?.accentColor ?? const Color(0xFF0057B7);
-    final backgroundColor = _clubConfig?.backgroundColor ?? Colors.black;
+    final hasClubConfig = _clubConfig != null;
+    final primaryColor = hasClubConfig
+        ? _clubConfig!.primaryColor
+        : Colors.white;
+    final accentColor = hasClubConfig
+        ? _clubConfig!.accentColor
+        : Colors.white70;
+    final backgroundColor = hasClubConfig
+        ? _clubConfig!.backgroundColor
+        : Colors.black;
 
     return MaterialApp(
       title: 'RunRank',

@@ -46,8 +46,8 @@ class ClubConfigService {
   static const _fallback = ClubConfig(
     id: 'fallback',
     name: 'Generic Running Club',
-    primaryColor: Color(0xFF0055FF),
-    accentColor: Color(0xFFFFD700),
+    primaryColor: Colors.white,
+    accentColor: Colors.white70,
     backgroundColor: Colors.black,
   );
 
