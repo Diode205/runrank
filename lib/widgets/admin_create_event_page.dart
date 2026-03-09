@@ -425,12 +425,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   }
 
   Widget _section(String title, Widget child) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
     return Card(
       elevation: 1,
       color: const Color(0xFF0F111A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+        side: BorderSide(color: primary, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -455,6 +458,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primary = colorScheme.primary;
+    final accent = colorScheme.secondary;
+
     return Scaffold(
       appBar: AppBar(title: const Text("Create Event")),
       body: SingleChildScrollView(
@@ -468,11 +476,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color(0xFF4A90E2),
-                          width: 1,
-                        ),
-                        foregroundColor: const Color(0xFFF5C542),
+                        side: BorderSide(color: primary, width: 1),
+                        foregroundColor: primary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -491,11 +496,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color(0xFF4A90E2),
-                          width: 1,
-                        ),
-                        foregroundColor: const Color(0xFFF5C542),
+                        side: BorderSide(color: primary, width: 1),
+                        foregroundColor: primary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -770,7 +772,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 color: const Color(0xFF0F111A),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFF4A90E2), width: 1),
+                  side: BorderSide(color: primary, width: 1),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -782,7 +784,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.yellow[700],
+                          color: primary,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -791,10 +793,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           Expanded(
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: Color(0xFF4A90E2),
-                                  width: 1,
-                                ),
+                                side: BorderSide(color: accent, width: 1),
                                 foregroundColor: Colors.white,
                               ),
                               onPressed: pickDate,
@@ -810,10 +809,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             Expanded(
                               child: OutlinedButton(
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFF4A90E2),
-                                    width: 1,
-                                  ),
+                                  side: BorderSide(color: accent, width: 1),
                                   foregroundColor: Colors.white,
                                 ),
                                 onPressed: () async {
@@ -867,7 +863,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+                    side: BorderSide(color: primary, width: 1),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
