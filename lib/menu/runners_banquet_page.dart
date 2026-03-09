@@ -315,8 +315,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       );
     }
 
-    final themeYellow = const Color(0xFFFFD700);
-    final themeBlue = const Color(0xFF0057B7);
+    final theme = Theme.of(context);
+    final themeYellow = theme.colorScheme.primary;
+    final themeBlue = theme.colorScheme.secondary;
 
     return Scaffold(
       backgroundColor: Colors.black,

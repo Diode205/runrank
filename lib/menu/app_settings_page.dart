@@ -118,6 +118,9 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), centerTitle: true),
       body: ListView(
@@ -127,7 +130,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             color: const Color(0xFF0F111A),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -180,15 +183,15 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
             backgroundColor: const Color(0xFF0F111A),
             collapsedShape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
             leading: const Icon(
               Icons.privacy_tip_outlined,
-              color: Color(0xFFF5C542),
+              color: Colors.white,
             ),
             title: const Text(
               'Privacy Policy',
@@ -249,9 +252,9 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                   children: [
                     TextButton(
                       onPressed: _openAppPrivacy,
-                      child: const Text(
+                      child: Text(
                         'View Full App Privacy Policy',
-                        style: TextStyle(color: Colors.amber),
+                        style: TextStyle(color: primary),
                       ),
                     ),
                     TextButton(
@@ -263,9 +266,9 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                           ),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         'Read more',
-                        style: TextStyle(color: Colors.amber),
+                        style: TextStyle(color: primary),
                       ),
                     ),
                   ],
@@ -280,13 +283,13 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
             backgroundColor: const Color(0xFF0F111A),
             collapsedShape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
-            leading: const Icon(Icons.gavel_outlined, color: Color(0xFFF5C542)),
+            leading: const Icon(Icons.gavel_outlined, color: Colors.white),
             title: const Text(
               'Terms of Use',
               style: TextStyle(color: Colors.white),
@@ -306,10 +309,10 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
             color: const Color(0xFF0F111A),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+              side: BorderSide(color: primary, width: 1),
             ),
             child: ListTile(
-              leading: const Icon(Icons.help_outline, color: Color(0xFFF5C542)),
+              leading: const Icon(Icons.help_outline, color: Colors.white),
               title: const Text(
                 'Help & Feedback',
                 style: TextStyle(color: Colors.white),

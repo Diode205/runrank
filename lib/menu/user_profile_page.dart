@@ -389,6 +389,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _buildHexAvatar() {
+    final primary = Theme.of(context).colorScheme.primary;
     final initials = _initials();
 
     return GestureDetector(
@@ -404,9 +405,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 // Outer blue hexagon border
                 ClipPath(
                   clipper: _HexagonClipper(),
-                  child: Container(
-                    color: const Color(0xFF0057B7), // Blue border
-                  ),
+                  child: Container(color: primary),
                 ),
                 // Inner dark hexagon with image / initials
                 Padding(
@@ -467,6 +466,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+
     final title = _fullName ?? 'Your Profile';
 
     return Scaffold(
@@ -522,18 +524,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFD300).withValues(alpha: 0.15),
+                      color: primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFFFD300),
-                        width: 1,
-                      ),
+                      border: Border.all(color: primary, width: 1),
                     ),
                     child: Text(
                       _memberSinceText(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFFFD300),
+                        color: primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -548,15 +547,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     decoration: BoxDecoration(
                       color: Colors.grey.shade900,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFF0057B7),
-                        width: 1,
-                      ),
+                      border: Border.all(color: primary, width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(
-                            0xFF0057B7,
-                          ).withValues(alpha: 0.25),
+                          color: primary.withValues(alpha: 0.25),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),

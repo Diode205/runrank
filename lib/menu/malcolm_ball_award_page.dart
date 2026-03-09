@@ -349,6 +349,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   }
 
   Widget _hallOfFameSection() {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -357,25 +359,20 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         decoration: BoxDecoration(
           color: const Color(0xFF0F111A),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF5C542), width: 1),
+          border: Border.all(color: primary, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Centered header
-            const SizedBox(
+            SizedBox(
               height: 36,
               child: Center(
                 child: Text(
                   '🏆 Hall Of Fame 🏆',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color.from(
-                      alpha: 1,
-                      red: 0.851,
-                      green: 0.91,
-                      blue: 0.02,
-                    ),
+                    color: primary,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -411,11 +408,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0x33F5C542),
+                                color: primary.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFF5C542),
-                                ),
+                                border: Border.all(color: primary),
                               ),
                               child: Text(
                                 w.year.toString(),

@@ -280,8 +280,9 @@ class _ExpensesClaimPageState extends State<ExpensesClaimPage> {
 
   @override
   Widget build(BuildContext context) {
-    const themeYellow = Color(0xFFFFD700);
-    const themeBlue = Color(0xFF0057B7);
+    final theme = Theme.of(context);
+    final themeYellow = theme.colorScheme.primary;
+    final themeBlue = theme.colorScheme.secondary;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -832,9 +833,7 @@ class _ExpensesClaimPageState extends State<ExpensesClaimPage> {
                               label: const Text('Add Receipt'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
-                                side: const BorderSide(
-                                  color: Color.fromRGBO(242, 235, 22, 0.964),
-                                ),
+                                side: BorderSide(color: themeYellow),
                               ),
                             ),
                           ),
@@ -846,9 +845,7 @@ class _ExpensesClaimPageState extends State<ExpensesClaimPage> {
                               label: const Text('PDF/Image'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
-                                side: const BorderSide(
-                                  color: Color.fromRGBO(246, 242, 39, 0.874),
-                                ),
+                                side: BorderSide(color: themeYellow),
                               ),
                             ),
                           ),

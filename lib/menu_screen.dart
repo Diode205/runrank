@@ -84,6 +84,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final colorScheme = Theme.of(context).colorScheme;
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
@@ -169,8 +170,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5C542),
-                        foregroundColor: Colors.black,
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -216,9 +217,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                           if (!mounted) return;
                           Navigator.pop(sheetContext);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: Color(0xFF1F3A93),
-                              content: Text(
+                            SnackBar(
+                              backgroundColor: colorScheme.primary,
+                              content: const Text(
                                 'Profile updated',
                                 style: TextStyle(color: Colors.white),
                               ),
@@ -259,6 +260,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   InputDecoration _inputDecoration(String label) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final accent = theme.colorScheme.secondary;
+
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
@@ -267,11 +272,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1F3A93)),
+        borderSide: BorderSide(color: accent),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFF5C542)),
+        borderSide: BorderSide(color: primary),
       ),
     );
   }
@@ -550,6 +555,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   Color _getMembershipColor(String? membershipType) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     switch (membershipType) {
       case '1st Claim':
         return const Color(0xFFFFD700);
@@ -560,7 +567,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       case 'Full-Time Education':
         return const Color(0xFF2E8B57);
       default:
-        return const Color(0xFFF5C542);
+        return primary;
     }
   }
 
@@ -710,13 +717,17 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     required String email,
     required String memberSince,
   }) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final accent = theme.colorScheme.secondary;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF1F3A93),
-            const Color(0xFFF5C542).withValues(alpha: 0.35),
+            accent,
+            primary.withValues(alpha: 0.35),
             const Color(0xFF0F111A),
           ],
           stops: const [0.0, 0.45, 1.0],
@@ -724,7 +735,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF5C542), width: 1.1),
+        border: Border.all(color: primary, width: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -933,15 +944,17 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Card(
       color: const Color(0xFF0F111A),
       elevation: 0.5,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFF5C542), width: 1),
+        side: BorderSide(color: primary, width: 1),
       ),
       child: ListTile(
-        leading: Icon(icon, size: 30, color: const Color(0xFFF5C542)),
+        leading: Icon(icon, size: 30, color: primary),
         title: Text(
           title,
           style: const TextStyle(fontSize: 16, color: Colors.white),

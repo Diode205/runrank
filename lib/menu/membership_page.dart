@@ -189,15 +189,17 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildStatusCard() {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF0057B7)),
+        border: Border.all(color: primary),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0057B7).withValues(alpha: 0.25),
+            color: primary.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
