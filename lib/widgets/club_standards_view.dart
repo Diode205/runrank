@@ -816,8 +816,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               child: Row(
                 children: [
                   Expanded(
+                    flex: _selectedDistance == 'Ultra' ? 4 : 1,
                     child: DropdownButtonFormField<String>(
-                      initialValue: _selectedDistance,
+                      isExpanded: true,
+                      value: _selectedDistance,
                       items: distances
                           .map(
                             (e) => DropdownMenuItem(value: e, child: Text(e)),
@@ -835,12 +837,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   ),
                   if (_selectedDistance == 'Ultra') ...[
                     const SizedBox(width: 8),
-                    SizedBox(
-                      width: 110,
+                    Expanded(
+                      flex: 3,
                       child: TextField(
                         controller: _ultraDistanceController,
                         decoration: const InputDecoration(
-                          labelText: 'Ultra',
+                          labelText: 'K / M',
                           hintText: 'KM or MI',
                         ),
                       ),
@@ -902,11 +904,19 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             child: Builder(
               builder: (context) {
                 final colorScheme = Theme.of(context).colorScheme;
+                final clubLower = (_clubName ?? '').toLowerCase();
+                final isNNBR = clubLower.contains(
+                  'north norfolk beach runners',
+                );
+                final borderColor = isNNBR
+                    ? const Color(0xFF0055FF)
+                    : colorScheme.primary;
+
                 return Container(
                   height: 200,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: colorScheme.primary, width: 2),
+                    border: Border.all(color: borderColor, width: 2),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
@@ -1952,359 +1962,398 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         ),
       );
     }
+    final baseTheme = Theme.of(context);
+    final clubLower = (_clubName ?? '').toLowerCase();
+    final isNNBR = clubLower.contains('north norfolk beach runners');
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            // HEADER
-            SliverAppBar(
-              backgroundColor: Colors.black,
-              elevation: _scrollOffset > 0 ? 4 : 0,
-              floating: false,
-              pinned: true,
-              expandedHeight: 130,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Container(
+    // For NNBR, restore the classic blue/yellow field borders
+    // while keeping other clubs using the app-wide theme.
+    final themedData = isNNBR
+        ? baseTheme.copyWith(
+            inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFF0055FF)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFFFFD700),
+                  width: 2,
+                ),
+              ),
+            ),
+          )
+        : baseTheme;
+
+    return Theme(
+      data: themedData,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              // HEADER
+              SliverAppBar(
+                backgroundColor: Colors.black,
+                elevation: _scrollOffset > 0 ? 4 : 0,
+                floating: false,
+                pinned: true,
+                expandedHeight: 130,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 22,
+                      vertical: 8,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.yellowAccent.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white30, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.yellowAccent.withValues(
-                            alpha: _scrollOffset > 0 ? 0.4 : 0.3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 22,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white30, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellowAccent.withValues(
+                              alpha: _scrollOffset > 0 ? 0.4 : 0.3,
+                            ),
+                            blurRadius: 12,
+                            spreadRadius: 2,
                           ),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Image.asset('assets/images/rank_logo.png', height: 70),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  'CLUB STANDARDS',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 23,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color.fromARGB(255, 77, 3, 224),
-                                    letterSpacing: 1.0,
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Image.asset(
+                            'assets/images/rank_logo.png',
+                            height: 70,
+                          ),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'CLUB STANDARDS',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 23,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color.fromARGB(255, 77, 3, 224),
+                                      letterSpacing: 1.0,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 1),
-                              FadeTransition(
-                                opacity: _fadeAnimation,
-                                child: SlideTransition(
-                                  position: _slideAnimation,
-                                  child: const FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      'Race And Admin Team On The Go',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontStyle: FontStyle.normal,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color.fromARGB(221, 235, 81, 5),
+                                const SizedBox(height: 1),
+                                FadeTransition(
+                                  opacity: _fadeAnimation,
+                                  child: SlideTransition(
+                                    position: _slideAnimation,
+                                    child: const FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Race And Admin Team On The Go',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontStyle: FontStyle.normal,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color.fromARGB(
+                                            221,
+                                            235,
+                                            81,
+                                            5,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // TOP CLUB PHOTO (static)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                  child: Builder(
+                    builder: (context) {
+                      final club = (_clubName ?? '').toLowerCase();
+                      final isNRR = club.contains('norwich road runners');
+                      final isNNBR = club.contains(
+                        'north norfolk beach runners',
+                      );
+
+                      // While club is unknown/loading, don't show a club hero at all
+                      // to avoid a noticeable flash before the club-specific UI.
+                      if (_clubName == null || (!isNRR && !isNNBR)) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // Common container with rounded corners & clipping so
+                      // both clubs get visibly rounded images.
+                      return Container(
+                        height: isNRR ? 180 : 150,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.black,
                         ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.asset(
+                          isNRR
+                              ? 'assets/images/NRRmain.png'
+                              : 'assets/images/nnbr_cover.png',
+                          width: double.infinity,
+                          fit: isNRR ? BoxFit.cover : BoxFit.contain,
+                          alignment: Alignment.center,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // INPUT FORM
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black45, blurRadius: 12),
                       ],
                     ),
+                    child: _buildInputForm(),
                   ),
                 ),
               ),
-            ),
 
-            // TOP CLUB PHOTO (static)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
-                child: Builder(
-                  builder: (context) {
-                    final club = (_clubName ?? '').toLowerCase();
-                    final isNRR = club.contains('norwich road runners');
-                    final isNNBR = club.contains('north norfolk beach runners');
-
-                    // While club is unknown/loading, don't show a club hero at all
-                    // to avoid a noticeable flash before the club-specific UI.
-                    if (_clubName == null || (!isNRR && !isNNBR)) {
-                      return const SizedBox.shrink();
-                    }
-
-                    // Common container with rounded corners & clipping so
-                    // both clubs get visibly rounded images.
-                    return Container(
-                      height: isNRR ? 180 : 150,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.black,
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset(
-                        isNRR
-                            ? 'assets/images/NRRmain.png'
-                            : 'assets/images/nnbr_cover.png',
-                        width: double.infinity,
-                        fit: isNRR ? BoxFit.cover : BoxFit.contain,
-                        alignment: Alignment.center,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-            // INPUT FORM
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black45, blurRadius: 12),
-                    ],
-                  ),
-                  child: _buildInputForm(),
-                ),
-              ),
-            ),
-
-            // RESULT MESSAGE
-            SliverToBoxAdapter(
-              child: _resultMessage == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      child: Text(
-                        _resultMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+              // RESULT MESSAGE
+              SliverToBoxAdapter(
+                child: _resultMessage == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          _resultMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-            ),
-
-            // INFO SECTIONS (Scrollable)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildInfoSection(
-                    'Club Standards',
-                    _clubStandardsDescription(),
-                    url: _clubStandardsUrl(),
-                    linkLabel: _clubStandardsLinkLabel(),
-                  ),
-                  _buildInfoSection(
-                    'Age-Grading',
-                    'Age-graded percentages are provided for guidance only and do not form part of the Club Standards assessment.\n\n'
-                        'Age record tables used are from ARRS, the Association of Road Racing Statisticians, which they maintained and updates as necessary.\n\n'
-                        'The distance record updates are as follows:\n'
-                        '\u2022 5km last update on 06 December 2017\n'
-                        '\u2022 10km last update on 28 November 2017\n'
-                        '\u2022 5miles last update on 10 December 2017\n'
-                        '\u2022 10miles last update on 16 March 2020\n'
-                        '\u2022 Half Marathon last update on 20 November 2017\n'
-                        '\u2022 Marathon last update on 01 November 2019\n\n'
-                        'ARRS is actively looking for people to help maintain their records, as well as sponsorships.',
-                    url: 'https://arrs.run/',
-                    linkLabel:
-                        'View full age-grading tables at ARRS (arrs.run)',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildCurrentStatusSection(),
-                  _buildAdminAwardsSection(),
-                  const SizedBox(height: 80),
-                ]),
               ),
-            ),
-          ],
+
+              // INFO SECTIONS (Scrollable)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildInfoSection(
+                      'Club Standards',
+                      _clubStandardsDescription(),
+                      url: _clubStandardsUrl(),
+                      linkLabel: _clubStandardsLinkLabel(),
+                    ),
+                    _buildInfoSection(
+                      'Age-Grading',
+                      'Age-graded percentages are provided for guidance only and do not form part of the Club Standards assessment.\n\n'
+                          'Age record tables used are from ARRS, the Association of Road Racing Statisticians, which they maintained and updates as necessary.\n\n'
+                          'The distance record updates are as follows:\n'
+                          '\u2022 5km last update on 06 December 2017\n'
+                          '\u2022 10km last update on 28 November 2017\n'
+                          '\u2022 5miles last update on 10 December 2017\n'
+                          '\u2022 10miles last update on 16 March 2020\n'
+                          '\u2022 Half Marathon last update on 20 November 2017\n'
+                          '\u2022 Marathon last update on 01 November 2019\n\n'
+                          'ARRS is actively looking for people to help maintain their records, as well as sponsorships.',
+                      url: 'https://arrs.run/',
+                      linkLabel:
+                          'View full age-grading tables at ARRS (arrs.run)',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildCurrentStatusSection(),
+                    _buildAdminAwardsSection(),
+                    const SizedBox(height: 80),
+                  ]),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
 
-      // FIXED BUTTON BAR at bottom
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        color: Colors.black,
-        child: Builder(
-          builder: (context) {
-            final isNRR =
-                _clubName != null &&
-                _clubName!.toLowerCase().contains('norwich road runners');
+        // FIXED BUTTON BAR at bottom
+        bottomNavigationBar: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: Colors.black,
+          child: Builder(
+            builder: (context) {
+              final isNRR =
+                  _clubName != null &&
+                  _clubName!.toLowerCase().contains('norwich road runners');
 
-            return Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isNRR
-                          ? const Color(0xFFD32F2F) // red for NRR
-                          : const Color(0xFFFFC107), // yellow for NNBR
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isNRR ? Colors.white70 : Colors.black87,
-                        width: 1.5,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black45,
-                          blurRadius: 12,
-                          spreadRadius: 2,
+              return Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isNRR
+                            ? const Color(0xFFD32F2F) // red for NRR
+                            : const Color(0xFFFFC107), // yellow for NNBR
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isNRR ? Colors.white70 : Colors.black87,
+                          width: 1.5,
                         ),
-                      ],
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black45,
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _onCalculate,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: isNRR
+                              ? Colors.white
+                              : Colors.black, // text color
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Check\nAchievement',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: ElevatedButton(
-                      onPressed: _onCalculate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: isNRR
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isNRR
                             ? Colors.white
-                            : Colors.black, // text color
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                            : const Color(0xFF0D47A1), // deeper blue for NNBR
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isNRR ? Colors.black87 : Colors.white70,
+                          width: 1.5,
                         ),
-                      ),
-                      child: const Text(
-                        'Check\nAchievement',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isNRR
-                          ? Colors.white
-                          : const Color(0xFF0D47A1), // deeper blue for NNBR
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isNRR ? Colors.black87 : Colors.white70,
-                        width: 1.5,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => HistoryScreen(),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: isNRR
-                                ? Colors.black
-                                : Colors.white,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 12,
+                            spreadRadius: 2,
                           ),
-                          child: const Text(
-                            'View My\nRace Records',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (_showBadgeOnRecordsButton)
-                          Positioned(
-                            top: -6,
-                            right: -6,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    _levelColor(_awardLevel!),
-                                    const Color(0xFF001133),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => HistoryScreen(),
                                 ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black54,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: isNRR
+                                  ? Colors.black
+                                  : Colors.white,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
-                                Icons.emoji_events,
-                                size: 18,
-                                color: Colors.white,
+                            ),
+                            child: const Text(
+                              'View My\nRace Records',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                      ],
+                          if (_showBadgeOnRecordsButton)
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      _levelColor(_awardLevel!),
+                                      const Color(0xFF001133),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black54,
+                                      blurRadius: 8,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.emoji_events,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
