@@ -164,108 +164,113 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F111A),
-        title: Text(
-          'Edit ${member['role']}',
-          style: const TextStyle(color: Color(0xFFFFD700)),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 4),
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Name',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  hintText: (member['name'] ?? '').toString().isNotEmpty
-                      ? member['name']?.toString()
-                      : null,
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  suffixIcon: IconButton(
-                    tooltip: 'Search club members',
-                    icon: const Icon(Icons.search, color: Color(0xFFFFD700)),
-                    onPressed: () => _openMemberSelector(
-                      index,
-                      nameController,
-                      emailController,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final primary = colorScheme.primary;
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: Text(
+            'Edit ${member['role']}',
+            style: TextStyle(color: primary),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 4),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    hintText: (member['name'] ?? '').toString().isNotEmpty
+                        ? member['name']?.toString()
+                        : null,
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    suffixIcon: IconButton(
+                      tooltip: 'Search club members',
+                      icon: Icon(Icons.search, color: primary),
+                      onPressed: () => _openMemberSelector(
+                        index,
+                        nameController,
+                        emailController,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  labelStyle: TextStyle(color: Colors.white70),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
                 ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              final newEmail = emailController.text.trim();
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                final newEmail = emailController.text.trim();
 
-              setState(() {
-                _committee[index]['name'] = newName;
-                if (newName.isEmpty) {
-                  _committee[index]['email'] = '';
-                  _committee[index]['userId'] = '';
-                  _committee[index]['avatarUrl'] = '';
-                } else {
-                  _committee[index]['email'] = newEmail;
+                setState(() {
+                  _committee[index]['name'] = newName;
+                  if (newName.isEmpty) {
+                    _committee[index]['email'] = '';
+                    _committee[index]['userId'] = '';
+                    _committee[index]['avatarUrl'] = '';
+                  } else {
+                    _committee[index]['email'] = newEmail;
+                  }
+                });
+                Navigator.pop(context);
+
+                final id = _committee[index]['id']?.toString();
+                if (id == null || id.isEmpty) return;
+
+                try {
+                  await _supabase
+                      .from('committee_roles')
+                      .update({
+                        'name': newName,
+                        'email': newName.isEmpty ? '' : newEmail,
+                        'user_id': newName.isEmpty
+                            ? null
+                            : (_committee[index]['userId'] ?? '')
+                                  .toString()
+                                  .isEmpty
+                            ? null
+                            : _committee[index]['userId'],
+                        'avatar_url': newName.isEmpty
+                            ? ''
+                            : (_committee[index]['avatarUrl'] ?? '').toString(),
+                      })
+                      .eq('id', id);
+                } catch (e) {
+                  debugPrint('Error updating committee role: $e');
                 }
-              });
-              Navigator.pop(context);
-
-              final id = _committee[index]['id']?.toString();
-              if (id == null || id.isEmpty) return;
-
-              try {
-                await _supabase
-                    .from('committee_roles')
-                    .update({
-                      'name': newName,
-                      'email': newName.isEmpty ? '' : newEmail,
-                      'user_id': newName.isEmpty
-                          ? null
-                          : (_committee[index]['userId'] ?? '')
-                                .toString()
-                                .isEmpty
-                          ? null
-                          : _committee[index]['userId'],
-                      'avatar_url': newName.isEmpty
-                          ? ''
-                          : (_committee[index]['avatarUrl'] ?? '').toString(),
-                    })
-                    .eq('id', id);
-              } catch (e) {
-                debugPrint('Error updating committee role: $e');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFD700),
-              foregroundColor: Colors.black,
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
+              child: const Text('Save'),
             ),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -284,6 +289,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final primary = colorScheme.primary;
         final localSearchController = TextEditingController();
         List<Map<String, dynamic>> results = [];
         bool searching = false;
@@ -339,7 +346,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.search, color: Color(0xFFFFD700)),
+                      Icon(Icons.search, color: primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -371,7 +378,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                       fillColor: const Color(0xFF151828),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.white24),
+                        borderSide: BorderSide(color: primary.withOpacity(0.4)),
                       ),
                     ),
                     onChanged: (value) => doSearch(value, setModalState),
@@ -405,7 +412,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                           return ListTile(
                             leading: CircleAvatar(
                               radius: 18,
-                              backgroundColor: const Color(0xFF1E406A),
+                              backgroundColor: colorScheme.primary.withOpacity(
+                                0.25,
+                              ),
                               backgroundImage: avatarUrl.isNotEmpty
                                   ? NetworkImage(avatarUrl)
                                   : null,
@@ -544,32 +553,36 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0F111A),
-        title: const Text(
-          'Send warning',
-          style: TextStyle(color: Color(0xFFFFD700)),
-        ),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Message to user',
-            labelStyle: TextStyle(color: Colors.white70),
+      builder: (dialogContext) {
+        final primary = Theme.of(dialogContext).colorScheme.primary;
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: Text('Send warning', style: TextStyle(color: primary)),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              labelText: 'Message to user',
+              labelStyle: TextStyle(color: Colors.white70),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+              ),
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
     );
 
     if (ok != true || controller.text.trim().isEmpty) return;
@@ -601,32 +614,38 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       final reasonController = TextEditingController();
       final ok = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF0F111A),
-          title: const Text(
-            'Block user',
-            style: TextStyle(color: Color(0xFFFFD700)),
-          ),
-          content: TextField(
-            controller: reasonController,
-            style: const TextStyle(color: Colors.white),
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Reason (optional)',
-              labelStyle: TextStyle(color: Colors.white70),
+        builder: (dialogContext) {
+          final primary = Theme.of(dialogContext).colorScheme.primary;
+          return AlertDialog(
+            backgroundColor: const Color(0xFF0F111A),
+            title: Text('Block user', style: TextStyle(color: primary)),
+            content: TextField(
+              controller: reasonController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                labelStyle: TextStyle(color: Colors.white70),
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Block'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: Theme.of(
+                    dialogContext,
+                  ).colorScheme.onPrimary,
+                ),
+                child: const Text('Block'),
+              ),
+            ],
+          );
+        },
       );
 
       if (ok != true) return;
@@ -793,6 +812,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final primary = colorScheme.primary;
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -806,10 +827,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.admin_panel_settings,
-                          color: Color(0xFFFFD700),
-                        ),
+                        Icon(Icons.admin_panel_settings, color: primary),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
@@ -842,7 +860,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                         fillColor: const Color(0xFF151828),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white24),
+                          borderSide: BorderSide(
+                            color: primary.withOpacity(0.4),
+                          ),
                         ),
                       ),
                       onChanged: (value) => _searchUsers(value, setModalState),
@@ -1064,114 +1084,117 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F111A),
-        title: Text(
-          'Contact ${member['name']}',
-          style: const TextStyle(color: Color(0xFFFFD700)),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Role: ${member['role']}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: subjectController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Subject',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF0055FF),
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: messageController,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 6,
-                decoration: InputDecoration(
-                  labelText: 'Message',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF0055FF),
-                      width: 2,
-                    ),
-                  ),
-                  alignLabelWithHint: true,
-                ),
-              ),
-            ],
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        final primary = colorScheme.primary;
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: Text(
+            'Contact ${member['name']}',
+            style: TextStyle(color: primary),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Role: ${member['role']}',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: subjectController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Subject',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: primary, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: messageController,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Message',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: primary, width: 2),
+                    ),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
             ),
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (subjectController.text.trim().isEmpty ||
-                  messageController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in all fields'),
-                    backgroundColor: Colors.red,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (subjectController.text.trim().isEmpty ||
+                    messageController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all fields'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // TODO: Store enquiry in Supabase or send via email service
+                // For now, show a confirmation
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Message sent to ${member['name']}. Thank you!',
+                    ),
+                    backgroundColor: primary,
                   ),
                 );
-                return;
-              }
-
-              // TODO: Store enquiry in Supabase or send via email service
-              // For now, show a confirmation
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Message sent to ${member['name']}. Thank you!',
-                  ),
-                  backgroundColor: const Color(0xFF0055FF),
-                ),
-              );
-            },
-            icon: const Icon(Icons.send, size: 18),
-            label: const Text('Send'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFD700),
-              foregroundColor: Colors.black,
+              },
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('Send'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+    final accent = colorScheme.secondary;
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -1193,15 +1216,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0A1A3A), Color(0xFF0D2F5A)],
+                    gradient: LinearGradient(
+                      colors: [
+                        primary.withOpacity(0.75),
+                        primary.withOpacity(0.45),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(
-                      color: const Color(0xFF1E406A),
-                      width: 1,
-                    ),
+                    border: Border.all(color: primary, width: 1),
                   ),
                   child: Stack(
                     alignment: Alignment.center,
@@ -1248,8 +1271,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
                               return Text(
                                 display,
-                                style: const TextStyle(
-                                  color: Color.fromARGB(255, 238, 228, 30),
+                                style: TextStyle(
+                                  color: colorScheme.onPrimary,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -1269,12 +1292,12 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                         ],
                       ),
                       // Left icon decorative only; aligned with header text
-                      const Positioned(
+                      Positioned(
                         top: 4,
                         left: 12,
                         child: Icon(
                           Icons.people,
-                          color: Color(0xFFFFD700),
+                          color: colorScheme.onPrimary.withOpacity(0.9),
                           size: 28,
                         ),
                       ),
@@ -1288,10 +1311,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                     child: IconButton(
                       tooltip: 'Admin controls',
                       onPressed: _openAdminControls,
-                      icon: const Icon(
-                        Icons.admin_panel_settings,
-                        color: Color(0xFFFFD700),
-                      ),
+                      icon: Icon(Icons.admin_panel_settings, color: primary),
                     ),
                   ),
               ],
@@ -1321,7 +1341,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                             end: Alignment.bottomRight,
                           ),
                           border: Border.all(
-                            color: const Color(0xFF0055FF).withOpacity(0.3),
+                            color: primary.withOpacity(0.35),
                             width: 1,
                           ),
                         ),
@@ -1334,7 +1354,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                   if (avatarUrl.isNotEmpty)
                                     CircleAvatar(
                                       radius: 24,
-                                      backgroundColor: const Color(0xFF1E406A),
+                                      backgroundColor: primary.withOpacity(
+                                        0.25,
+                                      ),
                                       backgroundImage: NetworkImage(avatarUrl),
                                     )
                                   else
@@ -1343,11 +1365,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                       height: 48,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFF0055FF),
-                                            Color(0xFF0088FF),
-                                          ],
+                                        gradient: LinearGradient(
+                                          colors: [primary, accent],
                                         ),
                                       ),
                                       child: const Icon(
@@ -1364,8 +1383,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                       children: [
                                         Text(
                                           member['role'] ?? '',
-                                          style: const TextStyle(
-                                            color: Color(0xFF56D3FF),
+                                          style: TextStyle(
+                                            color: accent,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                             letterSpacing: 0.5,
@@ -1415,19 +1434,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                     child: Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFFFFD700,
-                                        ).withOpacity(0.2),
+                                        color: primary.withOpacity(0.18),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: const Color(
-                                            0xFFFFD700,
-                                          ).withOpacity(0.4),
+                                          color: primary.withOpacity(0.45),
                                         ),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.edit,
-                                        color: Color(0xFFFFD700),
+                                        color: primary,
                                         size: 16,
                                       ),
                                     ),
@@ -1447,19 +1462,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                     child: Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFF56D3FF,
-                                        ).withOpacity(0.2),
+                                        color: accent.withOpacity(0.18),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: const Color(
-                                            0xFF56D3FF,
-                                          ).withOpacity(0.4),
+                                          color: accent.withOpacity(0.45),
                                         ),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.send,
-                                        color: Color(0xFF56D3FF),
+                                        color: accent,
                                         size: 16,
                                       ),
                                     ),
