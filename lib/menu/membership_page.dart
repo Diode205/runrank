@@ -189,17 +189,23 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildStatusCard() {
-    final primary = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    Color borderColor = colorScheme.primary;
+
+    // Avoid washed-out white borders if the primary is very bright
+    if (borderColor.computeLuminance() > 0.8) {
+      borderColor = colorScheme.secondary;
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: primary),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: primary.withValues(alpha: 0.25),
+            color: borderColor.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -446,12 +452,20 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildNNBRInfo() {
+    final colorScheme = Theme.of(context).colorScheme;
+    Color borderColor = colorScheme.primary;
+
+    // Fall back to accent if primary is too close to white
+    if (borderColor.computeLuminance() > 0.8) {
+      borderColor = colorScheme.secondary;
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1F1F1F),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: borderColor.withValues(alpha: 0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

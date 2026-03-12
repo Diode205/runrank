@@ -389,7 +389,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _buildHexAvatar() {
-    final primary = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    Color borderColor = colorScheme.primary;
+
+    // If the primary color is very bright (near white),
+    // fall back to the accent color so the hex border
+    // still looks distinct on dark backgrounds.
+    if (borderColor.computeLuminance() > 0.8) {
+      borderColor = colorScheme.secondary;
+    }
     final initials = _initials();
 
     return GestureDetector(
@@ -405,7 +413,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 // Outer blue hexagon border
                 ClipPath(
                   clipper: _HexagonClipper(),
-                  child: Container(color: primary),
+                  child: Container(color: borderColor),
                 ),
                 // Inner dark hexagon with image / initials
                 Padding(

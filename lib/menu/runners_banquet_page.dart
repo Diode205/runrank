@@ -315,9 +315,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       );
     }
 
-    final theme = Theme.of(context);
-    final themeYellow = theme.colorScheme.primary;
-    final themeBlue = theme.colorScheme.secondary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final themeYellow = _brandYellow(colorScheme);
+    final themeBlue = _brandBlue(colorScheme);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -343,7 +343,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [themeYellow.withOpacity(0.9), themeBlue],
+                    colors: [themeYellow.withOpacity(0.95), themeBlue],
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(18),
@@ -1360,5 +1360,28 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         ],
       ),
     );
+  }
+
+  // Brand-aware helpers: when both primary and secondary colours
+  // from the global theme are very light (e.g. fallback white),
+  // switch to the familiar NNBR yellow/blue pairing so banquet
+  // headers, borders and highlights no longer appear white.
+
+  Color _brandYellow(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFFF5C542); // NNBR yellow
+    }
+    return colorScheme.primary;
+  }
+
+  Color _brandBlue(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFF0057B7); // NNBR blue
+    }
+    return colorScheme.secondary;
   }
 }

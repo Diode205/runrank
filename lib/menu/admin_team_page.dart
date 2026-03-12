@@ -1192,8 +1192,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final primary = colorScheme.primary;
-    final accent = colorScheme.secondary;
+    final primary = _brandPrimary(colorScheme);
+    final accent = _brandAccent(colorScheme);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1218,8 +1218,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                     borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
                       colors: [
-                        primary.withOpacity(0.75),
-                        primary.withOpacity(0.45),
+                        primary.withOpacity(0.85),
+                        accent.withOpacity(0.75),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -1334,14 +1334,14 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                           borderRadius: BorderRadius.circular(14),
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withOpacity(0.08),
-                              Colors.white.withOpacity(0.02),
+                              primary.withOpacity(0.12),
+                              accent.withOpacity(0.05),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           border: Border.all(
-                            color: primary.withOpacity(0.35),
+                            color: primary.withOpacity(0.6),
                             width: 1,
                           ),
                         ),
@@ -1486,5 +1486,28 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         ],
       ),
     );
+  }
+
+  // Brand-aware helpers: if both primary and accent in the
+  // global theme are very light (near white), fall back to
+  // NNBR yellow/blue so committee headers and cards keep the
+  // expected combined club colours.
+
+  Color _brandPrimary(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFFF5C542); // NNBR yellow
+    }
+    return colorScheme.primary;
+  }
+
+  Color _brandAccent(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFF0057B7); // NNBR blue
+    }
+    return colorScheme.secondary;
   }
 }

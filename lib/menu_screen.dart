@@ -555,7 +555,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   Color _getMembershipColor(String? membershipType) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = _brandPrimary(colorScheme);
 
     switch (membershipType) {
       case '1st Claim':
@@ -717,9 +718,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     required String email,
     required String memberSince,
   }) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final accent = theme.colorScheme.secondary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = _brandPrimary(colorScheme);
+    final accent = _brandAccent(colorScheme);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
@@ -859,12 +860,15 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   Widget _infoFieldBox() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final borderColor = _brandPrimary(colorScheme);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F111A),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF5C542), width: 1),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,11 +898,15 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   Widget _membershipButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final outlineColor = _brandAccent(colorScheme);
+    final contentColor = outlineColor;
+
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.white54),
+          side: BorderSide(color: outlineColor),
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -910,10 +918,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             MaterialPageRoute(builder: (_) => const MembershipPage()),
           );
         },
-        icon: const Icon(Icons.desktop_windows, color: Colors.amber),
-        label: const Text(
+        icon: Icon(Icons.desktop_windows, color: contentColor),
+        label: Text(
           'Membership & Renewal',
-          style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w600),
+          style: TextStyle(color: contentColor, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -944,17 +952,18 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final borderColor = _brandAccent(colorScheme);
 
     return Card(
       color: const Color(0xFF0F111A),
       elevation: 0.5,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: primary, width: 1),
+        side: BorderSide(color: borderColor, width: 1),
       ),
       child: ListTile(
-        leading: Icon(icon, size: 30, color: primary),
+        leading: Icon(icon, size: 30, color: borderColor),
         title: Text(
           title,
           style: const TextStyle(fontSize: 16, color: Colors.white),
@@ -993,6 +1002,29 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         ),
       ),
     );
+  }
+
+  // Brand-aware helpers: if both primary and accent from the
+  // club configuration are very light (near white), fall back
+  // to the NNBR-style yellow/blue so borders and gradients stay
+  // visible on dark backgrounds.
+
+  Color _brandPrimary(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFFF5C542); // NNBR yellow
+    }
+    return colorScheme.primary;
+  }
+
+  Color _brandAccent(ColorScheme colorScheme) {
+    final pLum = colorScheme.primary.computeLuminance();
+    final sLum = colorScheme.secondary.computeLuminance();
+    if (pLum > 0.8 && sLum > 0.8) {
+      return const Color(0xFF0057B7); // NNBR blue
+    }
+    return colorScheme.secondary;
   }
 }
 
