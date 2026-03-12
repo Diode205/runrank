@@ -8,6 +8,7 @@ import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
 import 'package:runrank/widgets/admin_edit_event_page.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:runrank/services/weather_service.dart';
 
 /// =============================================================
 /// CLUB EVENTS CALENDAR — unified for all event types
@@ -25,6 +26,11 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   List<ClubEvent> _events = [];
   bool _loading = true;
   String userRole = "reader"; // reader or admin
+
+  // Per-event weather cache for upcoming events so we can show
+  // a small forecast next to the time on each calendar card.
+  final Map<String, WeatherAtTime?> _eventWeather = {};
+  final Set<String> _weatherRequested = {};
 
   String? _clubName;
   Set<String> _clubUserIds = {};
@@ -327,6 +333,37 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     );
   }
 
+  void _ensureWeatherLoaded(ClubEvent e) {
+    // Only show weather within 7 days of the event, matching
+    // the behaviour used on the event details venue preview.
+    final now = DateTime.now();
+    final diff = e.dateTime.difference(now);
+    if (diff.inDays < 0 || diff.inDays > 7) return;
+
+    if (_eventWeather.containsKey(e.id) || _weatherRequested.contains(e.id)) {
+      return;
+    }
+
+    final lat = e.latitude;
+    final lng = e.longitude;
+    if (lat == null || lng == null) return;
+
+    _weatherRequested.add(e.id);
+    WeatherService.fetchWeather(latitude: lat, longitude: lng, when: e.dateTime)
+        .then((result) {
+          if (!mounted) return;
+          setState(() {
+            _eventWeather[e.id] = result;
+          });
+        })
+        .catchError((_) {
+          if (!mounted) return;
+          setState(() {
+            _eventWeather[e.id] = null;
+          });
+        });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -366,6 +403,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                   SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final e = group.events[index];
+                      _ensureWeatherLoaded(e);
+                      final weather = _eventWeather[e.id];
                       final currentUserId = supabase.auth.currentUser?.id;
                       final isCreator =
                           currentUserId != null && e.createdBy == currentUserId;
@@ -433,6 +472,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                           weekday: _weekday(e.dateTime),
                           day: e.dateTime.day,
                           timeLabel: _fmtTime(e.dateTime),
+                          weather: weather,
                           title: displayTitle,
                           subtitle: subtitleText,
                           activityType: e.eventType,
@@ -610,6 +650,7 @@ class _EventCard extends StatelessWidget {
   final String weekday;
   final int day;
   final String timeLabel;
+  final WeatherAtTime? weather;
   final String title;
   final String subtitle;
   final String activityType;
@@ -620,6 +661,7 @@ class _EventCard extends StatelessWidget {
     required this.weekday,
     required this.day,
     required this.timeLabel,
+    required this.weather,
     required this.title,
     required this.subtitle,
     required this.activityType,
@@ -774,13 +816,38 @@ class _EventCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              timeLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  timeLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (weather != null) ...[
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    _weatherIcon(weather!.code),
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      "${weather!.tempC.round()}°C • ${weather!.windMph.round()} mph • ${weather!.description}",
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -810,5 +877,20 @@ class _EventCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _weatherIcon(int code) {
+    if (code == 0) return Icons.wb_sunny_rounded;
+    if (code == 1 || code == 2) return Icons.wb_cloudy_rounded;
+    if (code == 3 || code == 45 || code == 48) return Icons.cloud;
+    if (code >= 51 && code <= 67) return Icons.grain_rounded;
+    if ((code >= 71 && code <= 77) || code == 85 || code == 86) {
+      return Icons.ac_unit_rounded;
+    }
+    if ((code >= 80 && code <= 82) || (code >= 61 && code <= 65)) {
+      return Icons.grain_rounded;
+    }
+    if (code >= 95) return Icons.thunderstorm_rounded;
+    return Icons.cloud_queue;
   }
 }
