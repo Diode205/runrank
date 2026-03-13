@@ -308,7 +308,7 @@ class ClubRecordsService {
     try {
       await _supabase.from('club_records').insert(record.toJson());
 
-      // Notify all users that a new club record has been set
+      // Notify users in the current admin's club that a new club record has been set
       try {
         final runner = record.runnerName;
         final distance = record.distance;
@@ -318,13 +318,27 @@ class ClubRecordsService {
         // directly to the correct distance tab. Spaces are replaced
         // with underscores for a route-safe token.
         final distanceToken = distance.replaceAll(' ', '_');
+        // Scope notifications strictly to the club of the admin
+        // who is adding the record. This avoids any possibility of
+        // cross-club leakage due to runner profiles or data issues.
+        final clubName = await _getCurrentUserClub();
 
-        await NotificationService.notifyAllUsers(
-          title: 'New club record set',
-          body: '$runner set a new $distance club record in $time.',
-          // e.g. [route:club_records/10K] or [route:club_records/Half_M]
-          route: 'club_records/' + distanceToken,
-        );
+        if (clubName != null && clubName.isNotEmpty) {
+          await NotificationService.notifyUsersInClub(
+            clubName: clubName,
+            title: 'New club record set',
+            body: '$runner set a new $distance club record in $time.',
+            // e.g. [route:club_records/10K] or [route:club_records/Half_M]
+            route: 'club_records/' + distanceToken,
+          );
+        } else {
+          // If we cannot resolve a club at all, skip sending a
+          // notification rather than broadcasting across all clubs.
+          // This avoids cross-club leakage of record activity.
+          print(
+            'ClubRecordsService.addRecord: Skipping notification because club could not be resolved for distance $distance and runner $runner',
+          );
+        }
       } catch (e) {
         print('Error sending club record notification: $e');
       }

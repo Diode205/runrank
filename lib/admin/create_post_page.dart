@@ -397,13 +397,18 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primary = _brandPrimary(colorScheme);
+    final accent = _brandAccent(colorScheme);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Post'),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: [primary.withOpacity(0.3), accent.withOpacity(0.3)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -442,9 +447,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               ),
                               TextSpan(
                                 text: 'Contact',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFFFFD300),
+                                  color: accent,
                                   fontWeight: FontWeight.w600,
                                   decoration: TextDecoration.underline,
                                   height: 1.5,
@@ -708,15 +713,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     // Submit button
                     Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0057B7), Color(0xFF003F8A)],
+                        gradient: LinearGradient(
+                          colors: [primary, accent],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0x4D0057B7),
+                            color: primary.withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -743,5 +748,25 @@ class _CreatePostPageState extends State<CreatePostPage> {
               ),
             ),
     );
+  }
+
+  Color _brandPrimary(ColorScheme scheme) {
+    final base = scheme.primary;
+    final luminance = base.computeLuminance();
+    if (luminance > 0.85) {
+      // Fallback to NNBR yellow when primary is too close to white.
+      return const Color(0xFFFFD300);
+    }
+    return base;
+  }
+
+  Color _brandAccent(ColorScheme scheme) {
+    final base = scheme.secondary;
+    final luminance = base.computeLuminance();
+    if (luminance > 0.85) {
+      // Fallback to NNBR blue when secondary is too close to white.
+      return const Color(0xFF0057B7);
+    }
+    return base;
   }
 }

@@ -426,7 +426,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   Widget _section(String title, Widget child) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final primary = _brandPrimary(theme.colorScheme);
 
     return Card(
       elevation: 1,
@@ -460,8 +460,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final primary = colorScheme.primary;
-    final accent = colorScheme.secondary;
+    final primary = _brandPrimary(colorScheme);
+    final accent = _brandAccent(colorScheme);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Create Event")),
@@ -880,5 +880,25 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         ),
       ),
     );
+  }
+
+  Color _brandPrimary(ColorScheme scheme) {
+    final base = scheme.primary;
+    final luminance = base.computeLuminance();
+    if (luminance > 0.85) {
+      // Fallback to NNBR yellow when primary is too close to white.
+      return const Color(0xFFFFD300);
+    }
+    return base;
+  }
+
+  Color _brandAccent(ColorScheme scheme) {
+    final base = scheme.secondary;
+    final luminance = base.computeLuminance();
+    if (luminance > 0.85) {
+      // Fallback to NNBR blue when secondary is too close to white.
+      return const Color(0xFF0057B7);
+    }
+    return base;
   }
 }

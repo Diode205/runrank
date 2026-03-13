@@ -364,6 +364,41 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
         });
   }
 
+  Future<String?> _getClubForUser(String userId) async {
+    try {
+      final row = await supabase
+          .from('user_profiles')
+          .select('club')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final name = (row?['club'] as String?)?.trim();
+      return (name != null && name.isNotEmpty) ? name : null;
+    } catch (e) {
+      debugPrint(
+        'ClubEventsCalendar: Error resolving club for user $userId: $e',
+      );
+      return null;
+    }
+  }
+
+  /// Resolve the club for notifications based on the club of the
+  /// currently logged-in user (the admin using this calendar).
+  /// This ensures cancellations are always scoped to the caller's
+  /// club, matching how the calendar itself is filtered.
+  Future<String?> _resolveClubForEvent(ClubEvent e) async {
+    if (_clubName != null && _clubName!.isNotEmpty) {
+      return _clubName;
+    }
+
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser != null) {
+      return await _getClubForUser(currentUser.id);
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -559,15 +594,26 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                                       })
                                       .eq('id', e.id);
 
-                                  // Notify all members about cancellation
+                                  // Notify members of the relevant club about cancellation
                                   try {
-                                    await NotificationService.notifyAllUsers(
-                                      title: '${e.title} Cancelled',
-                                      body: reasonController.text.isNotEmpty
-                                          ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
-                                          : 'Event has been cancelled.',
-                                      eventId: e.id,
+                                    final clubName = await _resolveClubForEvent(
+                                      e,
                                     );
+                                    if (clubName != null &&
+                                        clubName.isNotEmpty) {
+                                      await NotificationService.notifyUsersInClub(
+                                        clubName: clubName,
+                                        title: '${e.title} Cancelled',
+                                        body: reasonController.text.isNotEmpty
+                                            ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
+                                            : 'Event has been cancelled.',
+                                        eventId: e.id,
+                                      );
+                                    } else {
+                                      debugPrint(
+                                        'ClubEventsCalendar: Skipping cancellation notification because club could not be resolved for event ${e.id}',
+                                      );
+                                    }
                                   } catch (notifErr) {
                                     debugPrint(
                                       'Error notifying users: $notifErr',

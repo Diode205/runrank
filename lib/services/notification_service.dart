@@ -49,6 +49,55 @@ class NotificationService {
   }
 
   // ---------------------------------------------------------------
+  // SEND NOTIFICATION TO ALL USERS IN A SPECIFIC CLUB
+  // ---------------------------------------------------------------
+  static Future<void> notifyUsersInClub({
+    required String clubName,
+    required String title,
+    required String body,
+    String? eventId,
+    String? route,
+  }) async {
+    print(
+      "DEBUG: notifyUsersInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
+    );
+    try {
+      final users = await _supabase
+          .from('user_profiles')
+          .select('id, club')
+          .eq('club', clubName);
+
+      for (final u in users) {
+        try {
+          final userId = u['id'] as String?;
+          if (userId == null || userId.isEmpty) continue;
+
+          final bodyWithRoute = route != null && route.isNotEmpty
+              ? '[route:' + route + '] ' + body
+              : body;
+
+          await _supabase.from('notifications').insert({
+            'user_id': userId,
+            'title': title,
+            'body': bodyWithRoute,
+            'event_id': eventId,
+            'is_read': false,
+          });
+          print(
+            "DEBUG: Club notification sent to user: $userId for club: $clubName",
+          );
+        } catch (e) {
+          print(
+            "DEBUG: Error sending club notification to user ${u['id']}: $e",
+          );
+        }
+      }
+    } catch (e) {
+      print("DEBUG: Error in notifyUsersInClub: $e");
+    }
+  }
+
+  // ---------------------------------------------------------------
   // NOTIFY SPECIFIC USER
   // ---------------------------------------------------------------
   static Future<void> notifyUser({
