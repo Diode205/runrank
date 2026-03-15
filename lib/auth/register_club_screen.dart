@@ -3,7 +3,9 @@ import 'package:runrank/auth/register_code_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterClubScreen extends StatefulWidget {
-  const RegisterClubScreen({super.key});
+  final bool isForMigration;
+
+  const RegisterClubScreen({super.key, this.isForMigration = false});
 
   @override
   State<RegisterClubScreen> createState() => _RegisterClubScreenState();
@@ -59,7 +61,11 @@ class _RegisterClubScreenState extends State<RegisterClubScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Select Your Club")),
+      appBar: AppBar(
+        title: Text(
+          widget.isForMigration ? 'Select New Club' : 'Select Your Club',
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: _loading
@@ -69,7 +75,9 @@ class _RegisterClubScreenState extends State<RegisterClubScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     value: _selectedClub,
-                    decoration: const InputDecoration(labelText: "Club"),
+                    decoration: InputDecoration(
+                      labelText: widget.isForMigration ? 'New Club' : 'Club',
+                    ),
                     items: _clubs
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
@@ -89,11 +97,16 @@ class _RegisterClubScreenState extends State<RegisterClubScreen> {
                                 MaterialPageRoute(
                                   builder: (_) => RegisterCodeScreen(
                                     selectedClub: _selectedClub!,
+                                    isForMigration: widget.isForMigration,
                                   ),
                                 ),
                               );
                             },
-                      child: const Text("Continue"),
+                      child: Text(
+                        widget.isForMigration
+                            ? 'Continue to Migration'
+                            : 'Continue',
+                      ),
                     ),
                   ),
                 ],

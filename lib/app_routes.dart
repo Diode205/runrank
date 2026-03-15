@@ -40,6 +40,7 @@ class AppRoutes {
   static const adminCharity = '/admin-charity';
   static const notifications = '/notifications';
   static const register = '/register';
+  static const migrateAccount = '/migrate-account';
 
   // Route table
   static Map<String, WidgetBuilder> routes = {
@@ -55,5 +56,6 @@ class AppRoutes {
     adminCharity: (_) => const AdminCharityEditorPage(),
     notifications: (_) => const NotificationsScreen(),
     register: (_) => const RegisterClubScreen(),
+    migrateAccount: (_) => const RegisterClubScreen(isForMigration: true),
   };
 }

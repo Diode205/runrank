@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/auth/register_profile_screen.dart';
+import 'package:runrank/auth/migrate_account_screen.dart';
 
 class RegisterCodeScreen extends StatefulWidget {
   final String selectedClub;
-  const RegisterCodeScreen({super.key, required this.selectedClub});
+  final bool isForMigration;
+
+  const RegisterCodeScreen({
+    super.key,
+    required this.selectedClub,
+    this.isForMigration = false,
+  });
 
   @override
   State<RegisterCodeScreen> createState() => _RegisterCodeScreenState();
@@ -27,7 +34,11 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Enter Club Code')),
+      appBar: AppBar(
+        title: Text(
+          widget.isForMigration ? 'Verify New Club Code' : 'Enter Club Code',
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -39,9 +50,11 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
             ),
 
             const SizedBox(height: 25),
-            const Text(
-              "Enter Verification Code",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            Text(
+              widget.isForMigration
+                  ? 'Enter verification code for your new club'
+                  : 'Enter Verification Code',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
 
             TextField(
@@ -61,14 +74,24 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
 
                 if (enteredCode.isNotEmpty &&
                     enteredCode == expectedCode.toUpperCase()) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RegisterProfileScreen(
-                        selectedClub: widget.selectedClub,
+                  if (widget.isForMigration) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            MigrateAccountScreen(newClub: widget.selectedClub),
                       ),
-                    ),
-                  );
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RegisterProfileScreen(
+                          selectedClub: widget.selectedClub,
+                        ),
+                      ),
+                    );
+                  }
                 } else {
                   setState(() {
                     _error = "Invalid club code. Please try again.";

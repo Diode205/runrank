@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/club_config_service.dart';
@@ -246,26 +248,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                       .update({
                         'name': newName,
                         'email': newName.isEmpty ? '' : newEmail,
-                        'user_id': newName.isEmpty
-                            ? null
-                            : (_committee[index]['userId'] ?? '')
-                                  .toString()
-                                  .isEmpty
-                            ? null
-                            : _committee[index]['userId'],
-                        'avatar_url': newName.isEmpty
-                            ? ''
-                            : (_committee[index]['avatarUrl'] ?? '').toString(),
                       })
                       .eq('id', id);
                 } catch (e) {
-                  debugPrint('Error updating committee role: $e');
+                  debugPrint('Error updating committee member: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not save member: $e')),
+                  );
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: colorScheme.onPrimary,
-              ),
               child: const Text('Save'),
             ),
           ],
@@ -274,64 +265,67 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     );
   }
 
-  void _openMemberSelector(
+  Future<void> _openMemberSelector(
     int index,
     TextEditingController nameController,
     TextEditingController emailController,
-  ) {
-    if (!_isAdmin) return;
+  ) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+    final messenger = ScaffoldMessenger.of(context);
 
-    showModalBottomSheet(
+    final localSearchController = TextEditingController();
+    bool searching = false;
+    List<Map<String, dynamic>> results = [];
+
+    Future<void> doSearch(String term, StateSetter setModalState) async {
+      if (term.trim().length < 2) {
+        setModalState(() {
+          searching = false;
+          results = [];
+        });
+        return;
+      }
+
+      setModalState(() {
+        searching = true;
+      });
+
+      try {
+        final clubName = _adminClub;
+
+        var query = _supabase
+            .from('user_profiles')
+            .select('id, full_name, email, avatar_url, club');
+
+        if (clubName != null && clubName.isNotEmpty) {
+          query = query.eq('club', clubName);
+        }
+
+        final data = await query
+            .or('full_name.ilike.%$term%,email.ilike.%$term%')
+            .limit(20);
+
+        setModalState(() {
+          results = List<Map<String, dynamic>>.from(data);
+          searching = false;
+        });
+      } catch (e) {
+        setModalState(() {
+          searching = false;
+        });
+        messenger.showSnackBar(SnackBar(content: Text('Search failed: $e')));
+      }
+    }
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF0F111A),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
-        final primary = colorScheme.primary;
-        final localSearchController = TextEditingController();
-        List<Map<String, dynamic>> results = [];
-        bool searching = false;
-
-        Future<void> doSearch(String term, StateSetter setModalState) async {
-          if (term.trim().length < 2) {
-            setModalState(() {
-              results = [];
-              searching = false;
-            });
-            return;
-          }
-
-          setModalState(() => searching = true);
-          try {
-            final clubName = _adminClub;
-
-            var query = _supabase
-                .from('user_profiles')
-                .select('id, full_name, email, avatar_url, membership_type');
-
-            if (clubName != null && clubName.isNotEmpty) {
-              query = query.eq('club', clubName);
-            }
-
-            final data = await query
-                .or('full_name.ilike.%$term%,email.ilike.%$term%')
-                .limit(20);
-
-            setModalState(() {
-              results = List<Map<String, dynamic>>.from(data);
-            });
-          } catch (e) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
-          } finally {
-            setModalState(() => searching = false);
-          }
-        }
-
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom + 16,
@@ -412,9 +406,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                           return ListTile(
                             leading: CircleAvatar(
                               radius: 18,
-                              backgroundColor: colorScheme.primary.withOpacity(
-                                0.25,
-                              ),
+                              backgroundColor: primary.withOpacity(0.25),
                               backgroundImage: avatarUrl.isNotEmpty
                                   ? NetworkImage(avatarUrl)
                                   : null,
@@ -672,6 +664,278 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         ),
       );
     }
+  }
+
+  Future<void> _openMigrationDialog(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    final fromClub = (user['club'] as String?) ?? _adminClub;
+    if (fromClub == null || fromClub.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Member has no club assigned.')),
+      );
+      return;
+    }
+
+    List<String> clubs = [];
+    try {
+      final data = await _supabase
+          .from('app_clubs')
+          .select('name')
+          .order('name', ascending: true);
+
+      clubs = [
+        for (final row in data)
+          if ((row['name'] ?? '').toString().isNotEmpty &&
+              (row['name'] as String) != fromClub)
+            (row['name'] as String),
+      ];
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not load clubs: $e')),
+      );
+      return;
+    }
+
+    if (clubs.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No other registered clubs available for migration.'),
+        ),
+      );
+      return;
+    }
+
+    String? selectedClub;
+    String? generatedCode;
+    String? errorText;
+
+    String _initials(String name) {
+      final buffer = StringBuffer();
+      for (final raw in name.split(' ')) {
+        final letters = raw.replaceAll(RegExp(r'[^A-Za-z]'), '').trim();
+        if (letters.isNotEmpty) {
+          buffer.write(letters[0].toUpperCase());
+        }
+      }
+      final result = buffer.toString();
+      return result.isEmpty ? name : result;
+    }
+
+    String _randomSuffix(int length) {
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      final rand = Random.secure();
+      return List.generate(
+        length,
+        (_) => chars[rand.nextInt(chars.length)],
+      ).join();
+    }
+
+    // Show dialog to pick destination club and generate code
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        final primary = colorScheme.primary;
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F111A),
+              title: Text(
+                'Generate migration code',
+                style: TextStyle(color: primary),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Member: ${user['full_name'] ?? '—'}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Current club: $fromClub',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: selectedClub,
+                        dropdownColor: const Color(0xFF151828),
+                        decoration: const InputDecoration(
+                          labelText: 'Destination club',
+                          labelStyle: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                          isDense: true,
+                        ),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        items: clubs
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c, overflow: TextOverflow.ellipsis),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          setStateDialog(() {
+                            selectedClub = v;
+                            errorText = null;
+                          });
+                        },
+                      ),
+                    ),
+                    if (errorText != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        errorText!,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    if (generatedCode != null) ...[
+                      const Text(
+                        'Migration code generated:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF151828),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SelectableText(
+                          generatedCode!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.amber,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Tip: copy this message and send it to the member.',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final destination = selectedClub ?? 'the new club';
+                          final instructions =
+                              '''
+RunRank account migration for ${user['full_name'] ?? 'your account'}
+
+New club: $destination
+Migration code: $generatedCode
+
+How to use this code:
+1. Open the RunRank app and log out if you are currently logged in.
+2. On the first screen, tap 'Migrate an Account'.
+3. Choose $destination as your new club.
+4. Enter the migration code exactly as shown above.
+
+For security we recommend using this code within the next few days. After it has been used once it will no longer be valid.
+''';
+
+                          await Clipboard.setData(
+                            ClipboardData(text: instructions),
+                          );
+
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Migration instructions copied'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.copy,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                        label: const Text(
+                          'Copy code and instructions',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    if (selectedClub == null || selectedClub!.isEmpty) {
+                      setStateDialog(
+                        () => errorText = 'Please select a destination club.',
+                      );
+                      return;
+                    }
+
+                    final code =
+                        'MIG-${_initials(fromClub)}-${_initials(selectedClub!)}-${_randomSuffix(5)}';
+
+                    try {
+                      await _supabase.from('membership_migrations').insert({
+                        'user_id': user['id'],
+                        'from_club': fromClub,
+                        'to_club': selectedClub,
+                        'migration_code': code,
+                        'status': 'approved',
+                      });
+
+                      setStateDialog(() {
+                        generatedCode = code;
+                      });
+
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Migration code generated: $code'),
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Could not create migration code: $e'),
+                        ),
+                      );
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                  child: const Text('Generate code'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _launchEmail({required String subject, String? body}) async {
@@ -1040,6 +1304,24 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                                         color: isBlocked
                                             ? Colors.lightGreenAccent
                                             : Colors.redAccent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      tooltip: 'Generate migration code',
+                                      onPressed: () => _openMigrationDialog(
+                                        user,
+                                        setModalState,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.compare_arrows,
+                                        color: Colors.amber,
                                       ),
                                     ),
                                     const SizedBox(width: 6),

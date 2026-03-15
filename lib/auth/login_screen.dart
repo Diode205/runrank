@@ -107,6 +107,14 @@ class _LoginScreenState extends State<LoginScreen> {
               },
               child: const Text("Create an Account"),
             ),
+
+            // Migrate existing account to a new club
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.migrateAccount);
+              },
+              child: const Text("Migrate an Account"),
+            ),
           ],
         ),
       ),
