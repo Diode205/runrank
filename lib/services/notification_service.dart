@@ -547,10 +547,11 @@ class NotificationService {
       Set<String> clubUserIds = {};
       String? debugClubName;
 
+      bool isAdmin = false;
       try {
         final profile = await _supabase
             .from('user_profiles')
-            .select('club')
+            .select('club, is_admin')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -560,6 +561,7 @@ class NotificationService {
             : null;
 
         debugClubName = clubName;
+        isAdmin = (profile?['is_admin'] ?? false) as bool;
 
         if (clubName != null) {
           final rows = await _supabase
@@ -578,10 +580,12 @@ class NotificationService {
         print('DEBUG: unseenPostActivityCount club resolution error: $e');
       }
 
+      // Only consider approved posts when computing activity so that
+      // pending/unapproved posts do not light up the Posts tab.
       final rows = await _supabase
           .from('club_posts')
-          .select('created_at, author_id')
-          .order('created_at', ascending: false)
+          .select('updated_at, author_id, is_approved')
+          .order('updated_at', ascending: false)
           .limit(50);
 
       DateTime? latestForClub;
@@ -593,11 +597,16 @@ class NotificationService {
           continue;
         }
 
-        final createdAtStr = row['created_at'] as String?;
-        if (createdAtStr == null) continue;
-        final createdAt = DateTime.tryParse(createdAtStr);
-        if (createdAt == null) continue;
-        latestForClub = createdAt.toUtc();
+        final isApproved = row['is_approved'] as bool? ?? false;
+        // Admins see activity for any new post (approved or pending);
+        // non-admins only see activity for approved posts.
+        if (!isAdmin && !isApproved) continue;
+
+        final updatedAtStr = row['updated_at'] as String?;
+        if (updatedAtStr == null) continue;
+        final updatedAt = DateTime.tryParse(updatedAtStr);
+        if (updatedAt == null) continue;
+        latestForClub = updatedAt.toUtc();
         break;
       }
 
@@ -628,10 +637,11 @@ class NotificationService {
       // its timestamp as the "last seen" marker.
       Set<String> clubUserIds = {};
 
+      bool isAdmin = false;
       try {
         final profile = await _supabase
             .from('user_profiles')
-            .select('club')
+            .select('club, is_admin')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -639,6 +649,8 @@ class NotificationService {
         final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
             ? clubNameRaw
             : null;
+
+        isAdmin = (profile?['is_admin'] ?? false) as bool;
 
         if (clubName != null) {
           final rows = await _supabase
@@ -657,10 +669,12 @@ class NotificationService {
         print('DEBUG: markPostsSeen club resolution error: $e');
       }
 
+      // Only consider approved posts when recording the last-seen
+      // marker so that pending/unapproved posts do not affect it.
       final rows = await _supabase
           .from('club_posts')
-          .select('created_at, author_id')
-          .order('created_at', ascending: false)
+          .select('updated_at, author_id, is_approved')
+          .order('updated_at', ascending: false)
           .limit(50);
 
       DateTime? latestForClub;
@@ -672,11 +686,16 @@ class NotificationService {
           continue;
         }
 
-        final createdAtStr = row['created_at'] as String?;
-        if (createdAtStr == null) continue;
-        final createdAt = DateTime.tryParse(createdAtStr);
-        if (createdAt == null) continue;
-        latestForClub = createdAt.toUtc();
+        final isApproved = row['is_approved'] as bool? ?? false;
+        // Admins mark all posts (approved or pending) as seen;
+        // non-admins only track approved posts.
+        if (!isAdmin && !isApproved) continue;
+
+        final updatedAtStr = row['updated_at'] as String?;
+        if (updatedAtStr == null) continue;
+        final updatedAt = DateTime.tryParse(updatedAtStr);
+        if (updatedAt == null) continue;
+        latestForClub = updatedAt.toUtc();
         break;
       }
 

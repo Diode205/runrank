@@ -322,11 +322,83 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
 
   Future<void> _rejectPost(String postId) async {
     final messenger = ScaffoldMessenger.of(context);
+
+    // Ask admin for a rejection reason before deleting/notifying.
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reject Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please provide a reason for rejecting this post:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Reason for rejection',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    final reason = reasonController.text.trim();
+
     try {
+      // Fetch author and title prior to delete so we can notify.
+      final post = await supabase
+          .from('club_posts')
+          .select('author_id, title')
+          .eq('id', postId)
+          .maybeSingle();
+
       await supabase.from('club_posts').delete().eq('id', postId);
+
+      final authorId = post?['author_id'] as String?;
+      final title = (post?['title'] ?? 'Post').toString();
+      if (authorId != null) {
+        final reasonText = reason.isNotEmpty ? ' Reason: $reason' : '';
+        await NotificationService.notifyUser(
+          userId: authorId,
+          title: 'Post Not Approved',
+          body:
+              'Your post "$title" was not approved by an admin as it does not meet the Club\'s Privacy and Data Protection Policies.$reasonText Please see Policies, Forms, and Notices in the Menu for full details.',
+          route: 'policies',
+        );
+      }
+
       await _loadPosts();
       if (mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text('Post rejected')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Post rejected and author notified')),
+        );
       }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));

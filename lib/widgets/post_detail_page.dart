@@ -22,6 +22,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   List<Map<String, dynamic>> attachments = [];
   Map<String, List<String>> reactions = {}; // emoji -> [user_ids]
   Set<String> userReactions = {}; // emojis the current user has used
+  List<Map<String, dynamic>> likeUsers = []; // users who "liked" (❤️)
   bool loading = true;
   bool isAdmin = false;
   bool isAuthor = false;
@@ -127,10 +128,14 @@ class _PostDetailPageState extends State<PostDetailPage> {
             .maybeSingle();
       }
 
-      // Load reactions
+      // Load reactions with basic user profile info so we can
+      // display avatars for those who have "liked" the post.
       final reactionsData = await supabase
           .from('club_post_reactions')
-          .select()
+          .select('''
+            emoji, user_id,
+            user_profiles!club_post_reactions_user_id_fkey(full_name, avatar_url)
+          ''')
           .eq('post_id', widget.postId);
 
       // Load comments with author names and avatars
@@ -150,11 +155,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .eq('post_id', widget.postId)
           .order('created_at');
 
-      // Group reactions by emoji
+      // Group reactions by emoji and collect "like" users
       final reactionMap = <String, List<String>>{};
       final userReactionSet = <String>{};
+      final likeUserList = <Map<String, dynamic>>[];
 
-      for (final reaction in reactionsData) {
+      for (final reaction in reactionsData as List) {
         final emoji = reaction['emoji'] as String;
         final userId = reaction['user_id'] as String;
 
@@ -166,6 +172,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
         if (user != null && userId == user.id) {
           userReactionSet.add(emoji);
         }
+
+        if (emoji == '❤️') {
+          final profile = reaction['user_profiles'] as Map<String, dynamic>?;
+          if (profile != null) {
+            likeUserList.add(profile);
+          }
+        }
       }
 
       if (mounted) {
@@ -175,6 +188,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           attachments = List<Map<String, dynamic>>.from(attachmentsData);
           reactions = reactionMap;
           userReactions = userReactionSet;
+          likeUsers = likeUserList;
           loading = false;
           isAdmin = (profile?['is_admin'] ?? false) as bool;
           isAuthor =
@@ -202,16 +216,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', widget.postId);
-
-      // Notify author
-      final authorId = post?['author_id'] as String?;
-      if (authorId != null) {
-        await NotificationService.notifyUser(
-          userId: authorId,
-          title: 'Post Approved',
-          body: 'Your post "${post?['title'] ?? 'Post'}" has been approved.',
-        );
-      }
       await _loadPostDetails();
       if (mounted) {
         messenger.showSnackBar(const SnackBar(content: Text('Post approved')));
@@ -223,8 +227,57 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   Future<void> _rejectPost() async {
     final messenger = ScaffoldMessenger.of(context);
+
+    // Ask admin for a rejection reason before notifying the author.
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reject Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please provide a reason for rejecting this post:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Reason for rejection',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    final reason = reasonController.text.trim();
+
     try {
-      // Keep as not approved, just notify author
+      // Keep as not approved, just notify author with reason
       await supabase
           .from('club_posts')
           .update({
@@ -235,17 +288,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
       final authorId = post?['author_id'] as String?;
       if (authorId != null) {
+        final title = post?['title'] ?? 'Post';
+        final reasonText = reason.isNotEmpty ? ' Reason: $reason' : '';
         await NotificationService.notifyUser(
           userId: authorId,
           title: 'Post Not Approved',
           body:
-              'Your post "${post?['title'] ?? 'Post'}" was not approved by an admin.',
+              'Your post "$title" was not approved by an admin as it does not meet the Club\'s Privacy and Data Protection Policies.$reasonText Please see Policies, Forms, and Notices in the Menu for full details.',
+          route: 'policies',
         );
       }
       await _loadPostDetails();
       if (mounted) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Author notified: not approved')),
+          const SnackBar(content: Text('Author notified with reason')),
         );
       }
     } catch (e) {
@@ -519,6 +575,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final authorMembershipType =
         post!['user_profiles']?['membership_type'] as String?;
     final imageUrl = post!['image_url'] as String?;
+    final likeCount = likeUsers.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -845,97 +902,81 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
 
-                  // Emoji reactions
+                  // Likes summary with avatars of users who "liked" (❤️)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          ...availableEmojis.map((emoji) {
-                            final count = reactions[emoji]?.length ?? 0;
-                            final isSelected = userReactions.contains(emoji);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: GestureDetector(
-                                onTap: () => _toggleReaction(emoji),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? Colors.blue.withValues(alpha: 0.3)
-                                        : Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? Colors.blue
-                                          : Colors.grey[700]!,
-                                      width: isSelected ? 2 : 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => _toggleReaction('❤️'),
+                              icon: Icon(
+                                userReactions.contains('❤️')
+                                    ? Icons.thumb_up
+                                    : Icons.thumb_up_outlined,
+                                color: userReactions.contains('❤️')
+                                    ? Colors.blue
+                                    : Colors.grey[400],
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Like ($likeCount)',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (likeUsers.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            height: 32,
+                            child: Stack(
+                              children: [
+                                for (int i = 0; i < likeUsers.length; i++)
+                                  Positioned(
+                                    left: i * 20.0,
+                                    child: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: Colors.white12,
+                                      backgroundImage:
+                                          likeUsers[i]['avatar_url'] != null
+                                          ? NetworkImage(
+                                              '${likeUsers[i]['avatar_url']}?t=${DateTime.now().millisecondsSinceEpoch}',
+                                            )
+                                          : null,
+                                      child: likeUsers[i]['avatar_url'] == null
+                                          ? Text(
+                                              (likeUsers[i]['full_name']
+                                                              as String?)
+                                                          ?.isNotEmpty ==
+                                                      true
+                                                  ? (likeUsers[i]['full_name']
+                                                            as String)[0]
+                                                        .toUpperCase()
+                                                  : '?',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        emoji,
-                                        style: const TextStyle(fontSize: 18),
-                                      ),
-                                      if (count > 0) ...[
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$count',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[400],
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
+                              ],
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                  ),
-
-                  const Divider(height: 32),
-
-                  // Kudos button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => _toggleReaction('❤️'),
-                          icon: Icon(
-                            userReactions.contains('❤️')
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: userReactions.contains('❤️')
-                                ? Colors.red
-                                : Colors.grey[400],
-                            size: 28,
-                          ),
-                        ),
-                        Text(
-                          '${reactions['❤️']?.length ?? 0} ${(reactions['❤️']?.length ?? 0) == 1 ? 'Like' : 'Likes'}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[400],
-                          ),
-                        ),
                       ],
                     ),
                   ),
 
-                  const Divider(height: 32),
+                  const SizedBox(height: 24),
 
                   // Comments section
                   Padding(
@@ -1042,7 +1083,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             ),
           ),
 
-          // Comment input
+          // Comment input with quick emoji row
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1050,38 +1091,69 @@ class _PostDetailPageState extends State<PostDetailPage> {
               border: Border(top: BorderSide(color: Colors.grey[800]!)),
             ),
             child: SafeArea(
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      decoration: InputDecoration(
-                        hintText: 'Add a comment...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[850],
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          decoration: InputDecoration(
+                            hintText: 'Add a comment...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[850],
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          maxLines: null,
                         ),
                       ),
-                      maxLines: null,
-                    ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: _postComment,
+                          icon: const Icon(Icons.send, color: Colors.white),
+                          iconSize: 24,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      onPressed: _postComment,
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      iconSize: 24,
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: availableEmojis.map((emoji) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: GestureDetector(
+                            onTap: () {
+                              _commentController.text += emoji;
+                              _commentController.selection =
+                                  TextSelection.fromPosition(
+                                    TextPosition(
+                                      offset: _commentController.text.length,
+                                    ),
+                                  );
+                            },
+                            child: Text(
+                              emoji,
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                 ],

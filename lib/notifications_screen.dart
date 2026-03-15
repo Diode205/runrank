@@ -7,6 +7,7 @@ import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
+import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/menu/team_achievements_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
@@ -259,6 +260,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ).then((_) => loadData());
           return;
         }
+      }
+
+      // Deep-link to policies screen when route is 'policies'
+      if (route == 'policies') {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PoliciesFormsNoticesPage()),
+        ).then((_) => loadData());
+        return;
       }
     }
 

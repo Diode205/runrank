@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:runrank/services/user_service.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'dart:io';
 
 class CreatePostPage extends StatefulWidget {

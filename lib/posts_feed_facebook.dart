@@ -7,6 +7,7 @@ import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/admin/edit_post_page.dart';
 import 'package:runrank/widgets/linkified_text.dart';
+import 'package:runrank/widgets/post_detail_page.dart';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
   const PostsFeedFacebookScreen({super.key});
@@ -50,26 +51,18 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeData();
+    _setupRealtime();
+    _initPosts();
   }
 
-  Future<void> _initializeData() async {
+  Future<void> _initPosts() async {
     await _checkAdminStatus();
     await _loadPosts();
-    _setupRealtime();
-  }
-
-  @override
-  void dispose() {
-    _postChannel?.unsubscribe();
-    for (var controller in _commentControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
   }
 
   void _setupRealtime() {
-    // Only listen to the main post table for major changes (new posts/deletes)
+    // Listen for changes to club_posts so the feed stays up to date
+    // for new posts, deletions, and approvals.
     _postChannel = supabase
         .channel('public:club_posts')
         .onPostgresChanges(
@@ -78,12 +71,22 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           table: 'club_posts',
           callback: (payload) {
             if (payload.eventType == PostgresChangeEvent.insert ||
-                payload.eventType == PostgresChangeEvent.delete) {
+                payload.eventType == PostgresChangeEvent.delete ||
+                payload.eventType == PostgresChangeEvent.update) {
               _loadPosts();
             }
           },
         )
         .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _postChannel?.unsubscribe();
+    for (final controller in _commentControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _checkAdminStatus() async {
@@ -116,6 +119,17 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   Future<void> _loadPosts() async {
     try {
       final now = DateTime.now().toIso8601String();
+      final user = supabase.auth.currentUser;
+
+      // For non-admins, don't load anything until we've resolved
+      // their club; otherwise the initial load after app start can
+      // briefly show posts from all clubs.
+      if (!isAdmin) {
+        final clubNameCheck = _clubName;
+        if (clubNameCheck == null || clubNameCheck.isEmpty) {
+          return;
+        }
+      }
 
       // Resolve club user IDs for current club; if none, fall back to
       // legacy behaviour (no club filter).
@@ -164,9 +178,51 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 
       final response = await query.order('created_at', ascending: false);
 
+      List data;
+
+      if (!isAdmin && user != null) {
+        // For non-admins, also include their own pending posts in a
+        // distinct section (only visible to them).
+        final pending = await supabase
+            .from('club_posts')
+            .select('''
+              id, title, content, author_id, author_name, created_at, is_approved, expiry_date,
+              user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type),
+              club_post_attachments(*)
+            ''')
+            .gte('expiry_date', now)
+            .eq('author_id', user.id)
+            .eq('is_approved', false)
+            .order('created_at', ascending: false);
+
+        final seenIds = <String>{};
+        final combined = <Map<String, dynamic>>[];
+
+        for (final row in pending as List) {
+          final id = row['id'] as String?;
+          if (id == null) continue;
+          if (seenIds.add(id)) {
+            row['__pending'] = true;
+            combined.add(row as Map<String, dynamic>);
+          }
+        }
+
+        for (final row in response as List) {
+          final id = row['id'] as String?;
+          if (id == null) continue;
+          if (seenIds.add(id)) {
+            combined.add(row as Map<String, dynamic>);
+          }
+        }
+
+        data = combined;
+      } else {
+        data = response as List;
+      }
+
       if (mounted) {
         setState(() {
-          posts = List<Map<String, dynamic>>.from(response);
+          posts = List<Map<String, dynamic>>.from(data);
           loading = false;
         });
       }
@@ -392,6 +448,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                 itemBuilder: (context, index) {
                   final post = posts[index];
                   final postId = post['id'];
+                  final isPending = post['__pending'] == true;
 
                   // Trigger details load only when item is built
                   if (!_reactionCounts.containsKey(postId)) {
@@ -401,6 +458,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                   Widget card = _PostCard(
                     post: post,
                     isAdmin: isAdmin,
+                    isPending: isPending,
                     reactionCounts: _reactionCounts[postId] ?? {},
                     userReactions: _userReactionsByPost[postId] ?? {},
                     comments: _commentsByPost[postId] ?? [],
@@ -421,9 +479,23 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                       post['user_profiles']?['membership_type'],
                     ),
                     timeAgo: _getTimeAgo(post['created_at']),
+                    onOpenDetail: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PostDetailPage(postId: postId),
+                        ),
+                      );
+                    },
                   );
 
-                  if (isAdmin) {
+                  // Allow admins and authors to swipe to edit/delete
+                  final currentUser = supabase.auth.currentUser;
+                  final isAuthor =
+                      currentUser != null &&
+                      post['author_id'] == currentUser.id;
+                  final canModify = isAdmin || isAuthor;
+
+                  if (canModify) {
                     return Dismissible(
                       key: ValueKey('post-fb-$postId'),
                       direction: DismissDirection.horizontal,
@@ -457,7 +529,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                       ),
                       confirmDismiss: (direction) async {
                         if (direction == DismissDirection.startToEnd) {
-                          // Edit post
+                          // Edit post (admin or author)
                           final updated = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
@@ -525,6 +597,31 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                     );
                   }
 
+                  // For non-admin, non-author viewers, optionally show a
+                  // heading before the first pending post in their list.
+                  if (!isAdmin && isPending) {
+                    final bool isFirstPending =
+                        index == 0 || posts[index - 1]['__pending'] != true;
+                    if (isFirstPending) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
+                            child: Text(
+                              'Pending posts (only visible to you)',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          card,
+                        ],
+                      );
+                    }
+                  }
+
                   return card;
                 },
               ),
@@ -537,11 +634,81 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
         .from('club_posts')
         .update({'is_approved': true})
         .eq('id', id);
+
     _loadPosts();
   }
 
   Future<void> _rejectPost(String id) async {
+    // Ask admin for a rejection reason before deleting/notifying.
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reject Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please provide a reason for rejecting this post:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Reason for rejection',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    final reason = reasonController.text.trim();
+
+    // Fetch author and title prior to delete so we can notify.
+    final post = await supabase
+        .from('club_posts')
+        .select('author_id, title')
+        .eq('id', id)
+        .maybeSingle();
+
     await supabase.from('club_posts').delete().eq('id', id);
+
+    final authorId = post?['author_id'] as String?;
+    final title = (post?['title'] ?? 'Post').toString();
+    if (authorId != null) {
+      final reasonText = reason.isNotEmpty ? ' Reason: $reason' : '';
+      await NotificationService.notifyUser(
+        userId: authorId,
+        title: 'Post Not Approved',
+        body:
+            'Your post "$title" was not approved by an admin as it does not meet the Club\'s Privacy and Data Protection Policies.$reasonText Please see Policies, Forms, and Notices in the Menu for full details.',
+        route: 'policies',
+      );
+    }
+
     _loadPosts();
   }
 }
@@ -549,6 +716,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 class _PostCard extends StatelessWidget {
   final Map<String, dynamic> post;
   final bool isAdmin;
+  final bool isPending;
   final Map<String, int> reactionCounts;
   final Set<String> userReactions;
   final List<Map<String, dynamic>> comments;
@@ -561,10 +729,12 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onReject;
   final Color membershipColor;
   final String timeAgo;
+  final VoidCallback onOpenDetail;
 
   const _PostCard({
     required this.post,
     required this.isAdmin,
+    required this.isPending,
     required this.reactionCounts,
     required this.userReactions,
     required this.comments,
@@ -577,6 +747,7 @@ class _PostCard extends StatelessWidget {
     required this.onReject,
     required this.membershipColor,
     required this.timeAgo,
+    required this.onOpenDetail,
   });
 
   @override
@@ -586,7 +757,7 @@ class _PostCard extends StatelessWidget {
         (profile?['full_name'] ?? post['author_name'] ?? 'Unknown').toString();
     final avatarUrl = profile?['avatar_url'] as String?;
     final attachments = (post['club_post_attachments'] as List?) ?? [];
-    final totalReactions = reactionCounts.values.fold(0, (a, b) => a + b);
+    final likeCount = reactionCounts['❤️'] ?? 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -624,6 +795,18 @@ class _PostCard extends StatelessWidget {
                   )
                 : null,
           ),
+          if (isPending)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Pending approval (only visible to you)',
+                style: TextStyle(
+                  color: Colors.amber,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -648,50 +831,30 @@ class _PostCard extends StatelessWidget {
           ],
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             child: Row(
               children: [
-                if (totalReactions > 0)
-                  Text(
-                    '👍 $totalReactions',
-                    style: const TextStyle(color: Colors.grey),
+                TextButton.icon(
+                  icon: Icon(
+                    userReactions.contains('❤️')
+                        ? Icons.thumb_up
+                        : Icons.thumb_up_outlined,
+                    color: userReactions.contains('❤️')
+                        ? Colors.blue
+                        : Colors.grey,
+                    size: 20,
                   ),
+                  label: Text('Like ($likeCount)'),
+                  onPressed: () => onToggleReaction('❤️'),
+                ),
                 const Spacer(),
-                if (comments.isNotEmpty)
-                  Text(
-                    '${comments.length} comments',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
+                TextButton(
+                  onPressed: onOpenDetail,
+                  child: Text('Make Comments (${comments.length})'),
+                ),
               ],
             ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              TextButton.icon(
-                icon: Icon(
-                  userReactions.isNotEmpty
-                      ? Icons.thumb_up
-                      : Icons.thumb_up_outlined,
-                ),
-                label: const Text('Like'),
-                onPressed: () => onToggleReaction('👍'),
-              ),
-              TextButton.icon(
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Comment'),
-                onPressed: onCommentToggle,
-              ),
-            ],
-          ),
-          if (showCommentInput) ...[
-            const Divider(),
-            _CommentSection(
-              comments: comments,
-              controller: commentController,
-              onSend: onSendComment,
-            ),
-          ],
         ],
       ),
     );
