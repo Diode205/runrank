@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
+import 'package:runrank/services/notification_service.dart';
 
 class AppSettingsPage extends StatefulWidget {
   const AppSettingsPage({super.key});
@@ -80,6 +82,70 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
     }
   }
 
+  Future<void> _requestAccountDeletion() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in to delete.')),
+      );
+      return;
+    }
+
+    try {
+      final profile = await client
+          .from('user_profiles')
+          .select('full_name, email, club')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final fullName = (profile?['full_name'] as String?)?.trim();
+      final email = (profile?['email'] as String?)?.trim();
+      final clubName = (profile?['club'] as String?)?.trim();
+
+      if (clubName == null || clubName.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to determine your club. Please contact an administrator.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final displayName = (fullName != null && fullName.isNotEmpty)
+          ? fullName
+          : 'Unknown member';
+      final emailText = (email != null && email.isNotEmpty)
+          ? email
+          : 'no email on file';
+
+      await NotificationService.notifyClubAdminsInClub(
+        clubName: clubName,
+        title: 'Account deletion requested',
+        body:
+            '$displayName ($emailText) has requested full account deletion. Please remove their account within 24 hours.',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The club has been notified. Profile will be deleted within 24 hours.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to request deletion: $e')));
+    }
+  }
+
   void _confirmRemoveProfile() {
     showDialog(
       context: context,
@@ -91,8 +157,9 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
           content: const Text(
-            'Removing your profile will permanently delete your data. This action cannot be undone.\n\n'
-            'If full account deletion is required (including authentication), please contact the administrators. ',
+            'Deleting your profile will request removal of your data from the club. '
+            'This action cannot be undone once processed.\n\n'
+            'Do you want to delete your account?',
             style: TextStyle(color: Colors.white70),
           ),
           actions: [
@@ -103,11 +170,11 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _launchEmail(subject: 'RunRank account deletion request');
+                _requestAccountDeletion();
               },
               child: const Text(
-                'Request via Email',
-                style: TextStyle(color: Colors.amber),
+                'Delete Account',
+                style: TextStyle(color: Colors.redAccent),
               ),
             ),
           ],
