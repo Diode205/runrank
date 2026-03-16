@@ -127,14 +127,21 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
         clubName: clubName,
         title: 'Account deletion requested',
         body:
-            '$displayName ($emailText) has requested full account deletion. Please remove their account within 24 hours.',
+            '$displayName ($emailText) has requested full account deletion. Please remove their account in line with club policy.',
+        route: 'club_committee',
+      );
+
+      // Also open the email app so the member can
+      // send a request to the appropriate club contact.
+      await _launchEmail(
+        subject: 'RunRank account deletion request – $displayName',
       );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'The club has been notified. Profile will be deleted within 24 hours.',
+            'Your club admins have been notified and an email draft has been opened.',
           ),
         ),
       );
@@ -173,7 +180,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
                 _requestAccountDeletion();
               },
               child: const Text(
-                'Delete Account',
+                'Yes, send request',
                 style: TextStyle(color: Colors.redAccent),
               ),
             ),

@@ -22,6 +22,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   bool _searching = false;
   bool _committeeLoaded = false;
   ClubConfig? _clubConfig;
+  int _deletionRequestCount = 0;
 
   final List<Map<String, dynamic>> _committee = [
     // Initial roles only; names/emails left blank so clubs can configure their own holders
@@ -45,8 +46,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   void initState() {
     super.initState();
     _loadAdmin();
-    _loadCommitteeFromDb();
     _loadClubConfig();
+    _loadDeletionRequestCount();
   }
 
   @override
@@ -80,6 +81,10 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         _isAdmin = isAdmin;
         _adminClub = club;
       });
+
+      // Once we know the admin's club, load the
+      // committee roles for that specific club.
+      await _loadCommitteeFromDb();
     } catch (e) {
       debugPrint('Error loading admin profile: $e');
       if (!mounted) return;
@@ -109,28 +114,30 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       if (!mounted) return;
 
       final rows = List<Map<String, dynamic>>.from(data as List);
-      if (rows.isEmpty) {
-        setState(() {
-          _committeeLoaded = true;
-        });
-        return;
-      }
-
       setState(() {
-        _committee
-          ..clear()
-          ..addAll(
-            rows.map(
-              (row) => {
-                'id': row['id']?.toString(),
-                'role': row['role']?.toString() ?? '',
-                'name': row['name']?.toString() ?? '',
-                'email': row['email']?.toString() ?? '',
-                'userId': row['user_id']?.toString() ?? '',
-                'avatarUrl': row['avatar_url']?.toString() ?? '',
-              },
-            ),
-          );
+        // Start from the default template of roles so the
+        // order is stable and each club always sees the
+        // full list of positions.
+        for (final member in _committee) {
+          member['id'] = member['id']; // keep id if any, will be overwritten
+          member['name'] = '';
+          member['email'] = '';
+          member['userId'] = '';
+          member['avatarUrl'] = '';
+        }
+
+        // Overlay any saved entries for this club by role.
+        for (final row in rows) {
+          final role = (row['role'] ?? '').toString();
+          final index = _committee.indexWhere((m) => (m['role'] ?? '') == role);
+          if (index == -1) continue;
+
+          _committee[index]['id'] = row['id']?.toString();
+          _committee[index]['name'] = row['name']?.toString() ?? '';
+          _committee[index]['email'] = row['email']?.toString() ?? '';
+          _committee[index]['userId'] = row['user_id']?.toString() ?? '';
+          _committee[index]['avatarUrl'] = row['avatar_url']?.toString() ?? '';
+        }
         _committeeLoaded = true;
       });
     } catch (e) {
@@ -151,6 +158,27 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       });
     } catch (e) {
       debugPrint('Error loading club config for admin page: $e');
+    }
+  }
+
+  Future<void> _loadDeletionRequestCount() async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final data = await _supabase
+          .from('notifications')
+          .select('id, title, is_read')
+          .eq('user_id', currentUser.id)
+          .eq('is_read', false)
+          .ilike('title', '%Account deletion requested%');
+
+      if (!mounted) return;
+      setState(() {
+        _deletionRequestCount = (data as List).length;
+      });
+    } catch (e) {
+      debugPrint('Error loading deletion request count: $e');
     }
   }
 
@@ -240,18 +268,51 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                 Navigator.pop(context);
 
                 final id = _committee[index]['id']?.toString();
-                if (id == null || id.isEmpty) return;
-
                 try {
-                  await _supabase
-                      .from('committee_roles')
-                      .update({
-                        'name': newName,
-                        'email': newName.isEmpty ? '' : newEmail,
-                      })
-                      .eq('id', id);
+                  final club = _adminClub;
+                  if (club == null || club.isEmpty) {
+                    return;
+                  }
+
+                  // If this role already exists in the DB, update it.
+                  if (id != null && id.isNotEmpty) {
+                    await _supabase
+                        .from('committee_roles')
+                        .update({
+                          'name': newName,
+                          'email': newName.isEmpty ? '' : newEmail,
+                          'user_id': _committee[index]['userId'] ?? null,
+                          'avatar_url': _committee[index]['avatarUrl'] ?? null,
+                        })
+                        .eq('id', id);
+                  } else {
+                    // Otherwise insert a new row for this club/role.
+                    final role = (_committee[index]['role'] ?? '').toString();
+                    final insertData = {
+                      'club': club,
+                      'role': role,
+                      'name': newName,
+                      'email': newName.isEmpty ? '' : newEmail,
+                      'user_id': _committee[index]['userId'] ?? null,
+                      'avatar_url': _committee[index]['avatarUrl'] ?? null,
+                      'display_order': index,
+                    };
+
+                    final inserted = await _supabase
+                        .from('committee_roles')
+                        .insert(insertData)
+                        .select('id')
+                        .single();
+
+                    final newId = inserted['id']?.toString();
+                    if (newId != null && newId.isNotEmpty && mounted) {
+                      setState(() {
+                        _committee[index]['id'] = newId;
+                      });
+                    }
+                  }
                 } catch (e) {
-                  debugPrint('Error updating committee member: $e');
+                  debugPrint('Error saving committee member: $e');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Could not save member: $e')),
                   );
@@ -1590,10 +1651,66 @@ For security we recommend using this code within the next few days. After it has
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: IconButton(
-                      tooltip: 'Admin controls',
-                      onPressed: _openAdminControls,
-                      icon: Icon(Icons.admin_panel_settings, color: primary),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Membership requests',
+                          onPressed: () {
+                            // Reset the local counter when the icon is tapped
+                            setState(() {
+                              _deletionRequestCount = 0;
+                            });
+
+                            _launchEmail(
+                              subject: 'RunRank membership requests',
+                            );
+                          },
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                Icons.email_outlined,
+                                color: _deletionRequestCount > 0
+                                    ? Colors.amberAccent
+                                    : primary,
+                              ),
+                              if (_deletionRequestCount > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.redAccent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 16,
+                                      minHeight: 16,
+                                    ),
+                                    child: Text(
+                                      '$_deletionRequestCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Admin controls',
+                          onPressed: _openAdminControls,
+                          icon: Icon(
+                            Icons.admin_panel_settings,
+                            color: primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],

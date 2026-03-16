@@ -11,6 +11,7 @@ import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/menu/team_achievements_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
+import 'package:runrank/menu/admin_team_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -212,6 +213,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const MalcolmBallAwardPage()),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route == 'club_committee') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AdministrativeTeamPage()),
         ).then((_) => loadData());
         return;
       }
