@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/club_config_service.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdministrativeTeamPage extends StatefulWidget {
@@ -57,107 +58,101 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   }
 
   Future<void> _loadAdmin() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      setState(() {
-        _isAdmin = false;
-        _adminClub = null;
-      });
-      return;
-    }
-
-    try {
-      final profile = await _supabase
-          .from('user_profiles')
-          .select('is_admin, club')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      final isAdmin = (profile?['is_admin'] ?? false) as bool;
-      final club = profile?['club']?.toString();
-
-      if (!mounted) return;
-      setState(() {
-        _isAdmin = isAdmin;
-        _adminClub = club;
-      });
-
-      // Once we know the admin's club, load the
-      // committee roles for that specific club.
-      await _loadCommitteeFromDb();
-    } catch (e) {
-      debugPrint('Error loading admin profile: $e');
-      if (!mounted) return;
-      setState(() {
-        _isAdmin = false;
-      });
-    }
-  }
-
-  Future<void> _loadCommitteeFromDb() async {
-    try {
-      final club = _adminClub;
-      if (club == null || club.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _committeeLoaded = true;
-        });
-        return;
-      }
-
-      final data = await _supabase
-          .from('committee_roles')
-          .select('id, role, name, email, user_id, avatar_url')
-          .eq('club', club)
-          .order('display_order');
-
-      if (!mounted) return;
-
-      final rows = List<Map<String, dynamic>>.from(data as List);
-      setState(() {
-        // Start from the default template of roles so the
-        // order is stable and each club always sees the
-        // full list of positions.
-        for (final member in _committee) {
-          member['id'] = member['id']; // keep id if any, will be overwritten
-          member['name'] = '';
-          member['email'] = '';
-          member['userId'] = '';
-          member['avatarUrl'] = '';
-        }
-
-        // Overlay any saved entries for this club by role.
-        for (final row in rows) {
-          final role = (row['role'] ?? '').toString();
-          final index = _committee.indexWhere((m) => (m['role'] ?? '') == role);
-          if (index == -1) continue;
-
-          _committee[index]['id'] = row['id']?.toString();
-          _committee[index]['name'] = row['name']?.toString() ?? '';
-          _committee[index]['email'] = row['email']?.toString() ?? '';
-          _committee[index]['userId'] = row['user_id']?.toString() ?? '';
-          _committee[index]['avatarUrl'] = row['avatar_url']?.toString() ?? '';
-        }
-        _committeeLoaded = true;
-      });
-    } catch (e) {
-      debugPrint('Error loading committee from DB: $e');
-      if (!mounted) return;
-      setState(() {
-        _committeeLoaded = true;
-      });
-    }
+    final isAdmin = await UserService.isAdmin();
+    if (!mounted) return;
+    setState(() {
+      _isAdmin = isAdmin;
+    });
   }
 
   Future<void> _loadClubConfig() async {
     try {
       final config = await ClubConfigService.loadForCurrentUser();
+      final clubName = config.name;
+
+      final data = await _supabase
+          .from('committee_roles')
+          .select(
+            'id, role, display_order, name, email, user_id, avatar_url, club',
+          )
+          .eq('club', clubName)
+          .order('display_order', ascending: true);
+
+      final rows = (data as List).cast<dynamic>();
+      // Map rows to slots primarily by role name so we handle
+      // both legacy 1-based display_order and any newer 0-based
+      // entries without losing or duplicating roles.
+      final baseRoles = _committee
+          .map((m) => (m['role'] ?? '').toString())
+          .toList();
+      final used = List<bool>.filled(_committee.length, false);
+
+      for (final row in rows) {
+        final rowRole = (row['role'] ?? '').toString();
+        final isKnownRole = baseRoles.contains(rowRole);
+        int? index;
+
+        // First, try to match by role name against the template list.
+        if (isKnownRole) {
+          for (var i = 0; i < baseRoles.length; i++) {
+            if (!used[i] && baseRoles[i] == rowRole) {
+              index = i;
+              break;
+            }
+          }
+        }
+
+        // If this is a custom role (not in the template list),
+        // fall back to using display_order as either 0-based or 1-based.
+        if (!isKnownRole && index == null) {
+          final rawOrder = row['display_order'];
+          if (rawOrder is int) {
+            final candidates = <int>[];
+            if (rawOrder >= 0 && rawOrder < _committee.length) {
+              candidates.add(rawOrder);
+            }
+            final oneBased = rawOrder - 1;
+            if (oneBased >= 0 && oneBased < _committee.length) {
+              candidates.add(oneBased);
+            }
+            for (final c in candidates) {
+              if (!used[c]) {
+                index = c;
+                break;
+              }
+            }
+          }
+        }
+
+        if (index == null || index < 0 || index >= _committee.length) {
+          continue;
+        }
+
+        final target = _committee[index];
+        used[index] = true;
+        target['id'] = row['id']?.toString();
+        target['role'] = row['role'] ?? target['role'];
+        target['name'] = (row['name'] ?? '').toString();
+        target['email'] = (row['email'] ?? '').toString();
+        final rawUserId = row['user_id'];
+        target['userId'] = rawUserId == null ? null : rawUserId.toString();
+        target['avatarUrl'] = row['avatar_url']?.toString() ?? '';
+      }
+
       if (!mounted) return;
       setState(() {
         _clubConfig = config;
+        _adminClub = clubName;
+        _committeeLoaded = true;
       });
     } catch (e) {
-      debugPrint('Error loading club config for admin page: $e');
+      debugPrint('Error loading club config or committee: $e');
+      if (!mounted) return;
+      setState(() {
+        _clubConfig = null;
+        _adminClub = null;
+        _committeeLoaded = true;
+      });
     }
   }
 
@@ -182,15 +177,53 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     }
   }
 
+  Future<void> _clearCommitteeMember(int index) async {
+    final id = _committee[index]['id']?.toString();
+
+    setState(() {
+      _committee[index]['name'] = '';
+      _committee[index]['email'] = '';
+      _committee[index]['userId'] = null;
+      _committee[index]['avatarUrl'] = null;
+    });
+
+    if (id == null || id.isEmpty) {
+      return;
+    }
+
+    try {
+      await _supabase
+          .from('committee_roles')
+          .update({
+            'name': '',
+            'email': '',
+            'user_id': null,
+            'avatar_url': null,
+          })
+          .eq('id', id);
+    } catch (e) {
+      debugPrint('Error clearing committee member: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not clear member: $e')));
+    }
+  }
+
   void _editMember(int index) {
     if (!_isAdmin) return;
 
     final member = _committee[index];
 
-    // Admins don't need to backspace to replace someone: fields start blank
-    // with the current holder shown as a hint.
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
+    // Admins don't need to backspace to replace someone: fields can start
+    // blank with the current holder shown as a hint, but we also keep
+    // controllers around to allow editing.
+    final nameController = TextEditingController(
+      text: (member['name'] ?? '').toString(),
+    );
+    final emailController = TextEditingController(
+      text: (member['email'] ?? '').toString(),
+    );
 
     showDialog(
       context: context,
@@ -243,6 +276,18 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
             ),
           ),
           actions: [
+            if ((member['name'] ?? '').toString().isNotEmpty ||
+                (member['email'] ?? '').toString().isNotEmpty)
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _clearCommitteeMember(index);
+                },
+                child: const Text(
+                  'Clear role',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text(
@@ -259,8 +304,8 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                   _committee[index]['name'] = newName;
                   if (newName.isEmpty) {
                     _committee[index]['email'] = '';
-                    _committee[index]['userId'] = '';
-                    _committee[index]['avatarUrl'] = '';
+                    _committee[index]['userId'] = null;
+                    _committee[index]['avatarUrl'] = null;
                   } else {
                     _committee[index]['email'] = newEmail;
                   }
@@ -269,31 +314,49 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
                 final id = _committee[index]['id']?.toString();
                 try {
-                  final club = _adminClub;
-                  if (club == null || club.isEmpty) {
-                    return;
+                  final dynamic rawUserId = _committee[index]['userId'];
+                  final String? userIdValue;
+                  if (rawUserId == null) {
+                    userIdValue = null;
+                  } else {
+                    final s = rawUserId.toString().trim();
+                    userIdValue = s.isEmpty ? null : s;
                   }
 
-                  // If this role already exists in the DB, update it.
                   if (id != null && id.isNotEmpty) {
+                    // Existing row: update without needing the club name.
                     await _supabase
                         .from('committee_roles')
                         .update({
                           'name': newName,
                           'email': newName.isEmpty ? '' : newEmail,
-                          'user_id': _committee[index]['userId'] ?? null,
+                          'user_id': userIdValue,
                           'avatar_url': _committee[index]['avatarUrl'] ?? null,
                         })
                         .eq('id', id);
                   } else {
                     // Otherwise insert a new row for this club/role.
+                    final club = _adminClub ?? _clubConfig?.name;
+                    if (club == null || club.isEmpty) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not save member: club is not set',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     final role = (_committee[index]['role'] ?? '').toString();
                     final insertData = {
                       'club': club,
                       'role': role,
                       'name': newName,
                       'email': newName.isEmpty ? '' : newEmail,
-                      'user_id': _committee[index]['userId'] ?? null,
+                      'user_id': userIdValue,
                       'avatar_url': _committee[index]['avatarUrl'] ?? null,
                       'display_order': index,
                     };
@@ -536,7 +599,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       var query = _supabase
           .from('user_profiles')
           .select(
-            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason, club',
+            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason, soft_removed_at, club',
           );
 
       if (clubName != null && clubName.isNotEmpty) {
@@ -1011,6 +1074,18 @@ For security we recommend using this code within the next few days. After it has
     Map<String, dynamic> user,
     StateSetter setModalState,
   ) {
+    final rawSoftRemovedAt = user['soft_removed_at'];
+    String? softRemovedIso;
+    if (rawSoftRemovedAt is String) {
+      softRemovedIso = rawSoftRemovedAt;
+    } else if (rawSoftRemovedAt is DateTime) {
+      softRemovedIso = rawSoftRemovedAt.toIso8601String();
+    }
+    String? softRemovedDisplay;
+    if (softRemovedIso != null && softRemovedIso.length >= 10) {
+      softRemovedDisplay = softRemovedIso.substring(0, 10);
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1019,40 +1094,70 @@ For security we recommend using this code within the next few days. After it has
           'Remove Profile',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        content: Text(
-          'Soft removal will immediately block access and clear optional profile details.\n\n'
-          'Member: ${user['full_name'] ?? '—'}\nEmail: ${user['email'] ?? '—'}',
-          style: const TextStyle(color: Colors.white70),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Member: ${user['full_name'] ?? '—'}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Email: ${user['email'] ?? '—'}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            if (softRemovedDisplay != null)
+              Text(
+                'This member was soft-removed on $softRemovedDisplay. You can cancel the soft removal or perform a Full Delete (permanent).',
+                style: const TextStyle(color: Colors.white70),
+              )
+            else
+              const Text(
+                'Soft removal will immediately block access and clear optional profile details. You can later return here to either cancel the soft removal or perform a Full Delete.',
+                style: TextStyle(color: Colors.white70),
+              ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _softRemoveProfile(user, setModalState);
-            },
-            child: const Text(
-              'Soft remove now',
-              style: TextStyle(color: Colors.redAccent),
+          if (softRemovedDisplay == null)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _softRemoveProfile(user, setModalState);
+              },
+              child: const Text(
+                'Soft remove now',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            )
+          else ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _cancelSoftRemoval(user, setModalState);
+              },
+              child: const Text(
+                'Cancel soft removal',
+                style: TextStyle(color: Colors.lightGreenAccent),
+              ),
             ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _launchEmail(
-                subject: 'RunRank profile removal request',
-                body:
-                    'Please remove the profile for: ${user['full_name'] ?? '—'} (${user['email'] ?? '—'}).',
-              );
-            },
-            child: const Text(
-              'Request via Email',
-              style: TextStyle(color: Colors.amber),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _confirmFullDelete(user, setModalState);
+              },
+              child: const Text(
+                'Full Delete',
+                style: TextStyle(color: Colors.redAccent),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1114,6 +1219,7 @@ For security we recommend using this code within the next few days. After it has
             'avatar_url': null,
             'is_admin': false,
             'admin_since': null,
+            'soft_removed_at': DateTime.now().toIso8601String(),
           })
           .eq('id', user['id'] as String);
 
@@ -1125,6 +1231,96 @@ For security we recommend using this code within the next few days. After it has
       messenger.showSnackBar(
         SnackBar(content: Text('Soft removal failed: $e')),
       );
+    }
+  }
+
+  Future<void> _cancelSoftRemoval(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update({
+            'is_blocked': false,
+            'block_reason': null,
+            'soft_removed_at': null,
+          })
+          .eq('id', user['id'] as String);
+
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Soft removal cancelled and user unblocked'),
+        ),
+      );
+
+      await _searchUsers(_searchController.text, setModalState);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to cancel soft removal: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmFullDelete(
+    Map<String, dynamic> user,
+    StateSetter setModalState,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Confirm Full Delete',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'This will permanently delete this member\'s account data in RunRank. Posts and club records may be anonymised but access to the app will be fully removed. This action cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Yes, permanently delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      final response = await _supabase.functions.invoke(
+        'full-delete-user',
+        body: {'userId': user['id']},
+      );
+
+      if (response.status == 200) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Account fully deleted')),
+        );
+        await _searchUsers(_searchController.text, setModalState);
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Full delete failed (code ${response.status}). Please check the server logs.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Full delete failed: $e')));
     }
   }
 
@@ -1219,90 +1415,101 @@ For security we recommend using this code within the next few days. After it has
                             final isAdmin = user['is_admin'] == true;
                             final isBlocked = user['is_blocked'] == true;
 
-                            return Row(
+                            return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.person_outline,
-                                  color: Colors.white70,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        user['full_name'] ?? 'Member',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      Text(
-                                        user['email'] ?? '',
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.person_outline,
+                                      color: Colors.white70,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Chip(
-                                            label: Text(
-                                              isAdmin ? 'Admin' : 'Reader',
-                                            ),
-                                            backgroundColor: isAdmin
-                                                ? Colors.green.withOpacity(0.2)
-                                                : Colors.blue.withOpacity(0.2),
-                                            labelStyle: const TextStyle(
+                                          Text(
+                                            user['full_name'] ?? 'Member',
+                                            style: const TextStyle(
                                               color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
-                                          Chip(
-                                            label: Text(
-                                              user['membership_type'] ?? '—',
-                                            ),
-                                            backgroundColor: Colors.white
-                                                .withOpacity(0.08),
-                                            labelStyle: const TextStyle(
+                                          Text(
+                                            user['email'] ?? '',
+                                            style: const TextStyle(
                                               color: Colors.white70,
                                               fontSize: 12,
                                             ),
                                           ),
-                                          if (isBlocked)
-                                            Chip(
-                                              label: const Text('Blocked'),
-                                              backgroundColor: Colors.red
-                                                  .withOpacity(0.2),
-                                              labelStyle: const TextStyle(
-                                                color: Colors.redAccent,
-                                                fontWeight: FontWeight.w600,
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            children: [
+                                              Chip(
+                                                label: Text(
+                                                  isAdmin ? 'Admin' : 'Reader',
+                                                ),
+                                                backgroundColor: isAdmin
+                                                    ? Colors.green.withOpacity(
+                                                        0.2,
+                                                      )
+                                                    : Colors.blue.withOpacity(
+                                                        0.2,
+                                                      ),
+                                                labelStyle: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              Chip(
+                                                label: Text(
+                                                  user['membership_type'] ??
+                                                      '—',
+                                                ),
+                                                backgroundColor: Colors.white
+                                                    .withOpacity(0.08),
+                                                labelStyle: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              if (isBlocked)
+                                                Chip(
+                                                  label: const Text('Blocked'),
+                                                  backgroundColor: Colors.red
+                                                      .withOpacity(0.2),
+                                                  labelStyle: const TextStyle(
+                                                    color: Colors.redAccent,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          if (user['block_reason'] != null &&
+                                              (user['block_reason'] as String?)
+                                                      ?.isNotEmpty ==
+                                                  true)
+                                            Text(
+                                              'Reason: ${user['block_reason']}',
+                                              style: const TextStyle(
+                                                color: Colors.white60,
+                                                fontSize: 12,
                                               ),
                                             ),
                                         ],
                                       ),
-                                      if (user['block_reason'] != null &&
-                                          (user['block_reason'] as String?)
-                                                  ?.isNotEmpty ==
-                                              true)
-                                        Text(
-                                          'Reason: ${user['block_reason']}',
-                                          style: const TextStyle(
-                                            color: Colors.white60,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
                                   children: [
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
@@ -1328,7 +1535,6 @@ For security we recommend using this code within the next few days. After it has
                                             : Colors.greenAccent,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -1344,7 +1550,6 @@ For security we recommend using this code within the next few days. After it has
                                         color: Colors.amber,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -1367,7 +1572,6 @@ For security we recommend using this code within the next few days. After it has
                                             : Colors.redAccent,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -1385,7 +1589,6 @@ For security we recommend using this code within the next few days. After it has
                                         color: Colors.amber,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,

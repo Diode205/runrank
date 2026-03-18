@@ -38,7 +38,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _club;
   String? _avatarUrl;
   DateTime? _memberSince;
-  DateTime? _adminSince;
   String? _membershipType;
 
   @override
@@ -73,6 +72,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final emailController = TextEditingController(text: _email ?? '');
     final ukaController = TextEditingController(text: _ukaNumber ?? '');
     String? selectedMembershipType = _membershipType;
+    DateTime? selectedMemberSince = _memberSince;
 
     await showModalBottomSheet(
       context: context,
@@ -165,6 +165,43 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     dropdownColor: const Color(0xFF0F111A),
                     style: const TextStyle(color: Colors.white),
                   ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Member since',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 18),
+                    label: Text(
+                      selectedMemberSince != null
+                          ? _formatMonthYear(selectedMemberSince!)
+                          : 'Select month and year',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white38),
+                    ),
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final initial = selectedMemberSince ?? now;
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: initial,
+                        firstDate: DateTime(1990, 1, 1),
+                        lastDate: DateTime(now.year + 1, 12, 31),
+                      );
+                      if (picked != null) {
+                        setModalState(
+                          () => selectedMemberSince = DateTime(
+                            picked.year,
+                            picked.month,
+                            1,
+                          ),
+                        );
+                      }
+                    },
+                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -184,14 +221,20 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                         final newEmail = emailController.text.trim();
                         final newUka = ukaController.text.trim();
                         try {
+                          final updateData = <String, dynamic>{
+                            'full_name': newName.isEmpty ? null : newName,
+                            'email': newEmail.isEmpty ? null : newEmail,
+                            'uka_number': newUka.isEmpty ? null : newUka,
+                            'membership_type': selectedMembershipType,
+                          };
+                          if (selectedMemberSince != null) {
+                            updateData['member_since'] = selectedMemberSince!
+                                .toIso8601String();
+                          }
+
                           await _supabase
                               .from('user_profiles')
-                              .update({
-                                'full_name': newName.isEmpty ? null : newName,
-                                'email': newEmail.isEmpty ? null : newEmail,
-                                'uka_number': newUka.isEmpty ? null : newUka,
-                                'membership_type': selectedMembershipType,
-                              })
+                              .update(updateData)
                               .eq('id', user.id);
 
                           // Also propagate updated name to existing club posts
@@ -213,6 +256,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                             _email = newEmail.isEmpty ? null : newEmail;
                             _ukaNumber = newUka.isEmpty ? null : newUka;
                             _membershipType = selectedMembershipType;
+                            _memberSince = selectedMemberSince;
                           });
                           if (!mounted) return;
                           Navigator.pop(sheetContext);
@@ -298,17 +342,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           .maybeSingle();
       final isAdmin = await UserService.isAdmin();
       final memberSinceRaw = profile?['member_since'];
-      final adminSinceRaw = profile?['admin_since'];
       final createdAtRaw = profile?['created_at'];
       DateTime? parsedMemberSince = memberSinceRaw is String
           ? DateTime.tryParse(memberSinceRaw)
           : memberSinceRaw is DateTime
           ? memberSinceRaw
-          : null;
-      DateTime? parsedAdminSince = adminSinceRaw is String
-          ? DateTime.tryParse(adminSinceRaw)
-          : adminSinceRaw is DateTime
-          ? adminSinceRaw
           : null;
       final parsedCreatedAt = createdAtRaw is String
           ? DateTime.tryParse(createdAtRaw)
@@ -324,16 +362,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           parsedMemberSince = parsedCreatedAt;
         } catch (_) {}
       }
-      if (isAdmin && parsedAdminSince == null) {
-        try {
-          final now = DateTime.now();
-          await _supabase
-              .from('user_profiles')
-              .update({'admin_since': now.toIso8601String()})
-              .eq('id', user.id);
-          parsedAdminSince = now;
-        } catch (_) {}
-      }
       setState(() {
         _fullName = profile?['full_name'] as String?;
         _email = profile?['email'] as String?;
@@ -341,7 +369,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         _club = profile?['club'] as String?;
         _avatarUrl = profile?['avatar_url'] as String?;
         _memberSince = parsedMemberSince;
-        _adminSince = parsedAdminSince;
         _membershipType = profile?['membership_type'] as String?;
         _isAdmin = isAdmin;
         _loading = false;
@@ -578,10 +605,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final memberSince = _memberSince != null
         ? 'Member Since ${_formatMonthYear(_memberSince!)}'
         : 'Member since not set';
-    final adminSince = _adminSince != null
-        ? 'Admin Since ${_formatMonthYear(_adminSince!)}'
-        : 'Admin since not set';
-    final sinceLabel = _isAdmin ? adminSince : memberSince;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -591,7 +614,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           child: _detailsCard(
             name: name,
             email: email,
-            memberSince: sinceLabel,
+            memberSince: memberSince,
           ),
         ),
       ],
