@@ -163,10 +163,10 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     try {
       final data = await _supabase
           .from('notifications')
-          .select('id, title, is_read')
+          .select('id, body, is_read')
           .eq('user_id', currentUser.id)
           .eq('is_read', false)
-          .ilike('title', '%Account deletion requested%');
+          .ilike('body', '%[route:club_committee]%');
 
       if (!mounted) return;
       setState(() {
@@ -1062,10 +1062,18 @@ For security we recommend using this code within the next few days. After it has
     );
   }
 
-  Future<void> _launchEmail({required String subject, String? body}) async {
+  Future<void> _launchEmail({
+    String? to,
+    required String subject,
+    String? body,
+  }) async {
     final uri = Uri(
       scheme: 'mailto',
-      queryParameters: {'subject': subject, if (body != null) 'body': body},
+      path: to,
+      queryParameters: {
+        'subject': subject,
+        if (body != null && body.isNotEmpty) 'body': body,
+      },
     );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
@@ -1623,116 +1631,39 @@ For security we recommend using this code within the next few days. After it has
     );
   }
 
-  void _showContactForm(int index) {
+  Future<void> _showContactForm(int index) async {
     final member = _committee[index];
-    final subjectController = TextEditingController();
-    final messageController = TextEditingController();
+    final email = (member['email'] ?? '').toString().trim();
+    if (email.isEmpty) return;
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        final primary = colorScheme.primary;
+    final role = (member['role'] ?? '').toString().trim();
+    final name = (member['name'] ?? '').toString().trim();
 
-        return AlertDialog(
-          backgroundColor: const Color(0xFF0F111A),
-          title: Text(
-            'Contact ${member['name']}',
-            style: TextStyle(color: primary),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Role: ${member['role']}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: subjectController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Subject',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: primary, width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: messageController,
-                  style: const TextStyle(color: Colors.white),
-                  maxLines: 6,
-                  decoration: InputDecoration(
-                    labelText: 'Message',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: primary, width: 2),
-                    ),
-                    alignLabelWithHint: true,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                if (subjectController.text.trim().isEmpty ||
-                    messageController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please fill in all fields'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
+    final subject = role.isNotEmpty
+        ? 'RunRank – $role enquiry'
+        : 'RunRank club committee enquiry';
+    final bodyHeader = name.isNotEmpty ? 'Dear $name,' : 'Dear club official,';
 
-                // TODO: Store enquiry in Supabase or send via email service
-                // For now, show a confirmation
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Message sent to ${member['name']}. Thank you!',
-                    ),
-                    backgroundColor: primary,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.send, size: 18),
-              label: const Text('Send'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: colorScheme.onPrimary,
-              ),
-            ),
-          ],
+    // Create a notification for the specific admin role holder
+    // so their committee email icon can glow when there are
+    // unread contact requests.
+    final rawUserId = member['userId'];
+    final userId = rawUserId?.toString().trim();
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        await NotificationService.notifyUser(
+          userId: userId,
+          title: 'Committee email opened',
+          body:
+              'A club member has opened an email draft to you for your role as $role.',
+          route: 'club_committee',
         );
-      },
-    );
+      } catch (e) {
+        debugPrint('Error creating committee email notification: $e');
+      }
+    }
+
+    await _launchEmail(to: email, subject: subject, body: '$bodyHeader\n\n');
   }
 
   @override
@@ -2071,7 +2002,7 @@ For security we recommend using this code within the next few days. After it has
                                         ),
                                       ),
                                       child: Icon(
-                                        Icons.send,
+                                        Icons.email_outlined,
                                         color: accent,
                                         size: 16,
                                       ),
