@@ -68,11 +68,25 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
     }
   }
 
-  Future<void> _launchEmail({required String subject}) async {
+  Future<void> _launchEmail({
+    String? to,
+    required String subject,
+    String? body,
+  }) async {
+    final encodedSubject = Uri.encodeComponent(subject);
+    final encodedBody = body != null && body.isNotEmpty
+        ? Uri.encodeComponent(body)
+        : null;
+    final query = [
+      'subject=$encodedSubject',
+      if (encodedBody != null) 'body=$encodedBody',
+    ].join('&');
+
     final uri = Uri(
       scheme: 'mailto',
       // No default recipient to avoid hardcoding; user can choose.
-      queryParameters: {'subject': subject},
+      path: to,
+      query: query,
     );
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
@@ -122,26 +136,78 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       final emailText = (email != null && email.isNotEmpty)
           ? email
           : 'no email on file';
+      // Work out committee recipients (Membership Secretary and
+      // Club Secretary) for targeted notifications.
+      Map<String, dynamic>? membershipRow;
+      Map<String, dynamic>? secretaryRow;
+      try {
+        final committeeRows = await client
+            .from('committee_roles')
+            .select('role, name, email, user_id')
+            .eq('club', clubName);
 
-      await NotificationService.notifyClubAdminsInClub(
-        clubName: clubName,
-        title: 'Account deletion requested',
-        body:
-            '$displayName ($emailText) has requested full account deletion. Please remove their account in line with club policy.',
-        route: 'club_committee',
-      );
+        if (committeeRows is List) {
+          for (final r in committeeRows) {
+            final row = r as Map<String, dynamic>;
+            final roleRaw = (row['role'] as String?) ?? '';
+            final roleLower = roleRaw.toLowerCase();
 
-      // Also open the email app so the member can
-      // send a request to the appropriate club contact.
-      await _launchEmail(
-        subject: 'RunRank account deletion request – $displayName',
-      );
+            if (roleLower.contains('membership secretary')) {
+              membershipRow ??= row;
+            } else if (roleLower.contains('secretary') &&
+                !roleLower.contains('membership')) {
+              secretaryRow ??= row;
+            }
+          }
+        }
+      } catch (e) {
+        // If committee lookup fails we fall back to notifying all admins.
+      }
+
+      final today = DateTime.now();
+      final requestDate =
+          '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final notificationBody =
+          '$displayName ($emailText) has requested member-initiated full deletion of their RunRank club account for $clubName on $requestDate. '
+          'Please process this deletion within seven (7) days of the request date in line with club policy. '
+          'After this 7-day window there is no additional grace period and the member will no longer be able to log in.';
+
+      final targetUserIds = <String>{};
+      for (final row in [membershipRow, secretaryRow]) {
+        if (row == null) continue;
+        final rawUserId = row['user_id'];
+        final userId = rawUserId?.toString().trim();
+        if (userId != null && userId.isNotEmpty) {
+          targetUserIds.add(userId);
+        }
+      }
+
+      if (targetUserIds.isNotEmpty) {
+        for (final userId in targetUserIds) {
+          await NotificationService.notifyUser(
+            userId: userId,
+            title: 'Account deletion requested',
+            body: notificationBody,
+            route: 'club_committee',
+          );
+        }
+      } else {
+        // If no specific committee holders are configured, fall back
+        // to notifying all admins in the club.
+        await NotificationService.notifyClubAdminsInClub(
+          clubName: clubName,
+          title: 'Account deletion requested',
+          body: notificationBody,
+          route: 'club_committee',
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Your club admins have been notified and an email draft has been opened.',
+            'Your account deletion request has been sent to your club. If you change your mind within 7 days, please email your club admins to cancel the request.',
           ),
         ),
       );
@@ -165,7 +231,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           ),
           content: const Text(
             'Deleting your profile will request removal of your data from the club. '
-            'This action cannot be undone once processed.\n\n'
+            'This action cannot be undone once processed within a week.\n\n'
             'Do you want to delete your account?',
             style: TextStyle(color: Colors.white70),
           ),

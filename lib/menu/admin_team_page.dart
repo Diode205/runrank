@@ -1067,14 +1067,16 @@ For security we recommend using this code within the next few days. After it has
     required String subject,
     String? body,
   }) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: to,
-      queryParameters: {
-        'subject': subject,
-        if (body != null && body.isNotEmpty) 'body': body,
-      },
-    );
+    final encodedSubject = Uri.encodeComponent(subject);
+    final encodedBody = body != null && body.isNotEmpty
+        ? Uri.encodeComponent(body)
+        : null;
+    final query = [
+      'subject=$encodedSubject',
+      if (encodedBody != null) 'body=$encodedBody',
+    ].join('&');
+
+    final uri = Uri(scheme: 'mailto', path: to, query: query);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
