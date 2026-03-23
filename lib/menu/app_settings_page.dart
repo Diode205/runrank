@@ -207,7 +207,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Your account deletion request has been sent to your club. If you change your mind within 7 days, please email your club admins to cancel the request.',
+            'Your request has been sent. Contact your club admins to cancel within seven (7) days.',
           ),
         ),
       );

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/widgets/event_details_page.dart';
@@ -218,10 +219,78 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       if (route == 'club_committee') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AdministrativeTeamPage()),
-        ).then((_) => loadData());
+        // For committee messages (including account deletion
+        // requests), show the full text and optionally allow
+        // sending an acknowledgement email to the member.
+        String? ackEmail;
+        String? ackName;
+
+        if (title == 'Account deletion requested') {
+          final match = RegExp(
+            r'^(.+?)\s+\(([^)]+)\)\s+has requested',
+          ).firstMatch(body);
+          if (match != null) {
+            final name = match.group(1)?.trim();
+            final email = match.group(2)?.trim();
+            if (email != null && email.contains('@')) {
+              ackEmail = email;
+            }
+            if (name != null && name.isNotEmpty) {
+              ackName = name;
+            }
+          }
+        }
+
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F111A),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Text(
+                  body,
+                  style: const TextStyle(color: Colors.white70, height: 1.4),
+                ),
+              ),
+              actions: [
+                if (ackEmail != null)
+                  TextButton(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      final subject =
+                          'RunRank account deletion request – acknowledgement';
+                      final namePart = ackName != null
+                          ? 'Hi $ackName,'
+                          : 'Hello,';
+                      final bodyText =
+                          '$namePart\n\nThank you for your request to delete your RunRank club account. '
+                          'We will aim to complete this within seven (7) days of your original request, '
+                          'in line with club policy. If you change your mind within this 7-day window, '
+                          'please contact your club admins to cancel the request.\n\nYour Admin Team';
+                      await _composeEmail(
+                        to: ackEmail,
+                        subject: subject,
+                        body: bodyText,
+                      );
+                    },
+                    child: const Text('Send acknowledgement email'),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+        await loadData();
         return;
       }
 
@@ -314,6 +383,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
       return;
     }
+  }
+
+  Future<void> _composeEmail({
+    String? to,
+    required String subject,
+    String? body,
+  }) async {
+    final encodedSubject = Uri.encodeComponent(subject);
+    final encodedBody = body != null && body.isNotEmpty
+        ? Uri.encodeComponent(body)
+        : null;
+    final query = [
+      'subject=$encodedSubject',
+      if (encodedBody != null) 'body=$encodedBody',
+    ].join('&');
+
+    final uri = Uri(scheme: 'mailto', path: to, query: query);
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _navigateToEvent(

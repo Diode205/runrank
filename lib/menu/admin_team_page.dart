@@ -1791,15 +1791,20 @@ For security we recommend using this code within the next few days. After it has
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          tooltip: 'Membership requests',
+                          tooltip: 'Acknowledgement email',
                           onPressed: () {
                             // Reset the local counter when the icon is tapped
                             setState(() {
                               _deletionRequestCount = 0;
                             });
 
+                            // Open the device email app with a generic
+                            // acknowledgement template that admins can use
+                            // when replying to member enquiries.
                             _launchEmail(
-                              subject: 'RunRank membership requests',
+                              subject: 'RunRank club enquiry – acknowledgement',
+                              body:
+                                  'Thank you for your email. We will endeavour to resolve your query as soon as possible.\n\nYour Admin Team',
                             );
                           },
                           icon: Stack(
