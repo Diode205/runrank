@@ -233,7 +233,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   Widget _buildGenderToggle() {
     final isMale = _currentGender == 'M';
     final currentLabel = isMale
-        ? "Showing Men's records"
+        ? "Showing Men's Records"
         : "Showing Women's Records";
     final buttonLabel = isMale ? "View Women's Top 10" : "View Men's Top 10";
 
