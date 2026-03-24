@@ -56,6 +56,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Map<String, List<RaceRecord>> _byDistance = {};
   Map<String, ClubRecord?> _clubRecords = {};
   String? _currentUserId;
+  String? _currentUserGender;
 
   @override
   void initState() {
@@ -178,8 +179,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _fetchClubRecords() async {
     try {
+      // Resolve the current user's gender once so that club record
+      // holders are filtered appropriately (men's vs women's records).
+      String? gender = _currentUserGender;
+      if (gender == null) {
+        gender = await _clubRecordsService.getDefaultGenderFilter();
+        if (gender != null) {
+          gender = gender.toUpperCase();
+        }
+        _currentUserGender = gender;
+      }
+
       for (final distance in _distances) {
-        var record = await _clubRecordsService.getClubRecordHolder(distance);
+        var record = await _clubRecordsService.getClubRecordHolder(
+          distance,
+          genderFilter: gender,
+        );
 
         // If there is no official club record yet for this distance but the
         // current user has results recorded, automatically ensure a
@@ -206,7 +221,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
 
             // Re-fetch after ensuring the record so UI reflects it.
-            record = await _clubRecordsService.getClubRecordHolder(distance);
+            record = await _clubRecordsService.getClubRecordHolder(
+              distance,
+              genderFilter: gender,
+            );
           }
         }
 

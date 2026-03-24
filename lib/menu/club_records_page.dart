@@ -17,6 +17,8 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   bool _loading = true;
   bool _isAdmin = false;
   Map<String, List<ClubRecord>> _recordsByDistance = {};
+  // 'M' or 'F' – defaults based on current user's gender
+  String _currentGender = 'M';
   final _distances = const [
     '5K',
     '5M',
@@ -46,8 +48,29 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
     setState(() => _loading = true);
 
     _isAdmin = await UserService.isAdmin();
+    final defaultGender = await _recordsService.getDefaultGenderFilter();
+    if (defaultGender != null &&
+        (defaultGender.toUpperCase() == 'M' ||
+            defaultGender.toUpperCase() == 'F')) {
+      _currentGender = defaultGender.toUpperCase();
+    } else {
+      _currentGender = 'M';
+    }
+
     _recordsByDistance = await _recordsService.getAllTopRecords(
       limitPerDistance: 10,
+      genderFilter: _currentGender,
+    );
+
+    setState(() => _loading = false);
+  }
+
+  Future<void> _loadRecordsForGender(String gender) async {
+    setState(() => _loading = true);
+
+    _recordsByDistance = await _recordsService.getAllTopRecords(
+      limitPerDistance: 10,
+      genderFilter: gender,
     );
 
     setState(() => _loading = false);
@@ -87,6 +110,8 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                       height: 1.6,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  _buildGenderToggle(),
                   const SizedBox(height: 16),
                   if (_isAdmin) _buildAdminButtons(),
                   if (_isAdmin) const SizedBox(height: 16),
@@ -202,6 +227,46 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildGenderToggle() {
+    final isMale = _currentGender == 'M';
+    final currentLabel = isMale
+        ? "Showing Men's records"
+        : "Showing Women's Records";
+    final buttonLabel = isMale ? "View Women's Top 10" : "View Men's Top 10";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Center(
+          child: Text(
+            currentLabel,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: OutlinedButton(
+            onPressed: () {
+              final nextGender = isMale ? 'F' : 'M';
+              setState(() {
+                _currentGender = nextGender;
+              });
+              _loadRecordsForGender(nextGender);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Color(0xFFFFD700)),
+            ),
+            child: Text(
+              buttonLabel,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -67,6 +67,9 @@ class ClubRecordsService {
   bool _clubLoaded = false;
   Set<String>? _cachedClubUserIds;
   bool _clubUserIdsLoaded = false;
+  String? _cachedUserGender;
+  bool _userGenderLoaded = false;
+  final Map<String, Set<String>> _cachedClubUserIdsByGender = {};
 
   Future<String?> _getCurrentUserClub() async {
     if (_clubLoaded) return _cachedClubName;
@@ -97,30 +100,75 @@ class ClubRecordsService {
     }
   }
 
+  Future<String?> _getCurrentUserGender() async {
+    if (_userGenderLoaded) return _cachedUserGender;
+
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      _userGenderLoaded = true;
+      _cachedUserGender = null;
+      return null;
+    }
+
+    try {
+      final row = await _supabase
+          .from('user_profiles')
+          .select('gender')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final raw = (row?['gender'] as String?)?.trim().toUpperCase();
+      if (raw == 'M' || raw == 'F') {
+        _cachedUserGender = raw;
+      } else {
+        _cachedUserGender = null;
+      }
+      _userGenderLoaded = true;
+      return _cachedUserGender;
+    } catch (e) {
+      print('Error fetching current user gender for club records: $e');
+      _userGenderLoaded = true;
+      _cachedUserGender = null;
+      return null;
+    }
+  }
+
   /// Returns the set of user IDs that belong to the current user's club.
   ///
   /// For the original NNBR club ("North Norfolk Beach Runners") we do not
   /// filter, so this returns an empty set and callers should treat that as
   /// "no club filter" to preserve existing behaviour.
   Future<Set<String>> _getCurrentClubUserIds() async {
+    return _getClubUserIdsForGender(null);
+  }
+
+  Future<Set<String>> _getClubUserIdsForGender(String? genderFilter) async {
     final club = await _getCurrentUserClub();
     if (club == null) return {};
 
-    // Legacy behaviour: NNBR was the original single club, so its records
-    // are shared and don't need additional filtering.
-    if (club.toLowerCase().contains('north norfolk beach runners')) {
-      return {};
-    }
-
-    if (_clubUserIdsLoaded && _cachedClubUserIds != null) {
-      return _cachedClubUserIds!;
+    if (genderFilter == null) {
+      if (_clubUserIdsLoaded && _cachedClubUserIds != null) {
+        return _cachedClubUserIds!;
+      }
+    } else {
+      final key = genderFilter.toUpperCase();
+      final cached = _cachedClubUserIdsByGender[key];
+      if (cached != null) {
+        return cached;
+      }
     }
 
     try {
-      final rows = await _supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('club', club);
+      var query = _supabase.from('user_profiles').select('id').eq('club', club);
+
+      if (genderFilter != null) {
+        final g = genderFilter.toUpperCase();
+        if (g == 'M' || g == 'F') {
+          query = query.eq('gender', g);
+        }
+      }
+
+      final rows = await query;
 
       final ids = <String>{};
       for (final row in rows as List) {
@@ -130,13 +178,24 @@ class ClubRecordsService {
         }
       }
 
-      _cachedClubUserIds = ids;
-      _clubUserIdsLoaded = true;
+      if (genderFilter == null) {
+        _cachedClubUserIds = ids;
+        _clubUserIdsLoaded = true;
+      } else {
+        _cachedClubUserIdsByGender[genderFilter.toUpperCase()] = ids;
+      }
+
       return ids;
     } catch (e) {
-      print('Error fetching user IDs for club $club: $e');
-      _clubUserIdsLoaded = true;
-      _cachedClubUserIds = {};
+      print(
+        'Error fetching user IDs for club $club with gender $genderFilter: $e',
+      );
+      if (genderFilter == null) {
+        _clubUserIdsLoaded = true;
+        _cachedClubUserIds = {};
+      } else {
+        _cachedClubUserIdsByGender[genderFilter.toUpperCase()] = {};
+      }
       return {};
     }
   }
@@ -145,9 +204,10 @@ class ClubRecordsService {
   Future<List<ClubRecord>> getTopRecords(
     String distance, {
     int limit = 5,
+    String? genderFilter,
   }) async {
     try {
-      final userIds = await _getCurrentClubUserIds();
+      final userIds = await _getClubUserIdsForGender(genderFilter);
       final applyClubFilter = userIds.isNotEmpty;
       final userIdList = userIds.toList();
 
@@ -269,6 +329,7 @@ class ClubRecordsService {
   /// Fetch top records for all distances
   Future<Map<String, List<ClubRecord>>> getAllTopRecords({
     int limitPerDistance = 5,
+    String? genderFilter,
   }) async {
     final distances = [
       '5K',
@@ -286,6 +347,7 @@ class ClubRecordsService {
       results[distance] = await getTopRecords(
         distance,
         limit: limitPerDistance,
+        genderFilter: genderFilter,
       );
     }
 
@@ -293,15 +355,26 @@ class ClubRecordsService {
   }
 
   /// Get the fastest record for a distance (club record holder)
-  Future<ClubRecord?> getClubRecordHolder(String distance) async {
+  Future<ClubRecord?> getClubRecordHolder(
+    String distance, {
+    String? genderFilter,
+  }) async {
     try {
-      final records = await getTopRecords(distance, limit: 1);
+      final records = await getTopRecords(
+        distance,
+        limit: 1,
+        genderFilter: genderFilter,
+      );
       return records.isNotEmpty ? records.first : null;
     } catch (e) {
       print('Error fetching club record holder for $distance: $e');
       return null;
     }
   }
+
+  /// Public helper so UI code can pick a sensible default gender filter
+  /// for club records based on the current user's profile.
+  Future<String?> getDefaultGenderFilter() => _getCurrentUserGender();
 
   /// Add a new club record (admin only)
   Future<bool> addRecord(ClubRecord record) async {
