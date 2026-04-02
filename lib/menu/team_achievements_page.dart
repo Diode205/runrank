@@ -129,7 +129,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
     final awardConfig = _getAwardConfig(achievement.award);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -158,7 +158,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
           borderRadius: BorderRadius.circular(20),
           onLongPress: _isAdmin ? () => _showOptionsDialog(achievement) : null,
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -166,7 +166,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                   children: [
                     // Award medal icon
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: awardConfig['color']!.withOpacity(0.2),
                         shape: BoxShape.circle,
@@ -178,10 +178,10 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                       child: Icon(
                         awardConfig['icon'] as IconData,
                         color: awardConfig['color'],
-                        size: 32,
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,17 +189,17 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                           Text(
                             achievement.award.toUpperCase(),
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: awardConfig['color'],
                               letterSpacing: 1.2,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             achievement.eventName,
                             style: const TextStyle(
-                              fontSize: 20,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -209,7 +209,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -217,7 +217,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                       child: Text(
                         achievement.teams,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           color: Colors.white,
                           height: 1.4,
                         ),
@@ -226,8 +226,8 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                        horizontal: 8,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.05),
@@ -246,7 +246,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                             _formatDate(achievement.achievementDate),
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontSize: 12,
+                              fontSize: 11,
                             ),
                           ),
                         ],

@@ -2221,12 +2221,12 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontStyle: FontStyle.normal,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color.fromARGB(
-                                                221,
-                                                235,
-                                                81,
-                                                5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color.from(
+                                                alpha: 0.886,
+                                                red: 0.349,
+                                                green: 0.008,
+                                                blue: 0.024,
                                               ),
                                             ),
                                           ),
@@ -2578,6 +2578,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         const Center(
                           child: Text(
                             'My Top 10',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
