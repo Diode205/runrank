@@ -643,6 +643,18 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             value: "Ekiden",
                             child: Text("Ekiden Relay"),
                           ),
+                          DropdownMenuItem(
+                            value: "AlexMoore",
+                            child: Text("Alex Moore Relay"),
+                          ),
+                          DropdownMenuItem(
+                            value: "NorwichTriathlon",
+                            child: Text("Norwich Triathlon Relay"),
+                          ),
+                          DropdownMenuItem(
+                            value: "Sandringham24",
+                            child: Text("Sandringham 24 Relay"),
+                          ),
                         ],
                         onChanged: (v) {
                           if (v == null) return;
