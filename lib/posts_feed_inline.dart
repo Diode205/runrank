@@ -463,6 +463,8 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(null);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Club Posts'),
@@ -470,7 +472,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

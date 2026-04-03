@@ -518,13 +518,15 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(null);
+
     if (loading) {
       return Scaffold(
         appBar: AppBar(
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+                colors: brandColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -542,7 +544,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+                colors: brandColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -609,7 +611,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

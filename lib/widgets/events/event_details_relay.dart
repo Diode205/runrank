@@ -417,17 +417,17 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 // Message host button
                 Container(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0057B7), Color(0xFF003F8A)],
+                    gradient: LinearGradient(
+                      colors: UserService.clubBrandGradient(null),
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: const Color(0x4D0057B7),
+                        color: Color(0x40000000),
                         blurRadius: 8,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),
@@ -534,7 +534,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         margin: const EdgeInsets.only(top: 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+            colors: UserService.clubBrandGradient(null),
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

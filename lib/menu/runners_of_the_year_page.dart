@@ -532,6 +532,8 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(null);
+
     return DefaultTabController(
       length: _awards.length,
       child: Scaffold(
@@ -539,9 +541,9 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
           title: const Text('Runners Of The Year'),
           centerTitle: true,
           flexibleSpace: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0x4DFFD300), Color(0x4D0057B7)],
+                colors: brandColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -552,9 +554,11 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0x1A0057B7), Color(0x1AFFD300)],
+                    colors: brandColors
+                        .map((c) => c.withValues(alpha: 0.1))
+                        .toList(),
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),

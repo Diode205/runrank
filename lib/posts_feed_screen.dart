@@ -5,6 +5,7 @@ import 'package:runrank/widgets/post_detail_page.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/widgets/inline_video_player.dart';
 import 'package:runrank/widgets/linkified_text.dart';
+import 'package:runrank/services/user_service.dart';
 
 class PostsFeedScreen extends StatefulWidget {
   const PostsFeedScreen({super.key});
@@ -224,6 +225,8 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(_clubName);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Club Posts'),
@@ -231,7 +234,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

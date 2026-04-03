@@ -44,6 +44,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
+    final brandColors = UserService.clubBrandGradient(null);
     // current user not used directly in this page
 
     return Scaffold(
@@ -62,7 +63,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -289,17 +290,17 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 // Message host button
                 Container(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0057B7), Color(0xFF003F8A)],
+                    gradient: LinearGradient(
+                      colors: brandColors,
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: const Color(0x4D0057B7),
+                        color: Color(0x40000000),
                         blurRadius: 8,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),

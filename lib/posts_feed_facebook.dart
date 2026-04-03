@@ -415,14 +415,16 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(null);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Club Posts'),
         centerTitle: true,
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0x4DFFD300), Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

@@ -9,6 +9,7 @@ import 'package:runrank/widgets/admin_create_event_page.dart';
 import 'package:runrank/widgets/admin_edit_event_page.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/weather_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 /// =============================================================
 /// CLUB EVENTS CALENDAR — unified for all event types
@@ -401,6 +402,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
   @override
   Widget build(BuildContext context) {
+    final brandColors = UserService.clubBrandGradient(_clubName);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -410,7 +413,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [const Color(0x4DFFD300), const Color(0x4D0057B7)],
+              colors: brandColors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
