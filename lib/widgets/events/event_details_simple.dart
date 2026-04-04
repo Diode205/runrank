@@ -41,7 +41,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(viewerClubName);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -467,11 +467,16 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 var displayType = rawType;
 
                 final eventType = widget.event.eventType.toLowerCase();
-                if (eventType == "special_event" && rawType == "running") {
+                if ((eventType == "special_event" ||
+                        eventType.startsWith("training")) &&
+                    rawType == "running") {
                   displayType = "Attending";
                 }
 
-                return "9 Type: $displayType";
+                // Show a simple, cross-platform label for the
+                // user's response type. Using a standard bullet
+                // avoids platform-specific emoji issues.
+                return "• Type: $displayType";
               }(), style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 12),
               OutlinedButton(

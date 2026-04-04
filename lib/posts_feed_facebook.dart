@@ -415,7 +415,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(_clubName);
 
     return Scaffold(
       appBar: AppBar(
@@ -484,7 +484,10 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                     onOpenDetail: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => PostDetailPage(postId: postId),
+                          builder: (_) => PostDetailPage(
+                            postId: postId,
+                            initialClubName: _clubName,
+                          ),
                         ),
                       );
                     },

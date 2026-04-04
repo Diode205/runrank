@@ -339,7 +339,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PostDetailPage(postId: post['id']),
+                            builder: (_) => PostDetailPage(
+                              postId: post['id'],
+                              initialClubName: _clubName,
+                            ),
                           ),
                         ).then((_) => _loadPosts());
                       },

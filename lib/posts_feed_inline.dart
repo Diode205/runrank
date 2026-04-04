@@ -19,6 +19,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
+  String? _clubName;
 
   // Track expanded states per post
   final Map<String, bool> _expandedReactions = {};
@@ -63,12 +64,20 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
     try {
       final profile = await supabase
           .from('user_profiles')
-          .select('is_admin')
+          .select('is_admin, club')
           .eq('id', user.id)
           .single();
 
       if (mounted) {
-        setState(() => isAdmin = profile['is_admin'] ?? false);
+        final clubNameRaw = (profile['club'] as String?)?.trim();
+        final clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+            ? clubNameRaw
+            : null;
+
+        setState(() {
+          isAdmin = profile['is_admin'] ?? false;
+          _clubName = clubName;
+        });
       }
     } catch (e) {
       print('Error checking admin status: $e');
@@ -463,7 +472,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(_clubName);
 
     return Scaffold(
       appBar: AppBar(

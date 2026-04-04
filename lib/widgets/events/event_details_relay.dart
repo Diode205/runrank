@@ -109,6 +109,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
+    final brandColors = UserService.clubBrandGradient(viewerClubName);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -125,10 +126,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                const Color(0xBBFFD300).withValues(alpha: 0.7),
-                const Color(0xBB0057B7).withValues(alpha: 0.7),
-              ],
+              colors: brandColors.map((c) => c.withValues(alpha: 0.7)).toList(),
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -418,7 +416,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: UserService.clubBrandGradient(null),
+                      colors: brandColors,
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -534,7 +532,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         margin: const EdgeInsets.only(top: 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: UserService.clubBrandGradient(null),
+            colors: UserService.clubBrandGradient(viewerClubName),
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

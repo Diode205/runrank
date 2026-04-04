@@ -55,8 +55,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     super.initState();
 
     adminTypes = [
-      "Training 1",
-      "Training 2",
+      "Training",
       "Race",
       "Cross Country",
       "Handicap Series",
@@ -77,7 +76,14 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     // Apply any provided initial values for prefilled navigation
     if (widget.initialEventType != null) {
       selectedCategory = "admin"; // only admin creates events here
-      selectedEventType = widget.initialEventType!;
+      final initType = widget.initialEventType!;
+      if (initType == "Training 1" || initType == "Training 2") {
+        // Legacy callers may still pass the old labels; normalise
+        // them into the new unified Training type.
+        selectedEventType = "Training";
+      } else {
+        selectedEventType = initType;
+      }
     }
     if (widget.initialHandicapDistance != null) {
       selectedHandicapDistance = widget.initialHandicapDistance;
@@ -113,6 +119,14 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   String selectedEventType = "";
   String selectedCategory = "";
   String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
+
+  // Special Event subtype (e.g. AGM, Club Nights, Awards Night)
+  static const List<String> _specialEventTypes = <String>[
+    'AGM',
+    'Club Nights',
+    'Awards Night',
+  ];
+  String? _selectedSpecialEventType;
 
   // Controllers
   final hostCtrl = TextEditingController();
@@ -186,8 +200,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         if (_isNRRClub) {
           // For NRR: keep all admin event types except Handicap Series.
           adminTypes = [
-            "Training 1",
-            "Training 2",
+            "Training",
             "Race",
             "Cross Country",
             "Relay",
@@ -199,8 +212,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         } else {
           // Default (NNBR and other clubs).
           adminTypes = [
-            "Training 1",
-            "Training 2",
+            "Training",
             "Race",
             "Cross Country",
             "Handicap Series",
@@ -282,10 +294,12 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   String buildTitle() {
     switch (selectedEventType) {
+      case "Training":
       case "Training 1":
-        return "Training 1";
       case "Training 2":
-        return "Training 2";
+        // New unified Training type (and legacy labels) all
+        // use a simple "Training" title for the calendar.
+        return "Training";
       case "Race":
         return "Race: $selectedRace";
       case "Cross Country":
@@ -296,6 +310,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       case "Relay":
         return "Relay";
       case "Special Event":
+        final suffix = _selectedSpecialEventType;
+        if (suffix != null && suffix.trim().isNotEmpty) {
+          return "Special Event - ${suffix.trim()}";
+        }
         return "Special Event";
       default:
         return selectedEventType;
@@ -670,6 +688,32 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+
+              // SPECIAL EVENT UI
+              if (selectedEventType == "Special Event")
+                _section(
+                  "Special Event Type",
+                  DropdownButtonFormField<String>(
+                    value:
+                        _selectedSpecialEventType ?? _specialEventTypes.first,
+                    items: _specialEventTypes
+                        .map(
+                          (e) => DropdownMenuItem<String>(
+                            value: e,
+                            child: Text(e),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSpecialEventType = value;
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Choose special event',
+                    ),
                   ),
                 ),
 

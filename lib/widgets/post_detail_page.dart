@@ -7,8 +7,9 @@ import 'package:runrank/widgets/inline_video_player.dart';
 
 class PostDetailPage extends StatefulWidget {
   final String postId;
+  final String? initialClubName;
 
-  const PostDetailPage({super.key, required this.postId});
+  const PostDetailPage({super.key, required this.postId, this.initialClubName});
 
   @override
   State<PostDetailPage> createState() => _PostDetailPageState();
@@ -28,6 +29,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   bool isAuthor = false;
   bool isApproved = true;
   RealtimeChannel? _commentsChannel;
+  String? _clubName;
 
   static const List<String> availableEmojis = [
     '👍',
@@ -56,6 +58,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   @override
   void initState() {
     super.initState();
+    _clubName = widget.initialClubName;
     _loadPostDetails();
 
     // Listen for new comments on this post so the thread updates live
@@ -123,7 +126,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
       if (user != null) {
         profile = await supabase
             .from('user_profiles')
-            .select('is_admin')
+            .select('is_admin, club')
             .eq('id', user.id)
             .maybeSingle();
       }
@@ -191,6 +194,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
           likeUsers = likeUserList;
           loading = false;
           isAdmin = (profile?['is_admin'] ?? false) as bool;
+          final clubNameRaw = (profile?['club'] as String?)?.trim();
+          _clubName = (clubNameRaw != null && clubNameRaw.isNotEmpty)
+              ? clubNameRaw
+              : null;
           isAuthor =
               user != null &&
               postData != null &&
@@ -518,7 +525,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(_clubName);
+    final clubLower = (_clubName ?? '').toLowerCase();
+    final isNRR = clubLower.contains('norwich road runners');
+    final sendButtonColors = isNRR
+        ? const [Color(0xFFD32F2F), Color(0xFFFFFFFF)] // NRR red + white
+        : const [Color(0xFFFFD300), Color(0xFF0057B7)]; // NNBR yellow + blue
 
     if (loading) {
       return Scaffold(
@@ -1118,10 +1130,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFFFD300), Color(0xFF0057B7)],
-                          ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: sendButtonColors),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(

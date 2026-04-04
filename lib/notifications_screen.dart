@@ -28,6 +28,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   StreamSubscription<int>? _unreadSubscription;
   RealtimeChannel? _notificationsChannel;
   Timer? _refreshTimer;
+  String? _clubName;
 
   // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
   String? _extractRoute(String text) {
@@ -43,6 +44,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadClubName();
     loadData();
 
     // Listen for unread-count changes so the list refreshes
@@ -95,6 +97,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadClubName() async {
+    try {
+      final name = await UserService.currentClubName();
+      if (!mounted) return;
+      setState(() {
+        _clubName = name;
+      });
+    } catch (_) {
+      // Best-effort only; fall back to default gradient on error.
+    }
   }
 
   Future<void> loadData() async {
@@ -335,7 +349,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (postId.isNotEmpty) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => PostDetailPage(postId: postId)),
+            MaterialPageRoute(
+              builder: (_) =>
+                  PostDetailPage(postId: postId, initialClubName: _clubName),
+            ),
           ).then((_) => loadData());
           return;
         }
@@ -472,9 +489,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Color _alertAccentColor() {
+    final lower = (_clubName ?? '').toLowerCase();
+    if (lower.contains('norwich road runners')) {
+      return const Color(0xFFD32F2F); // NRR red
+    }
+    return const Color(0xFF0057B7); // NNBR blue / default
+  }
+
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(_clubName);
 
     return Scaffold(
       appBar: AppBar(
@@ -582,7 +607,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         side: BorderSide(
                           color: isRead
                               ? Colors.white.withOpacity(0.1)
-                              : Colors.blue.withOpacity(0.3),
+                              : _alertAccentColor().withOpacity(0.5),
                           width: isRead ? 1 : 2,
                         ),
                       ),
@@ -631,7 +656,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                       width: 10,
                                       height: 10,
                                       decoration: BoxDecoration(
-                                        color: Colors.blue,
+                                        color: _alertAccentColor(),
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: Colors.grey[800]!,

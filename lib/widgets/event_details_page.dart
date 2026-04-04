@@ -9,7 +9,7 @@ import 'package:runrank/widgets/events/event_details_relay.dart';
 /// EventDetailsPage routes to the appropriate event-type specific page based on event type.
 ///
 /// Event Types:
-/// - Group 1 (Simple): Training_1, Training_2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
+/// - Group 1 (Simple): Training, Training_1, Training_2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
 /// - Group 2 (Race): Race, Handicap_Series
 /// - Group 3 (Relay): Relay
 class EventDetailsPage extends StatelessWidget {
@@ -27,6 +27,7 @@ class EventDetailsPage extends StatelessWidget {
     final type = event.eventType.toLowerCase();
 
     switch (type) {
+      case 'training':
       case 'training_1':
       case 'training_2':
       case 'special_event':

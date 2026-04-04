@@ -460,7 +460,10 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                       // Derive a relay label for RNR vs Ekiden
                       String displayTitle = e.title ?? "";
                       String subtitleText = e.venue;
-                      if (e.eventType.toLowerCase() == 'relay') {
+                      final normalizedType = e.eventType
+                          .toLowerCase()
+                          .replaceAll(" ", "_");
+                      if (normalizedType == 'relay') {
                         final rawTeam = e.relayTeam?.trim() ?? '';
                         final teamLower = rawTeam.toLowerCase();
                         final isEkiden = teamLower.startsWith('ekiden');
@@ -498,6 +501,19 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                                 : '${e.venue} • Team: $teamLabel';
                           }
                         }
+                      } else if (normalizedType == 'training' ||
+                          normalizedType == 'training_1' ||
+                          normalizedType == 'training_2') {
+                        // For Training events, show "Training with {Host}" so
+                        // members can immediately see who is leading the
+                        // session on the calendar card.
+                        final host = e.hostOrDirector.trim();
+                        if (host.isNotEmpty) {
+                          displayTitle = 'Training with $host';
+                        } else {
+                          displayTitle = 'Training';
+                        }
+                        subtitleText = e.venue;
                       } else {
                         subtitleText = e.venue;
                       }
@@ -721,6 +737,7 @@ class _EventCard extends StatelessWidget {
   Color _background(String t) {
     String normalized = t.toLowerCase().replaceAll(" ", "_");
     switch (normalized) {
+      case 'training':
       case 'training_1':
       case 'training_2':
         return const Color(0x33FFF59D);
@@ -746,6 +763,7 @@ class _EventCard extends StatelessWidget {
   String _icon(String t) {
     String normalized = t.toLowerCase().replaceAll(" ", "_");
     switch (normalized) {
+      case 'training':
       case 'training_1':
       case 'training_2':
         return '🏃';

@@ -44,7 +44,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   Widget build(BuildContext context) {
     final e = widget.event;
     final dt = e.dateTime;
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(viewerClubName);
     // current user not used directly in this page
 
     return Scaffold(

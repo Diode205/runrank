@@ -19,6 +19,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   final Map<String, List<AwardWinnerRow>> _winnersByAward = {};
   bool _loading = true;
   List<String> _memberNames = [];
+  String? _clubName;
 
   final List<Map<String, String>> _awards = const [
     {'key': 'short_performance', 'title': '🏃‍♀️Short Distance🏃‍➡️'},
@@ -41,6 +42,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     setState(() => _loading = true);
     try {
       final isAdmin = await UserService.isAdmin();
+      final clubName = await UserService.currentClubName();
       final Map<String, List<AwardWinnerRow>> map = {};
       for (final a in _awards) {
         final key = a['key']!;
@@ -59,6 +61,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
       if (!mounted) return;
       setState(() {
         _isAdmin = isAdmin;
+        _clubName = clubName;
         _winnersByAward.clear();
         _winnersByAward.addAll(map);
         _loading = false;
@@ -532,7 +535,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(null);
+    final brandColors = UserService.clubBrandGradient(_clubName);
 
     return DefaultTabController(
       length: _awards.length,
