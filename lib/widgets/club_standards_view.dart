@@ -178,33 +178,39 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           .maybeSingle();
 
       if (row == null) return;
+      final rawGender = (row['gender'] as String?)?.trim().toUpperCase();
+      final club = (row['club'] as String?)?.trim();
+
+      int? age;
       final dobStr = row['date_of_birth'] as String?;
-      if (dobStr == null || dobStr.isEmpty) return;
+      if (dobStr != null && dobStr.isNotEmpty) {
+        final dob = DateTime.tryParse(dobStr);
+        if (dob != null) {
+          final now = DateTime.now();
+          var calculatedAge = now.year - dob.year;
+          final hasHadBirthdayThisYear =
+              (now.month > dob.month) ||
+              (now.month == dob.month && now.day >= dob.day);
+          if (!hasHadBirthdayThisYear) {
+            calculatedAge--;
+          }
 
-      final dob = DateTime.tryParse(dobStr);
-      if (dob == null) return;
-
-      final now = DateTime.now();
-      int age = now.year - dob.year;
-      final hasHadBirthdayThisYear =
-          (now.month > dob.month) ||
-          (now.month == dob.month && now.day >= dob.day);
-      if (!hasHadBirthdayThisYear) {
-        age--;
+          if (calculatedAge > 0 && calculatedAge <= 120) {
+            age = calculatedAge;
+          }
+        }
       }
-
-      if (age <= 0 || age > 120) return;
 
       if (!mounted) return;
       setState(() {
-        _ageController.text = age.toString();
+        if (age != null) {
+          _ageController.text = age.toString();
+        }
 
-        final rawGender = (row['gender'] as String?)?.trim().toUpperCase();
         if (rawGender != null && (rawGender == 'M' || rawGender == 'F')) {
           _selectedGender = rawGender;
         }
 
-        final club = row['club'] as String?;
         if (club != null && club.isNotEmpty) {
           _clubName = club;
 
@@ -234,6 +240,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           }
         }
       });
+
+      // Club-specific award rules depend on the loaded club, so refresh
+      // the overall status once profile data is available.
+      await _loadCurrentAwardStatus();
     } catch (e) {
       // ignore: avoid_print
       print('Error pre-filling age from profile: $e');
@@ -340,7 +350,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           _awardLevel = null;
           _awardCount = 0;
           _awardError =
-              'Once you have race records across our six key club distances, you\'ll see your overall Club Standard Award here.';
+              'Once you have race records across our ${_awardDistances.length} key club distances, you\'ll see your overall Club Standard Award here.';
           _showBadgeOnRecordsButton = false;
         });
         return;
@@ -1178,7 +1188,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
-            'Based on $_awardCount of the 6 club standard distances you\'ve raced,',
+            'Based on $_awardCount of the ${_awardDistances.length} club standard distances you\'ve raced,',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
@@ -1233,7 +1243,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     } else {
       content = Text(
         _awardError ??
-            'Tap "Check Your Award" to see your current overall Club Standard once you have race records across our six key club distances.',
+            'Tap "Check Your Award" to see your current overall Club Standard once you have race records across our ${_awardDistances.length} key club distances.',
         textAlign: TextAlign.center,
         style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
       );
@@ -1395,7 +1405,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       }
     }
 
-    // Compute overall award for each user using the same rule (4 of 6 distances)
+    // Compute overall award for each user using the active club rule.
     final Map<String, String> userAwardLevel = {};
 
     perUserBestByDistance.forEach((userId, bestByDistance) {
