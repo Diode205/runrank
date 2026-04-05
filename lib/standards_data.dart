@@ -2,6 +2,8 @@
 // Replace the sample entries below with your full NNBR tables (all times in seconds).
 // Structure: { 'M18-29': { '5K': { 'Diamond': 935, 'Gold': 1091, ... } } }
 
+import 'standards_data_nrr.dart';
+
 final Map<String, Map<String, Map<String, int>>> clubStandardsSeconds = {
   // SAMPLE: Male 18-29 (times are seconds: e.g. 15:35 -> 15*60 + 35 = 935)
   'M18-29': {
@@ -1066,6 +1068,110 @@ final Map<String, Map<String, Map<String, int>>> clubStandardsSeconds = {
     },
   },
 };
+
+final Map<String, Map<String, Map<String, int>>> nnbrClubStandardsSeconds =
+    clubStandardsSeconds;
+
+const List<String> nnbrAwardLevels = <String>[
+  'Copper',
+  'Bronze',
+  'Silver',
+  'Gold',
+  'Diamond',
+];
+
+const List<String> nrrAwardLevels = <String>[
+  'Copper',
+  'Bronze',
+  'Silver',
+  'Gold',
+  'Platinum',
+  'Emerald',
+  'Diamond',
+];
+
+const List<String> nnbrAwardDistances = <String>[
+  '5K',
+  '5M',
+  '10K',
+  '10M',
+  'Half M',
+  'Marathon',
+];
+
+const List<String> nrrAwardDistances = <String>[
+  '5K',
+  '5M',
+  '10K',
+  '10M',
+  'Half M',
+  '20M',
+  'Marathon',
+];
+
+bool isNRRClubName(String? clubName) {
+  final lower = clubName?.toLowerCase() ?? '';
+  return lower.contains('norwich road runners');
+}
+
+Map<String, Map<String, Map<String, int>>> standardsTableForClub(
+  String? clubName,
+) {
+  return isNRRClubName(clubName)
+      ? nrrClubStandardsSeconds
+      : nnbrClubStandardsSeconds;
+}
+
+List<String> awardLevelsForClub(String? clubName) {
+  return isNRRClubName(clubName) ? nrrAwardLevels : nnbrAwardLevels;
+}
+
+List<String> awardDistancesForClub(String? clubName) {
+  return isNRRClubName(clubName) ? nrrAwardDistances : nnbrAwardDistances;
+}
+
+int requiredAwardDistanceCountForClub(String? clubName) {
+  return isNRRClubName(clubName) ? 5 : 4;
+}
+
+String ageGroupForClub({
+  required String gender,
+  required int age,
+  String? clubName,
+}) {
+  final g = gender.toUpperCase() == 'F' ? 'F' : 'M';
+
+  if (isNRRClubName(clubName)) {
+    if (age <= 34) return '${g}Under35';
+    if (age >= 75) return '${g}75+';
+    if (age >= 35 && age <= 39) return '${g}35-39';
+    if (age >= 40 && age <= 44) return '${g}40-44';
+    if (age >= 45 && age <= 49) return '${g}45-49';
+    if (age >= 50 && age <= 54) return '${g}50-54';
+    if (age >= 55 && age <= 59) return '${g}55-59';
+    if (age >= 60 && age <= 64) return '${g}60-64';
+    if (age >= 65 && age <= 69) return '${g}65-69';
+    return '${g}70-74';
+  }
+
+  if (age >= 18 && age <= 29) return '${g}18-29';
+  if (age >= 30 && age <= 34) return '${g}30-34';
+  if (age >= 35 && age <= 39) return '${g}35-39';
+  if (age >= 40 && age <= 44) return '${g}40-44';
+  if (age >= 45 && age <= 49) return '${g}45-49';
+  if (age >= 50 && age <= 54) return '${g}50-54';
+  if (age >= 55 && age <= 59) return '${g}55-59';
+  if (age >= 60 && age <= 64) return '${g}60-64';
+  if (age >= 65 && age <= 69) return '${g}65-69';
+  if (age >= 70 && age <= 74) return '${g}70-74';
+  if (age >= 75 && age <= 79) return '${g}75-79';
+  if (age >= 80 && age <= 84) return '${g}80-84';
+  return '${g}18-29';
+}
+
+bool clubSupportsStandardDistance(String? clubName, String distance) {
+  return awardDistancesForClub(clubName).contains(distance);
+}
 
 // For age-grading/world-best references (in seconds).
 // This is used by the age grade calculation: map key to a world-best reference (seconds)

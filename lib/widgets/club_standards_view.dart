@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
 import 'package:runrank/calculator_logic.dart';
+import 'package:runrank/standards_data.dart';
 import 'package:runrank/widgets/result_card.dart';
 import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
@@ -44,22 +45,16 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   // ---------------------------------------------------------
   // Current Club Standard award status (from race history)
   // ---------------------------------------------------------
-  final List<String> _awardLevels = const [
-    'Copper',
-    'Bronze',
-    'Silver',
-    'Gold',
-    'Diamond',
-  ];
+  List<String> get _awardLevels => awardLevelsForClub(_clubName);
 
-  final List<String> _awardDistances = const [
-    '5K',
-    '5M',
-    '10K',
-    '10M',
-    'Half M',
-    'Marathon',
-  ];
+  List<String> get _awardDistances => awardDistancesForClub(_clubName);
+
+  int get _requiredAwardDistanceCount =>
+      requiredAwardDistanceCountForClub(_clubName);
+
+  bool _isStandardDistance(String distance) {
+    return clubSupportsStandardDistance(_clubName, distance);
+  }
 
   // Input controllers
   final TextEditingController _raceNameController = TextEditingController();
@@ -381,7 +376,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             count++;
           }
         }
-        if (count >= 4) {
+        if (count >= _requiredAwardDistanceCount) {
           achievedLevel = level;
           contributingDistances = count;
           break;
@@ -431,6 +426,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         return const Color(0xFFC0C0C0);
       case 'Gold':
         return const Color(0xFFFFD700);
+      case 'Platinum':
+        return const Color(0xFFB0E0E6);
+      case 'Emerald':
+        return const Color(0xFF2ECC71);
       case 'Diamond':
         return const Color(0xFF00E5FF);
       default:
@@ -540,7 +539,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final recordsService = ClubRecordsService();
     bool shouldEnsureRecord = false;
 
-    if (distance == '20M' || distance == 'Ultra') {
+    if (!_isStandardDistance(distance)) {
       shouldEnsureRecord = true;
     } else {
       final currentHolder = await recordsService.getClubRecordHolder(distance);
@@ -702,7 +701,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final gender = _selectedGender;
     final distance = _selectedDistance;
     // Special handling for non-standard distances (20M, Ultra)
-    if (distance == '20M' || distance == 'Ultra') {
+    if (!_isStandardDistance(distance)) {
       // Build a race label that can include the Ultra distance detail
       String raceLabel = race;
       if (distance == 'Ultra') {
@@ -814,6 +813,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       age: age,
       distance: distance,
       finishSeconds: seconds,
+      clubName: _clubName,
     );
 
     final level = eval['level'] as String;
@@ -1410,7 +1410,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             count++;
           }
         }
-        if (count >= 4) {
+        if (count >= _requiredAwardDistanceCount) {
           achievedLevel = level;
           break;
         }

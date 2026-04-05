@@ -101,6 +101,28 @@ class ResultCard extends StatelessWidget {
   _ResultStyle _mapStandardToStyle(String raw) {
     final label = raw.trim().toUpperCase();
 
+    if (label.startsWith('DIAMOND')) {
+      return _ResultStyle(
+        displayLabel: 'DIAMOND',
+        badgeColor: const Color(0xFF00E5FF),
+        icon: Icons.diamond_rounded,
+      );
+    }
+    if (label.startsWith('EMERALD')) {
+      return _ResultStyle(
+        displayLabel: 'EMERALD',
+        badgeColor: const Color(0xFF2ECC71),
+        icon: Icons.auto_awesome_rounded,
+      );
+    }
+    if (label.startsWith('PLATINUM')) {
+      return _ResultStyle(
+        displayLabel: 'PLATINUM',
+        badgeColor: const Color(0xFFB0E0E6),
+        icon: Icons.workspace_premium_rounded,
+      );
+    }
+
     if (label.startsWith('GOLD')) {
       return _ResultStyle(
         displayLabel: 'GOLD',
@@ -122,11 +144,11 @@ class ResultCard extends StatelessWidget {
         icon: Icons.emoji_events_rounded,
       );
     }
-    if (label.startsWith('PLATINUM')) {
+    if (label.startsWith('COPPER')) {
       return _ResultStyle(
-        displayLabel: 'PLATINUM',
-        badgeColor: const Color(0xFFB0E0E6),
-        icon: Icons.workspace_premium_rounded,
+        displayLabel: 'COPPER',
+        badgeColor: const Color(0xFFB87333),
+        icon: Icons.military_tech_rounded,
       );
     }
 

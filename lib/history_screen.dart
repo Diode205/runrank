@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/menu/club_records_page.dart';
+import 'package:runrank/standards_data.dart';
 import 'calculator_logic.dart';
 
 class RaceRecord {
@@ -57,6 +58,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Map<String, ClubRecord?> _clubRecords = {};
   String? _currentUserId;
   String? _currentUserGender;
+  String? _currentUserClub;
 
   @override
   void initState() {
@@ -82,6 +84,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     try {
+      final profile = await client
+          .from('user_profiles')
+          .select('club')
+          .eq('id', user.id)
+          .maybeSingle();
+      _currentUserClub = (profile?['club'] as String?)?.trim();
+
       final rows = await client
           .from('race_results')
           .select('''
@@ -337,7 +346,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildSummaryCard(String distance, List<RaceRecord> records) {
     if (records.isEmpty) return const SizedBox.shrink();
 
-    final isSpecialDistance = distance == '20M' || distance == 'Ultra';
+    final isSpecialDistance = !clubSupportsStandardDistance(
+      _currentUserClub,
+      distance,
+    );
 
     final bestTime = records.reduce(
       (a, b) =>
@@ -845,20 +857,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
           // Then delete by id. RLS will ensure that only rows where
           // user_id = auth.uid() are actually deletable for non-admins.
-          if (candidates is List) {
-            for (final row in candidates) {
-              final id = row['id'] as String?;
-              if (id == null) continue;
-              try {
-                final deletedClub = await client
-                    .from('club_records')
-                    .delete()
-                    .eq('id', id)
-                    .select();
-                print('DEBUG delete club_records by id ($id): $deletedClub');
-              } catch (e) {
-                print('DEBUG error deleting club_records by id ($id): $e');
-              }
+          for (final row in candidates) {
+            final id = row['id'] as String?;
+            if (id == null) continue;
+            try {
+              final deletedClub = await client
+                  .from('club_records')
+                  .delete()
+                  .eq('id', id)
+                  .select();
+              print('DEBUG delete club_records by id ($id): $deletedClub');
+            } catch (e) {
+              print('DEBUG error deleting club_records by id ($id): $e');
             }
           }
         } catch (e) {
@@ -991,14 +1001,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // Re-evaluate level + age grade for standard distances
       String level = r.level;
       double ageGrade = r.ageGrade;
-      if (_distances.contains(r.distance) &&
-          r.distance != '20M' &&
-          r.distance != 'Ultra') {
+      if (clubSupportsStandardDistance(_currentUserClub, r.distance)) {
         final eval = RunCalculator.evaluate(
           gender: r.gender,
           age: r.age,
           distance: r.distance,
           finishSeconds: parsedSeconds,
+          clubName: _currentUserClub,
         );
         level = eval['level'] as String;
         ageGrade = eval['ageGrade'] as double;

@@ -36,21 +36,8 @@ class RunCalculator {
   }
 
   // Determine age-group string key for clubStandardsSeconds map
-  static String getAgeGroup(String gender, int age) {
-    final g = gender.toUpperCase() == 'F' ? 'F' : 'M';
-    if (age >= 18 && age <= 29) return '${g}18-29';
-    if (age >= 30 && age <= 34) return '${g}30-34';
-    if (age >= 35 && age <= 39) return '${g}35-39';
-    if (age >= 40 && age <= 44) return '${g}40-44';
-    if (age >= 45 && age <= 49) return '${g}45-49';
-    if (age >= 50 && age <= 54) return '${g}50-54';
-    if (age >= 55 && age <= 59) return '${g}55-59';
-    if (age >= 60 && age <= 64) return '${g}60-64';
-    if (age >= 65 && age <= 69) return '${g}65-69';
-    if (age >= 70 && age <= 74) return '${g}70-74';
-    if (age >= 75 && age <= 79) return '${g}75-79';
-    if (age >= 80 && age <= 84) return '${g}80-84';
-    return '${g}18-29'; // fallback
+  static String getAgeGroup(String gender, int age, {String? clubName}) {
+    return ageGroupForClub(gender: gender, age: age, clubName: clubName);
   }
 
   // Returns Map with keys: 'level', 'diffToNext', 'nextLevel', 'achievedThreshold', 'ageGrade', 'ageGradeMessage', 'finishSeconds'
@@ -59,9 +46,10 @@ class RunCalculator {
     required int age,
     required String distance, // '5K', '10K', 'Half M' etc
     required int finishSeconds,
+    String? clubName,
   }) {
-    final ageGroup = getAgeGroup(gender, age);
-    final group = clubStandardsSeconds[ageGroup];
+    final ageGroup = getAgeGroup(gender, age, clubName: clubName);
+    final group = standardsTableForClub(clubName)[ageGroup];
     final result = <String, dynamic>{'level': 'Unknown', 'ageGroup': ageGroup};
 
     if (group == null || !group.containsKey(distance)) {
@@ -75,7 +63,7 @@ class RunCalculator {
         group[distance]!; // Map<String,int> level->seconds
 
     // Ordered levels
-    final order = ['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Copper'];
+    final order = awardLevelsForClub(clubName).reversed.toList();
     String achieved = 'Unranked';
     String? nextLevel;
     int? nextThreshold;
@@ -84,6 +72,9 @@ class RunCalculator {
     for (final level in order) {
       if (standardsForDistance.containsKey(level)) {
         final threshold = standardsForDistance[level]!;
+        if (threshold <= 0) {
+          continue;
+        }
         if (finishSeconds <= threshold) {
           achieved = level;
           achievedThreshold = threshold;
@@ -93,13 +84,20 @@ class RunCalculator {
     }
 
     if (achieved == 'Unranked') {
-      final sortedLevels = standardsForDistance.entries.toList()
-        ..sort((a, b) => a.value.compareTo(b.value));
+      final sortedLevels =
+          standardsForDistance.entries
+              .where((entry) => entry.value > 0)
+              .toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
       nextLevel = sortedLevels.isNotEmpty ? sortedLevels.last.key : null;
       nextThreshold = sortedLevels.isNotEmpty ? sortedLevels.last.value : null;
     } else {
       final keys = order
-          .where((l) => standardsForDistance.containsKey(l))
+          .where(
+            (l) =>
+                standardsForDistance.containsKey(l) &&
+                (standardsForDistance[l] ?? 0) > 0,
+          )
           .toList();
       final idx = keys.indexOf(achieved);
       if (idx > 0) {
