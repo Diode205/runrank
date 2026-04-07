@@ -342,7 +342,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     try {
       final rows = await client
           .from('race_results')
-          .select('distance, level')
+          .select('distance, level, time_seconds, gender, age')
           .eq('user_id', user.id);
 
       if (rows.isEmpty) {
@@ -362,7 +362,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       for (final row in rows) {
         final distance = (row['distance'] as String?) ?? '';
-        final level = (row['level'] as String?) ?? '';
+        final level = _effectiveLevelFromRaceRow(row);
 
         if (!_awardDistances.contains(distance)) continue;
         if (!_awardLevels.contains(level)) continue;
@@ -424,6 +424,32 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   int _levelIndex(String level) {
     final idx = _awardLevels.indexOf(level);
     return idx < 0 ? -1 : idx;
+  }
+
+  String _effectiveLevelFromRaceRow(Map<String, dynamic> row) {
+    final storedLevel = (row['level'] as String?) ?? '';
+    final distance = (row['distance'] as String?) ?? '';
+    final timeSecondsRaw = row['time_seconds'];
+    final finishSeconds = timeSecondsRaw is num ? timeSecondsRaw.toInt() : 0;
+    final gender = ((row['gender'] as String?) ?? '').toUpperCase();
+    final age = row['age'] is int ? row['age'] as int : 0;
+
+    if (!clubSupportsStandardDistance(_clubName, distance)) {
+      return storedLevel;
+    }
+
+    if (finishSeconds <= 0 || (gender != 'M' && gender != 'F') || age <= 0) {
+      return storedLevel;
+    }
+
+    final eval = RunCalculator.evaluate(
+      gender: gender,
+      age: age,
+      distance: distance,
+      finishSeconds: finishSeconds,
+      clubName: _clubName,
+    );
+    return eval['level'] as String;
   }
 
   Color _levelColor(String level) {
@@ -1372,10 +1398,14 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final rows = allowedUserIds == null
         ? await client
               .from('race_results')
-              .select('user_id, distance, level, raceDate')
+              .select(
+                'user_id, distance, level, raceDate, time_seconds, gender, age',
+              )
         : await client
               .from('race_results')
-              .select('user_id, distance, level, raceDate')
+              .select(
+                'user_id, distance, level, raceDate, time_seconds, gender, age',
+              )
               .inFilter('user_id', allowedUserIds.toList());
 
     final Map<String, Map<String, String>> perUserBestByDistance = {};
@@ -1383,7 +1413,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     for (final row in rows) {
       final userId = row['user_id'] as String?;
       final distance = (row['distance'] as String?) ?? '';
-      final level = (row['level'] as String?) ?? '';
+      final level = _effectiveLevelFromRaceRow(row);
 
       if (userId == null) continue;
       if (!_awardDistances.contains(distance)) continue;

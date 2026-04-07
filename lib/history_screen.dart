@@ -119,16 +119,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
             : 'Untitled race';
 
         final distance = row['distance'] as String? ?? '';
-        final finishSeconds = row['time_seconds'] ?? 0;
+        final finishSecondsRaw = row['time_seconds'];
+        final finishSeconds = finishSecondsRaw is num
+            ? finishSecondsRaw.toInt()
+            : 0;
         final timeText = formatTime(finishSeconds);
-
-        final level = row['level'] as String? ?? 'Unknown';
 
         final ageGradeRaw = row['age_grade'];
         final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
 
-        final gender = (row['gender'] as String?) ?? '';
+        final gender = ((row['gender'] as String?) ?? '').toUpperCase();
         final age = row['age'] is int ? row['age'] as int : 0;
+
+        var level = row['level'] as String? ?? 'Unknown';
+        if (clubSupportsStandardDistance(_currentUserClub, distance) &&
+            finishSeconds > 0 &&
+            (gender == 'M' || gender == 'F') &&
+            age > 0) {
+          final eval = RunCalculator.evaluate(
+            gender: gender,
+            age: age,
+            distance: distance,
+            finishSeconds: finishSeconds,
+            clubName: _currentUserClub,
+          );
+          level = eval['level'] as String;
+        }
 
         DateTime raceDate;
         if (row['raceDate'] != null) {
