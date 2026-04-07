@@ -1,6 +1,45 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
+
+class _SavedVenuePreset {
+  final String venue;
+  final String address;
+  final String latitude;
+  final String longitude;
+
+  const _SavedVenuePreset({
+    required this.venue,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  String get id => '${venue.trim()}|${address.trim()}';
+
+  String get label {
+    return venue.trim();
+  }
+
+  Map<String, dynamic> toJson() => {
+    'venue': venue,
+    'address': address,
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  factory _SavedVenuePreset.fromJson(Map<String, dynamic> json) {
+    return _SavedVenuePreset(
+      venue: (json['venue'] as String? ?? '').trim(),
+      address: (json['address'] as String? ?? '').trim(),
+      latitude: (json['latitude'] as String? ?? '').trim(),
+      longitude: (json['longitude'] as String? ?? '').trim(),
+    );
+  }
+}
 
 class AdminCreateEventPage extends StatefulWidget {
   final String userRole;
@@ -33,6 +72,75 @@ class AdminCreateEventPage extends StatefulWidget {
 }
 
 class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
+  static const Map<String, _SavedVenuePreset> _raceVenuePresets = {
+    'Dinosaur Dash': _SavedVenuePreset(
+      venue: 'Roarr Adventure Park',
+      address: 'Lenwade Norwich',
+      latitude: '52.71297101786584',
+      longitude: '1.1201313893317326',
+    ),
+    'Wroxham 5K': _SavedVenuePreset(
+      venue: 'Broadland High Ormiston Academy',
+      address: 'Wroxham',
+      latitude: '52.71665374668599',
+      longitude: '1.4141447659842001',
+    ),
+  };
+
+  static const Map<String, _SavedVenuePreset> _crossCountryVenuePresets = {
+    'Broadland Country Park Race 1': _SavedVenuePreset(
+      venue: 'Broadland Country Park',
+      address: 'Horsford Norwich',
+      latitude: '52.7108107164322',
+      longitude: '1.2260404278394894',
+    ),
+    'Broadland Country Park Race 2': _SavedVenuePreset(
+      venue: 'Broadland Country Park',
+      address: 'Horsford Norwich',
+      latitude: '52.7108107164322',
+      longitude: '1.2260404278394894',
+    ),
+    'Broadland Country Park Race 3': _SavedVenuePreset(
+      venue: 'Broadland Country Park',
+      address: 'Horsford Norwich',
+      latitude: '52.7108107164322',
+      longitude: '1.2260404278394894',
+    ),
+  };
+
+  static const Map<String, _SavedVenuePreset> _relayVenuePresets = {
+    'RNR': _SavedVenuePreset(
+      venue: 'Lynnsport',
+      address: 'Kings Lynn',
+      latitude: '52.7625527580909',
+      longitude: '0.41744744668855344',
+    ),
+    'Ekiden': _SavedVenuePreset(
+      venue: 'Ipswich High School',
+      address: 'Woolverstone',
+      latitude: '52.003048545066015',
+      longitude: '1.1952880774216965',
+    ),
+    'AlexMoore': _SavedVenuePreset(
+      venue: 'Norfolk Showground',
+      address: 'Norwich',
+      latitude: '52.64978545095906',
+      longitude: '1.1767761647985628',
+    ),
+    'NorwichTriathlon': _SavedVenuePreset(
+      venue: 'Whitlingham Country Park',
+      address: 'Norwich',
+      latitude: '52.621704228248134',
+      longitude: '1.3391771752640746',
+    ),
+    'Sandringham24': _SavedVenuePreset(
+      venue: 'Sandringham Estate',
+      address: 'Norfolk',
+      latitude: '52.82982259449807',
+      longitude: '0.5124635792869614',
+    ),
+  };
+
   final supabase = Supabase.instance.client;
 
   final _formKey = GlobalKey<FormState>();
@@ -49,6 +157,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
   String? _selectedHostId;
+  List<_SavedVenuePreset> _savedVenuePresets = [];
+  String? _selectedSavedVenueId;
 
   @override
   void initState() {
@@ -251,9 +361,220 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           hostCtrl.text = initial['full_name'] as String;
         }
       });
+
+      await _loadSavedVenuePresets();
+      _applyFixedVenuePresetForCurrentSelection();
     } catch (e) {
       debugPrint('Error loading hosts: $e');
     }
+  }
+
+  String _savedVenuesPrefsKey() {
+    final rawClub = (_clubName ?? 'default_club').trim().toLowerCase();
+    final safeClub = rawClub.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    return 'admin_saved_venues_$safeClub';
+  }
+
+  Future<void> _loadSavedVenuePresets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_savedVenuesPrefsKey()) ?? const [];
+      final presets = raw
+          .map((entry) => jsonDecode(entry) as Map<String, dynamic>)
+          .map(_SavedVenuePreset.fromJson)
+          .where((preset) => preset.venue.isNotEmpty)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _savedVenuePresets = presets;
+        if (_selectedSavedVenueId != null &&
+            !_savedVenuePresets.any((p) => p.id == _selectedSavedVenueId)) {
+          _selectedSavedVenueId = null;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading saved venue presets: $e');
+    }
+  }
+
+  Future<void> _saveCurrentVenuePreset() async {
+    final venue = venueCtrl.text.trim();
+    if (venue.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a venue name before saving it.')),
+      );
+      return;
+    }
+
+    final preset = _SavedVenuePreset(
+      venue: venue,
+      address: venueAddressCtrl.text.trim(),
+      latitude: latitudeCtrl.text.trim(),
+      longitude: longitudeCtrl.text.trim(),
+    );
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final updated = [..._savedVenuePresets];
+      final existingIndex = updated.indexWhere((p) => p.id == preset.id);
+      if (existingIndex >= 0) {
+        updated[existingIndex] = preset;
+      } else {
+        updated.add(preset);
+      }
+
+      final encoded = updated.map((p) => jsonEncode(p.toJson())).toList();
+      await prefs.setStringList(_savedVenuesPrefsKey(), encoded);
+
+      if (!mounted) return;
+      setState(() {
+        _savedVenuePresets = updated;
+        _selectedSavedVenueId = preset.id;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved venue: ${preset.venue}')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save venue: $e')));
+    }
+  }
+
+  Future<void> _deleteSelectedVenuePreset() async {
+    final selectedPreset = _selectedVenuePresetForCurrentInput();
+    final selectedId = selectedPreset?.id ?? _selectedSavedVenueId;
+    if (selectedId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a saved venue to delete.')),
+      );
+      return;
+    }
+
+    final preset = _savedVenuePresets.cast<_SavedVenuePreset?>().firstWhere(
+      (p) => p?.id == selectedId,
+      orElse: () => null,
+    );
+    if (preset == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved venue no longer exists.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete saved venue?'),
+        content: Text('Remove "${preset.venue}" from the saved venue list?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final updated = _savedVenuePresets
+          .where((p) => p.id != selectedId)
+          .toList();
+      final encoded = updated.map((p) => jsonEncode(p.toJson())).toList();
+      await prefs.setStringList(_savedVenuesPrefsKey(), encoded);
+
+      if (!mounted) return;
+      setState(() {
+        _savedVenuePresets = updated;
+        _selectedSavedVenueId = null;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Deleted venue: ${preset.venue}')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete venue: $e')));
+    }
+  }
+
+  void _applySavedVenuePreset(_SavedVenuePreset preset) {
+    setState(() {
+      _selectedSavedVenueId = preset.id;
+      venueCtrl.text = preset.venue;
+      venueAddressCtrl.text = preset.address;
+      latitudeCtrl.text = preset.latitude;
+      longitudeCtrl.text = preset.longitude;
+    });
+  }
+
+  void _setVenueFieldsFromPreset(_SavedVenuePreset? preset) {
+    venueCtrl.text = preset?.venue ?? '';
+    venueAddressCtrl.text = preset?.address ?? '';
+    latitudeCtrl.text = preset?.latitude ?? '';
+    longitudeCtrl.text = preset?.longitude ?? '';
+  }
+
+  void _applyFixedVenuePreset(_SavedVenuePreset? preset) {
+    setState(() {
+      _selectedSavedVenueId = null;
+      _setVenueFieldsFromPreset(preset);
+    });
+  }
+
+  void _applyFixedVenuePresetForCurrentSelection() {
+    _SavedVenuePreset? preset;
+    switch (selectedEventType) {
+      case 'Race':
+        preset = _raceVenuePresets[selectedRace];
+        break;
+      case 'Cross Country':
+        preset =
+            _crossCountryVenuePresets[crossCountryRaceNameCtrl.text.trim()];
+        break;
+      case 'Relay':
+        preset = _relayVenuePresets[_selectedRelayFormat];
+        break;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _selectedSavedVenueId = null;
+      _setVenueFieldsFromPreset(preset);
+    });
+  }
+
+  List<_SavedVenuePreset> _matchingVenuePresets(String query) {
+    final trimmed = query.trim().toLowerCase();
+    if (trimmed.length < 2) return const [];
+
+    return _savedVenuePresets.where((preset) {
+      final venue = preset.venue.trim().toLowerCase();
+      return venue.startsWith(trimmed) && venue != trimmed;
+    }).toList();
+  }
+
+  _SavedVenuePreset? _selectedVenuePresetForCurrentInput() {
+    final venue = venueCtrl.text.trim().toLowerCase();
+    if (venue.isEmpty) return null;
+
+    for (final preset in _savedVenuePresets) {
+      if (preset.venue.trim().toLowerCase() == venue) {
+        return preset;
+      }
+    }
+    return null;
   }
 
   @override
@@ -549,7 +870,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                               (e) => DropdownMenuItem(value: e, child: Text(e)),
                             )
                             .toList(),
-                  onChanged: (v) => setState(() => selectedEventType = v!),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => selectedEventType = v);
+                    _applyFixedVenuePresetForCurrentSelection();
+                  },
                 ),
               ),
 
@@ -564,7 +889,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     items: raceNames
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
-                    onChanged: (v) => setState(() => selectedRace = v),
+                    onChanged: (v) {
+                      setState(() => selectedRace = v);
+                      _applyFixedVenuePreset(_raceVenuePresets[v]);
+                    },
                     decoration: const InputDecoration(labelText: "Select Race"),
                   ),
                 ),
@@ -618,6 +946,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           setState(() {
                             crossCountryRaceNameCtrl.text = v;
                           });
+                          _applyFixedVenuePreset(_crossCountryVenuePresets[v]);
                         },
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? "Required" : null,
@@ -677,6 +1006,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                         onChanged: (v) {
                           if (v == null) return;
                           setState(() => _selectedRelayFormat = v);
+                          _applyFixedVenuePreset(_relayVenuePresets[v]);
                         },
                       ),
                       const SizedBox(height: 8),
@@ -722,101 +1052,181 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               // HOST / VENUE / DESCRIPTION
               _section(
                 "Event Details",
-                Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _selectedHostId,
-                      decoration: const InputDecoration(
-                        labelText: "Host / Director",
-                      ),
-                      items: _hosts
-                          .where(
-                            (h) => selectedCategory == "admin"
-                                ? (h['is_admin'] as bool? ?? false)
-                                : true,
-                          )
-                          .map(
-                            (h) => DropdownMenuItem<String>(
-                              value: h['id'] as String,
+                Builder(
+                  builder: (context) {
+                    final matchingVenuePresets = selectedEventType == 'Training'
+                        ? _matchingVenuePresets(venueCtrl.text)
+                        : const <_SavedVenuePreset>[];
+                    final selectedPreset =
+                        _selectedVenuePresetForCurrentInput();
+                    final showVenueSuggestions =
+                        selectedEventType == 'Training' &&
+                        matchingVenuePresets.isNotEmpty &&
+                        selectedPreset == null;
+
+                    return Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: _selectedHostId,
+                          decoration: const InputDecoration(
+                            labelText: "Host / Director",
+                          ),
+                          items: _hosts
+                              .where(
+                                (h) => selectedCategory == "admin"
+                                    ? (h['is_admin'] as bool? ?? false)
+                                    : true,
+                              )
+                              .map(
+                                (h) => DropdownMenuItem<String>(
+                                  value: h['id'] as String,
+                                  child: Text(
+                                    (h['full_name'] as String?) ?? 'Member',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedHostId = value;
+                              final match = _hosts.firstWhere(
+                                (h) => h['id'] == value,
+                                orElse: () => <String, dynamic>{
+                                  'full_name': '',
+                                },
+                              );
+                              hostCtrl.text =
+                                  (match['full_name'] as String?) ?? '';
+                            });
+                          },
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Required' : null,
+                        ),
+                        if (selectedCategory == "admin")
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6.0, bottom: 4.0),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
                               child: Text(
-                                (h['full_name'] as String?) ?? 'Member',
+                                "For Admin Events, only admin users can be selected as hosts.",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
                               ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedHostId = value;
-                          final match = _hosts.firstWhere(
-                            (h) => h['id'] == value,
-                            orElse: () => <String, dynamic>{'full_name': ''},
-                          );
-                          hostCtrl.text = (match['full_name'] as String?) ?? '';
-                        });
-                      },
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Required' : null,
-                    ),
-                    if (selectedCategory == "admin")
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6.0, bottom: 4.0),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            "For Admin Events, only admin users can be selected as hosts.",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
+                          ),
+                        TextFormField(
+                          controller: venueCtrl,
+                          onChanged: selectedEventType == 'Training'
+                              ? (_) => setState(() {
+                                  _selectedSavedVenueId =
+                                      _selectedVenuePresetForCurrentInput()?.id;
+                                })
+                              : null,
+                          decoration: const InputDecoration(labelText: "Venue"),
+                          validator: (v) =>
+                              v!.trim().isEmpty ? "Required" : null,
+                        ),
+                        if (showVenueSuggestions) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: matchingVenuePresets.map((preset) {
+                                return ActionChip(
+                                  label: Text(preset.label),
+                                  avatar: const Icon(
+                                    Icons.place_outlined,
+                                    size: 18,
+                                  ),
+                                  onPressed: () =>
+                                      _applySavedVenuePreset(preset),
+                                );
+                              }).toList(),
                             ),
                           ),
+                        ],
+                        TextFormField(
+                          controller: venueAddressCtrl,
+                          decoration: const InputDecoration(
+                            labelText: "Venue Address",
+                          ),
                         ),
-                      ),
-                    TextFormField(
-                      controller: venueCtrl,
-                      decoration: const InputDecoration(labelText: "Venue"),
-                      validator: (v) => v!.trim().isEmpty ? "Required" : null,
-                    ),
-                    TextFormField(
-                      controller: venueAddressCtrl,
-                      decoration: const InputDecoration(
-                        labelText: "Venue Address",
-                      ),
-                    ),
-                    TextFormField(
-                      controller: latitudeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: "Latitude (optional)",
-                        hintText: "52.9501",
-                      ),
-                    ),
-                    TextFormField(
-                      controller: longitudeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: "Longitude (optional)",
-                        hintText: "1.3012",
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "Tip: In Google Maps, right‑click the venue and copy the first number (lat) and second number (lon).",
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                    TextFormField(
-                      controller: descriptionCtrl,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: "Description",
-                      ),
-                    ),
-                  ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: latitudeCtrl,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      signed: true,
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: "Lat (optional)",
+                                  hintText: "52.9501",
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: longitudeCtrl,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      signed: true,
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: "Long (optional)",
+                                  hintText: "1.3012",
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (selectedEventType == 'Training') ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _saveCurrentVenuePreset,
+                                  icon: const Icon(Icons.bookmark_add_outlined),
+                                  label: const Text('Save Venue'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: selectedPreset == null
+                                      ? null
+                                      : _deleteSelectedVenuePreset,
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('Unsave Venue'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        const Text(
+                          "Tip: In Google Maps, right‑click the venue and copy the first number (lat) and second number (lon).",
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                        TextFormField(
+                          controller: descriptionCtrl,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: "Description",
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
 
