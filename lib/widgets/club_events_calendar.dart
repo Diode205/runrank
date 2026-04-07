@@ -535,7 +535,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         ),
                       );
 
-                      if (isCreator) {
+                      if (isCreator && !e.isCancelled) {
                         // Single Dismissible handles both edit (L→R) and cancel (R→L)
                         card = Dismissible(
                           key: ValueKey('event-swipe-${e.id}'),
@@ -556,6 +556,19 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                             ),
                           ),
                           confirmDismiss: (direction) async {
+                            if (e.isCancelled) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Cancelled events can no longer be edited or cancelled again',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return false;
+                            }
+
                             if (direction == DismissDirection.startToEnd) {
                               // Edit
                               final result = await Navigator.push(
