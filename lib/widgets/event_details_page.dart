@@ -24,7 +24,7 @@ class EventDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final type = event.eventType.toLowerCase();
+    final type = event.eventType.trim().toLowerCase().replaceAll(' ', '_');
 
     switch (type) {
       case 'training':
