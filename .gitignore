@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local API keys / config
 lib/config/maps_config.dart
+
+# Supabase CLI local temp state
+supabase/.temp/
