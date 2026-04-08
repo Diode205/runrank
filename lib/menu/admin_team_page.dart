@@ -1120,12 +1120,12 @@ For security we recommend using this code within the next few days. After it has
             const SizedBox(height: 12),
             if (softRemovedDisplay != null)
               Text(
-                'This member was soft-removed on $softRemovedDisplay. You can cancel the soft removal or perform a Full Delete (permanent).',
+                'This member was soft-removed on $softRemovedDisplay. Full Delete is the final step and should only be used after the grace period has passed without membership renewal, or when the member has directly requested permanent account removal. You can also cancel the soft removal from here.',
                 style: const TextStyle(color: Colors.white70),
               )
             else
               const Text(
-                'Soft removal will immediately block access and clear optional profile details. You can later return here to either cancel the soft removal or perform a Full Delete.',
+                'Soft removal immediately blocks access and clears optional profile details while keeping the account in a grace-period state. If the member renews, you can cancel the soft removal later. If they do not renew, or they request permanent account removal, you can later return here to perform Full Delete.',
                 style: TextStyle(color: Colors.white70),
               ),
           ],
@@ -1310,21 +1310,48 @@ For security we recommend using this code within the next few days. After it has
     if (ok != true) return;
 
     try {
+      final userId = user['id'] as String;
       final response = await _supabase.functions.invoke(
         'full-delete-user',
-        body: {'userId': user['id']},
+        body: {'userId': userId},
       );
 
       if (response.status == 200) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Account fully deleted')),
-        );
+        final remainingProfile = await _supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+
+        final responseData = response.data;
+        final functionConfirmedDelete =
+            responseData is Map && responseData['deleted'] == true;
+        final profileDeleted = remainingProfile == null;
+
+        if (functionConfirmedDelete || profileDeleted) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Account fully deleted')),
+          );
+        } else {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Delete request completed, but the profile still exists. Check the full-delete-user function deployment.',
+              ),
+            ),
+          );
+        }
+
         await _searchUsers(_searchController.text, setModalState);
       } else {
+        final responseData = response.data;
+        final detail = responseData is Map ? responseData['error'] : null;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Full delete failed (code ${response.status}). Please check the server logs.',
+              detail == null
+                  ? 'Full delete failed (code ${response.status}). Please check the server logs.'
+                  : 'Full delete failed: $detail',
             ),
           ),
         );
