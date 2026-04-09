@@ -1,10 +1,11 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:runrank/services/user_service.dart';
-import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreatePostPage extends StatefulWidget {
   const CreatePostPage({super.key});
@@ -19,12 +20,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 100));
-  // Admin status
   bool _isAdmin = false;
-  // Title category dropdown
   String _titleCategory = 'Announcement';
   bool _useCustomTitle = false;
-  // Attachments collected via + button (images or URLs)
   final List<Map<String, String>> _attachments = [];
   bool _uploading = false;
   bool _attachmentUploading = false;
@@ -33,7 +31,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
   void initState() {
     super.initState();
     _checkAdminStatus();
-    // Initialize title from default category
     _titleController.text = _titleCategory;
   }
 
@@ -74,8 +71,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       await supabase.storage.from('club-media').upload(path, image);
 
-      final publicUrl = supabase.storage.from('club-media').getPublicUrl(path);
-      return publicUrl;
+      return supabase.storage.from('club-media').getPublicUrl(path);
     } catch (e) {
       print('Error uploading image: $e');
       return null;
@@ -130,7 +126,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
       final file = File(pickedFile.path);
       final fileName = pickedFile.name;
 
-      const maxVideoBytes = 50 * 1024 * 1024; // ~50MB
+      const maxVideoBytes = 50 * 1024 * 1024;
       final fileSize = await file.length();
       if (fileSize > maxVideoBytes) {
         if (mounted) {
@@ -221,7 +217,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
       final file = File(picked.path!);
       final fileName = picked.name;
 
-      // Enforce a soft size limit for video files to avoid large storage usage
       final lowerName = fileName.toLowerCase();
       final isVideo =
           lowerName.endsWith('.mp4') ||
@@ -231,7 +226,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
           lowerName.endsWith('.webm') ||
           lowerName.endsWith('.flv');
 
-      const maxVideoBytes = 50 * 1024 * 1024; // ~50MB
+      const maxVideoBytes = 50 * 1024 * 1024;
       if (isVideo && picked.size > maxVideoBytes) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -248,7 +243,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
         return;
       }
 
-      // Upload file to storage
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
@@ -261,7 +255,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
           .from('club-media')
           .getPublicUrl(storagePath);
 
-      // Determine attachment type based on file extension
       String attachmentType = 'file';
       if (lowerName.endsWith('.png') ||
           lowerName.endsWith('.jpg') ||
@@ -307,7 +300,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
         setState(() => _uploading = false);
         return;
       }
-      // Fetch author display name for denormalized storage (avoids RLS on user_profiles)
+
       String authorName = 'Unknown';
       try {
         final profile = await supabase
@@ -319,7 +312,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
         if (name != null && name.trim().isNotEmpty) {
           authorName = name.trim();
         } else {
-          // Fallback to user metadata if available
           final displayName = user.userMetadata?['full_name'] as String?;
           if (displayName != null && displayName.trim().isNotEmpty) {
             authorName = displayName.trim();
@@ -327,22 +319,17 @@ class _CreatePostPageState extends State<CreatePostPage> {
         }
       } catch (e) {
         debugPrint('Error fetching author name: $e');
-        // Fallback to user metadata
         final displayName = user.userMetadata?['full_name'] as String?;
         if (displayName != null && displayName.trim().isNotEmpty) {
           authorName = displayName.trim();
         }
       }
 
-      // Determine approval
       final isApproved = _isAdmin;
-
-      // Compose title depending on category/custom
       final titleText = _useCustomTitle
           ? _titleController.text.trim()
           : _titleCategory;
 
-      // Insert post and return id
       final inserted = await supabase
           .from('club_posts')
           .insert({
@@ -359,7 +346,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       final postId = inserted['id'] as String;
 
-      // Save attachments
       for (final att in _attachments) {
         await supabase.from('club_post_attachments').insert({
           'post_id': postId,
@@ -424,7 +410,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Approval policy notice
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -432,55 +417,56 @@ class _CreatePostPageState extends State<CreatePostPage> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey[700]!),
                       ),
-                      child: Center(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              const TextSpan(
-                                text:
-                                    'All posts are subject to Admin approval. Any post that is deemed irrelevant and or unnecessary may not be published. Please refer to Club Policies on Privacy, Health & Safety, and Data Protection. ',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white70,
-                                  height: 1.5,
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'Contact',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: accent,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                  height: 1.5,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    Navigator.of(
-                                      context,
-                                    ).popUntil((route) => route.isFirst);
-                                    // Navigate to admin in menu
-                                    Navigator.of(context).pushNamed('/menu');
-                                  },
-                              ),
-                              const TextSpan(
-                                text:
-                                    ' your Admin for clarification and guidance.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white70,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'All posts are subject to Admin approval. Any post that is deemed irrelevant and or unnecessary may not be published. Please refer to Club Policies on Privacy, Health & Safety, and Data Protection.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+                          const SizedBox(height: 12),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'Contact',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: accent,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                    height: 1.5,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () {
+                                      Navigator.of(
+                                        context,
+                                      ).popUntil((route) => route.isFirst);
+                                      Navigator.of(context).pushNamed('/menu');
+                                    },
+                                ),
+                                const TextSpan(
+                                  text:
+                                      ' your Admin for clarification and guidance.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // Title category + optional custom title (responsive)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -524,14 +510,12 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               if (!_useCustomTitle) {
                                 _titleController.text = v;
                               } else {
-                                // Clear the field for custom title
                                 _titleController.clear();
                               }
                             });
                           },
                         ),
                         const SizedBox(height: 12),
-                        // Custom title field (always present but hidden if not needed)
                         if (_useCustomTitle)
                           TextFormField(
                             autofocus: true,
@@ -557,8 +541,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // Content field
                     Stack(
                       children: [
                         TextFormField(
@@ -697,21 +679,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                             .toList(),
                       ),
                     ],
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Text(
-                        'Unless removed earlier by Admin, post expires 100 days from date of publication.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
                     const SizedBox(height: 32),
-
-                    // Submit button
                     Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -755,7 +723,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
     final base = scheme.primary;
     final luminance = base.computeLuminance();
     if (luminance > 0.85) {
-      // Fallback to NNBR yellow when primary is too close to white.
       return const Color(0xFFFFD300);
     }
     return base;
@@ -765,7 +732,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
     final base = scheme.secondary;
     final luminance = base.computeLuminance();
     if (luminance > 0.85) {
-      // Fallback to NNBR blue when secondary is too close to white.
       return const Color(0xFF0057B7);
     }
     return base;
