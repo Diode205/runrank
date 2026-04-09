@@ -1,6 +1,7 @@
 // lib/services/notification_service.dart
 
 import 'dart:async';
+import 'package:runrank/models/club_event.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -462,42 +463,37 @@ class NotificationService {
 
       final rows = await _supabase
           .from('club_events')
-          .select('id, date, time, created_by')
+          .select(
+            'id, date, time, created_by, created_at, is_cancelled, cancelled_at, event_type, training_number, race_name, handicap_distance, title, host_or_director, host_user_id, venue, venue_address, description, marshal_call_date, latitude, longitude, relay_team, cancel_reason, relay_stages_json, expected_time_required',
+          )
           .order('date')
           .order('time');
 
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
 
       int count = 0;
       for (final row in rows as List) {
-        final dateStr = row['date'] as String?;
-        final timeVal = row['time'];
-        if (dateStr == null || timeVal == null) continue;
-
-        final timeStr = timeVal.toString().split('.').first;
-        DateTime dt;
         try {
-          dt = DateTime.parse('$dateStr $timeStr');
-        } catch (_) {
-          continue;
-        }
+          final event = ClubEvent.fromSupabase(Map<String, dynamic>.from(row));
 
-        final d = DateTime(dt.year, dt.month, dt.day);
-        if (d.isBefore(today)) continue;
-
-        // If we have a club-specific user set, only count events
-        // created by users in that set.
-        if (clubUserIds.isNotEmpty) {
-          final createdBy = row['created_by']?.toString();
-          if (createdBy == null || !clubUserIds.contains(createdBy)) {
+          if (!event.isVisibleInCalendarAt(now)) {
             continue;
           }
-        }
 
-        final id = row['id'].toString();
-        if (!seenIds.contains(id)) {
-          count++;
+          // If we have a club-specific user set, only count events
+          // created by users in that set.
+          if (clubUserIds.isNotEmpty) {
+            final createdBy = event.createdBy;
+            if (createdBy == null || !clubUserIds.contains(createdBy)) {
+              continue;
+            }
+          }
+
+          if (!seenIds.contains(event.id)) {
+            count++;
+          }
+        } catch (_) {
+          continue;
         }
       }
 

@@ -219,39 +219,16 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
       );
 
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
 
       final parsed = (rows as List).map((e) => ClubEvent.fromSupabase(e)).where(
         (e) {
-          final d = DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day);
-          final inDateRange = d.isAtSameMomentAs(today) || d.isAfter(today);
-
           // If we have a set of user IDs for this club, only keep events
           // created by those users. Otherwise (legacy/NNBR), keep all.
           final inClub = _clubUserIds.isEmpty
               ? true
               : (e.createdBy != null && _clubUserIds.contains(e.createdBy));
 
-          if (!(inDateRange && inClub)) {
-            return false;
-          }
-
-          // For cancelled events, only show them on the calendar for up to
-          // 24 hours after the time they were cancelled.
-          if (e.isCancelled) {
-            final cancelledAt = e.cancelledAt ?? e.createdAt;
-            if (cancelledAt == null) {
-              // If we have no timestamp at all, treat as already expired.
-              return false;
-            }
-
-            final expiry = cancelledAt.add(const Duration(hours: 24));
-            if (expiry.isBefore(now)) {
-              return false;
-            }
-          }
-
-          return true;
+          return inClub && e.isVisibleInCalendarAt(now);
         },
       ).toList();
 

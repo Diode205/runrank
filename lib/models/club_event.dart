@@ -59,6 +59,29 @@ class ClubEvent {
     required this.expectedTimeRequired,
   });
 
+  bool isVisibleInCalendarAt(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDay = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (eventDay.isBefore(today)) {
+      return false;
+    }
+
+    if (isCancelled) {
+      final cancelledAtOrCreatedAt = cancelledAt ?? createdAt;
+      if (cancelledAtOrCreatedAt == null) {
+        return false;
+      }
+
+      final expiry = cancelledAtOrCreatedAt.add(const Duration(hours: 24));
+      if (expiry.isBefore(now)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /// ---------------------------------------------------------------------------
   /// PARSE FROM SUPABASE
   /// ---------------------------------------------------------------------------
