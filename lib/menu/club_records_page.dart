@@ -661,6 +661,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
     final timeController = TextEditingController();
     DateTime selectedDate = DateTime.now();
     String selectedDistance = '5K';
+    String selectedGender = _currentGender;
     bool isHistorical = false;
 
     showDialog(
@@ -702,6 +703,25 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   onChanged: (val) {
                     if (val != null) {
                       setDialogState(() => selectedDistance = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedGender,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                  dropdownColor: const Color(0xFF1A1D2E),
+                  style: const TextStyle(color: Colors.white),
+                  items: const [
+                    DropdownMenuItem(value: 'M', child: Text("Men's")),
+                    DropdownMenuItem(value: 'F', child: Text("Women's")),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() => selectedGender = val);
                     }
                   },
                 ),
@@ -808,6 +828,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   timeSeconds: timeSeconds,
                   runnerName: runnerNameController.text.trim(),
                   userId: null,
+                  gender: selectedGender,
                   raceName: raceNameController.text.trim(),
                   raceDate: selectedDate,
                   isHistorical: isHistorical,
@@ -820,6 +841,13 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                     const SnackBar(content: Text('Record added successfully')),
                   );
                   _loadData();
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to add record'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -842,6 +870,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
     );
     DateTime selectedDate = record.raceDate;
     String selectedDistance = record.distance;
+    String selectedGender = record.gender ?? _currentGender;
     bool isHistorical = record.isHistorical;
 
     showDialog(
@@ -883,6 +912,25 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   onChanged: (val) {
                     if (val != null) {
                       setDialogState(() => selectedDistance = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedGender,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                  dropdownColor: const Color(0xFF1A1D2E),
+                  style: const TextStyle(color: Colors.white),
+                  items: const [
+                    DropdownMenuItem(value: 'M', child: Text("Men's")),
+                    DropdownMenuItem(value: 'F', child: Text("Women's")),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() => selectedGender = val);
                     }
                   },
                 ),
@@ -983,6 +1031,8 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                   timeSeconds: timeSeconds,
                   runnerName: runnerNameController.text.trim(),
                   userId: record.userId,
+                  club: record.club,
+                  gender: selectedGender,
                   raceName: raceNameController.text.trim(),
                   raceDate: selectedDate,
                   isHistorical: isHistorical,
@@ -1000,6 +1050,13 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                     ),
                   );
                   _loadData();
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to update record'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
