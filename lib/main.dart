@@ -23,7 +23,7 @@ final RouteObserver<ModalRoute<void>> routeObserver =
 bool _isTransientNetworkError(Object error) {
   // Supabase wraps some network issues in AuthException with a SocketException
   if (error is AuthException) {
-    final msg = error.message ?? '';
+    final msg = error.message;
     if (msg.contains('Failed host lookup') || msg.contains('SocketException')) {
       return true;
     }
@@ -165,11 +165,34 @@ class RunRankApp extends StatefulWidget {
 
 class _RunRankAppState extends State<RunRankApp> {
   ClubConfig? _clubConfig;
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadClubConfig();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      final event = data.event;
+
+      if (!mounted) return;
+
+      if (event == AuthChangeEvent.signedOut ||
+          event == AuthChangeEvent.userDeleted) {
+        setState(() {
+          _clubConfig = null;
+        });
+      }
+
+      _loadClubConfig();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadClubConfig() async {
