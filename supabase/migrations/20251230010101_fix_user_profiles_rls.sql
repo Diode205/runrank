@@ -7,9 +7,11 @@ begin;
 alter table public.user_profiles enable row level security;
 
 -- 2) Drop any old conflicting policies if they exist
+drop policy if exists "Anyone can view user profiles" on public.user_profiles;
 drop policy if exists "Users can update own profile" on public.user_profiles;
 drop policy if exists "Users can view own profile" on public.user_profiles;
 drop policy if exists "Admins can update is_admin field" on public.user_profiles;
+drop policy if exists "Admins can update user admin and block status" on public.user_profiles;
 
 -- 3) READ: Users can view profiles
 -- Anyone can view any user's profile (public info)

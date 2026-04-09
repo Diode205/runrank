@@ -13,6 +13,9 @@ create unique index if not exists award_nominees_name_lc_uidx
 
 alter table public.award_nominees enable row level security;
 
+drop policy if exists award_nominees_select_all on public.award_nominees;
+drop policy if exists award_nominees_insert_auth on public.award_nominees;
+
 create policy award_nominees_select_all
   on public.award_nominees for select
   using (true);
@@ -33,6 +36,9 @@ create table if not exists public.award_nominations (
 
 alter table public.award_nominations enable row level security;
 
+drop policy if exists award_nominations_select_all on public.award_nominations;
+drop policy if exists award_nominations_insert_self on public.award_nominations;
+
 create policy award_nominations_select_all
   on public.award_nominations for select using (true);
 
@@ -50,6 +56,9 @@ create table if not exists public.award_votes (
 );
 
 alter table public.award_votes enable row level security;
+
+drop policy if exists award_votes_select_all on public.award_votes;
+drop policy if exists award_votes_insert_self on public.award_votes;
 
 create policy award_votes_select_all
   on public.award_votes for select using (true);
@@ -69,6 +78,9 @@ create table if not exists public.award_emojis (
 
 alter table public.award_emojis enable row level security;
 
+drop policy if exists award_emojis_select_all on public.award_emojis;
+drop policy if exists award_emojis_insert_self on public.award_emojis;
+
 create policy award_emojis_select_all
   on public.award_emojis for select using (true);
 
@@ -86,6 +98,9 @@ create table if not exists public.award_comments (
 );
 
 alter table public.award_comments enable row level security;
+
+drop policy if exists award_comments_select_all on public.award_comments;
+drop policy if exists award_comments_insert_self on public.award_comments;
 
 create policy award_comments_select_all
   on public.award_comments for select using (true);

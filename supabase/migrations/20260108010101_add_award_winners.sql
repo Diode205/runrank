@@ -12,6 +12,11 @@ create table if not exists public.award_winners (
 
 alter table public.award_winners enable row level security;
 
+drop policy if exists award_winners_select_all on public.award_winners;
+drop policy if exists award_winners_insert_admin on public.award_winners;
+drop policy if exists award_winners_update_admin on public.award_winners;
+drop policy if exists award_winners_delete_admin on public.award_winners;
+
 create policy award_winners_select_all
   on public.award_winners for select using (true);
 
