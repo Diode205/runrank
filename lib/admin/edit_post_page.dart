@@ -32,11 +32,11 @@ class _EditPostPageState extends State<EditPostPage> {
       if (expiryStr != null && expiryStr.isNotEmpty) {
         _expiryDate = DateTime.parse(expiryStr);
       } else {
-        _expiryDate = DateTime.now().add(const Duration(days: 365));
+        _expiryDate = DateTime.now().add(const Duration(days: 100));
       }
     } catch (e) {
       debugPrint('Error parsing expiry_date: $e');
-      _expiryDate = DateTime.now().add(const Duration(days: 365));
+      _expiryDate = DateTime.now().add(const Duration(days: 100));
     }
   }
 

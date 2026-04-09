@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:runrank/services/user_service.dart';
-import 'package:runrank/services/notification_service.dart';
 import 'dart:io';
 
 class CreatePostPage extends StatefulWidget {
@@ -19,7 +18,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  DateTime _expiryDate = DateTime.now().add(const Duration(days: 365));
+  DateTime _expiryDate = DateTime.now().add(const Duration(days: 100));
   // Admin status
   bool _isAdmin = false;
   // Title category dropdown
@@ -642,7 +641,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     const SizedBox(height: 8),
                     Text(
                       'Tip: Any https:// link in Content becomes a tappable link in the post. '
-                      'Videos are limited to about 50MB to save storage.',
+                      'Videos are limited to about 50MB, which is usually around 1 to 3 minutes depending on quality. '
+                      'Posts expire automatically 100 days after publication unless removed earlier by Admin.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[500],
@@ -700,7 +700,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
-                        'Unless removed by Admin, post expires one year from date of publication.',
+                        'Unless removed earlier by Admin, post expires 100 days from date of publication.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],

@@ -2097,7 +2097,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       final isAdmin = await UserService.isAdmin();
       final now = DateTime.now();
-      final expiry = now.add(const Duration(days: 365));
+      final expiry = now.add(const Duration(days: 100));
 
       await client.from('club_posts').insert({
         'title': title,

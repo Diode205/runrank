@@ -500,6 +500,47 @@ class _PostDetailPageState extends State<PostDetailPage> {
     }
   }
 
+  void _openImageFullscreen(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Center(
+                child: Image.network(imageUrl, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAttachmentUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cannot open attachment')));
+    }
+  }
+
   String _getTimeAgo(String? dateStr) {
     if (dateStr == null) return '';
     try {
@@ -589,6 +630,15 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final authorMembershipType =
         post!['user_profiles']?['membership_type'] as String?;
     final imageUrl = post!['image_url'] as String?;
+    final imageAttachments = attachments
+        .where((a) => a['type'] == 'image')
+        .toList();
+    final videoAttachments = attachments
+        .where((a) => a['type'] == 'video')
+        .toList();
+    final otherAttachments = attachments
+        .where((a) => a['type'] != 'image' && a['type'] != 'video')
+        .toList();
     final likeCount = likeUsers.length;
 
     return Scaffold(
@@ -727,17 +777,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   // Image
                   if (imageUrl != null && imageUrl.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Image.network(
-                      imageUrl,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 200,
-                        color: Colors.grey[800],
-                        child: Icon(
-                          Icons.broken_image,
-                          size: 48,
-                          color: Colors.grey[600],
+                    GestureDetector(
+                      onTap: () => _openImageFullscreen(imageUrl),
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 200,
+                          color: Colors.grey[800],
+                          child: Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                     ),
@@ -762,129 +815,151 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (attachments.any(
-                                (a) => a['type'] == 'video',
-                              )) ...[
+                              if (imageAttachments.isNotEmpty) ...[
+                                GestureDetector(
+                                  onTap: () => _openImageFullscreen(
+                                    imageAttachments.first['url'] as String,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      imageAttachments.first['url'] as String,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: 220,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        height: 220,
+                                        color: Colors.grey[800],
+                                        child: Icon(
+                                          Icons.broken_image,
+                                          size: 48,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              if (videoAttachments.isNotEmpty) ...[
                                 InlineVideoPlayer(
-                                  url:
-                                      attachments.firstWhere(
-                                            (a) => a['type'] == 'video',
-                                          )['url']
-                                          as String,
+                                  url: videoAttachments.first['url'] as String,
                                 ),
                                 const SizedBox(height: 8),
                               ],
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: attachments.map<Widget>((a) {
-                                  final attachType =
-                                      a['type'] as String? ?? 'file';
-                                  final fileName =
-                                      a['name'] as String? ?? 'Attachment';
-                                  final isImage = attachType == 'image';
+                                children: [
+                                  ...imageAttachments.skip(1).map<Widget>((a) {
+                                    final fileName =
+                                        a['name'] as String? ?? 'Image';
 
-                                  IconData getIcon() {
-                                    if (isImage) return Icons.image;
-                                    if (fileName.toLowerCase().endsWith(
-                                      '.pdf',
-                                    )) {
-                                      return Icons.picture_as_pdf;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                          '.doc',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.docx',
-                                        )) {
-                                      return Icons.description;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                          '.xls',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.xlsx',
-                                        )) {
-                                      return Icons.table_chart;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                          '.ppt',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.pptx',
-                                        )) {
-                                      return Icons.slideshow;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                          '.mp4',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.mov',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.avi',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.mkv',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.webm',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.flv',
-                                        )) {
-                                      return Icons.videocam;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                      '.gif',
-                                    )) {
-                                      return Icons.animation;
-                                    }
-                                    if (fileName.toLowerCase().endsWith(
-                                          '.zip',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.rar',
-                                        ) ||
-                                        fileName.toLowerCase().endsWith(
-                                          '.7z',
-                                        )) {
-                                      return Icons.folder_zip;
-                                    }
-                                    return Icons.attachment;
-                                  }
+                                    return ActionChip(
+                                      avatar: const Icon(Icons.image, size: 18),
+                                      label: Text(
+                                        fileName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () {
+                                        final url = a['url'] as String?;
+                                        if (url == null || url.isEmpty) return;
+                                        _openImageFullscreen(url);
+                                      },
+                                    );
+                                  }),
+                                  ...videoAttachments.skip(1).map<Widget>((a) {
+                                    final fileName =
+                                        a['name'] as String? ?? 'Video';
 
-                                  return ActionChip(
-                                    avatar: Icon(getIcon(), size: 18),
-                                    label: Text(
-                                      fileName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    onPressed: () async {
-                                      final url = a['url'] as String?;
-                                      if (url == null || url.isEmpty) return;
-                                      final messenger = ScaffoldMessenger.of(
-                                        context,
-                                      );
-                                      try {
-                                        final uri = Uri.parse(url);
-                                        await launchUrl(
-                                          uri,
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      } catch (e) {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Cannot open: $fileName',
-                                            ),
-                                          ),
-                                        );
+                                    return ActionChip(
+                                      avatar: const Icon(
+                                        Icons.videocam,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        fileName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () => _openAttachmentUrl(
+                                        a['url'] as String?,
+                                      ),
+                                    );
+                                  }),
+                                  ...otherAttachments.map<Widget>((a) {
+                                    final attachType =
+                                        a['type'] as String? ?? 'file';
+                                    final fileName =
+                                        a['name'] as String? ?? 'Attachment';
+
+                                    IconData getIcon() {
+                                      if (attachType == 'link')
+                                        return Icons.link;
+                                      if (fileName.toLowerCase().endsWith(
+                                        '.pdf',
+                                      )) {
+                                        return Icons.picture_as_pdf;
                                       }
-                                    },
-                                  );
-                                }).toList(),
+                                      if (fileName.toLowerCase().endsWith(
+                                            '.doc',
+                                          ) ||
+                                          fileName.toLowerCase().endsWith(
+                                            '.docx',
+                                          )) {
+                                        return Icons.description;
+                                      }
+                                      if (fileName.toLowerCase().endsWith(
+                                            '.xls',
+                                          ) ||
+                                          fileName.toLowerCase().endsWith(
+                                            '.xlsx',
+                                          )) {
+                                        return Icons.table_chart;
+                                      }
+                                      if (fileName.toLowerCase().endsWith(
+                                            '.ppt',
+                                          ) ||
+                                          fileName.toLowerCase().endsWith(
+                                            '.pptx',
+                                          )) {
+                                        return Icons.slideshow;
+                                      }
+                                      if (fileName.toLowerCase().endsWith(
+                                        '.gif',
+                                      )) {
+                                        return Icons.animation;
+                                      }
+                                      if (fileName.toLowerCase().endsWith(
+                                            '.zip',
+                                          ) ||
+                                          fileName.toLowerCase().endsWith(
+                                            '.rar',
+                                          ) ||
+                                          fileName.toLowerCase().endsWith(
+                                            '.7z',
+                                          )) {
+                                        return Icons.folder_zip;
+                                      }
+                                      return Icons.attachment;
+                                    }
+
+                                    return ActionChip(
+                                      avatar: Icon(getIcon(), size: 18),
+                                      label: Text(
+                                        fileName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () async {
+                                        await _openAttachmentUrl(
+                                          a['url'] as String?,
+                                        );
+                                      },
+                                    );
+                                  }),
+                                ],
                               ),
                             ],
                           ),
