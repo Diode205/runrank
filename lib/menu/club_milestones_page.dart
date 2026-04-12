@@ -31,10 +31,12 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         title: const Text(
           'Club Milestones',
@@ -43,9 +45,7 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF0055FF)),
-            )
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -84,11 +84,13 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
   }
 
   Widget _buildAdminButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0055FF), Color(0xFF00AAFF)],
+        gradient: LinearGradient(
+          colors: [colorScheme.primary, colorScheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -137,6 +139,8 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
     required ClubMilestone milestone,
     required bool isLast,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onLongPress: _isAdmin ? () => _showOptionsDialog(milestone) : null,
       child: Container(
@@ -151,12 +155,12 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                   height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0055FF), Color(0xFF00AAFF)],
+                    gradient: LinearGradient(
+                      colors: [colorScheme.primary, colorScheme.secondary],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF0055FF).withOpacity(0.3),
+                        color: colorScheme.primary.withOpacity(0.3),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -183,10 +187,10 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                 children: [
                   Text(
                     milestone.milestoneDate,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0055FF),
+                      color: colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 4),

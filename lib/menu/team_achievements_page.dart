@@ -31,10 +31,12 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         title: const Text(
           'Team Achievements',
@@ -43,16 +45,14 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFFD700)),
-            )
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Our team achievements celebrate the collective successes of North Norfolk Beach Runners across various competitions.',
+                    'Our team achievements celebrate the collective successes of Norwich Road Runners across various competitions.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
@@ -76,11 +76,13 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
   }
 
   Widget _buildAdminButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+        gradient: LinearGradient(
+          colors: [colorScheme.primary, colorScheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -88,10 +90,20 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
       ),
       child: ElevatedButton.icon(
         onPressed: _showAddDialog,
-        icon: const Icon(Icons.add, color: Colors.black),
-        label: const Text(
+        icon: Icon(
+          Icons.add,
+          color: colorScheme.primary.computeLuminance() > 0.6
+              ? Colors.black
+              : Colors.white,
+        ),
+        label: Text(
           'Add Achievement',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: colorScheme.primary.computeLuminance() > 0.6
+                ? Colors.black
+                : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -263,6 +275,8 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
   }
 
   Map<String, dynamic> _getAwardConfig(String award) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     switch (award) {
       case 'Gold':
         return {'color': const Color(0xFFFFD700), 'icon': Icons.emoji_events};
@@ -271,7 +285,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
       case 'Bronze':
         return {'color': const Color(0xFFCD7F32), 'icon': Icons.emoji_events};
       case 'Champion':
-        return {'color': const Color(0xFF0055FF), 'icon': Icons.military_tech};
+        return {'color': colorScheme.primary, 'icon': Icons.military_tech};
       default:
         return {'color': Colors.white, 'icon': Icons.emoji_events};
     }

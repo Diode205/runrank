@@ -79,10 +79,12 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   @override
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         title: Text(
           'Club Records — ${_distances[_currentIndex]}',
@@ -96,8 +98,8 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+            ? Center(
+                child: CircularProgressIndicator(color: colorScheme.primary),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,20 +167,22 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildAdminButtons() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3)),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.admin_panel_settings,
-                color: Color(0xFFFFD700),
+                color: colorScheme.primary,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -196,8 +200,10 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add Record'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD700),
-                  foregroundColor: Colors.black,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.primary.computeLuminance() > 0.6
+                      ? Colors.black
+                      : Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 8,
@@ -216,7 +222,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
               icon: const Icon(Icons.sync, size: 18),
               label: const Text('Sync from Race Results'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0055FF),
+                backgroundColor: colorScheme.secondary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -231,6 +237,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildGenderToggle() {
+    final colorScheme = Theme.of(context).colorScheme;
     final isMale = _currentGender == 'M';
     final currentLabel = isMale
         ? "Showing Men's Records"
@@ -258,7 +265,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFFFD700)),
+              side: BorderSide(color: colorScheme.primary),
             ),
             child: Text(
               buttonLabel,
@@ -352,23 +359,25 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildDistanceHeader(String distance) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Container(
           width: 4,
           height: 24,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFD700),
+            color: colorScheme.primary,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 12),
         Text(
           distance,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Color(0xFFFFD700),
+            color: colorScheme.primary,
           ),
         ),
       ],

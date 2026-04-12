@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/payment_service.dart';
 import 'package:runrank/services/user_service.dart';
@@ -160,13 +162,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _FixedHeaderDelegate(
-                    // Give the header a little more vertical space so the
-                    // status card text doesn't overflow on smaller screens
-                    // or with larger text scales.
-                    extent: 210,
+                    extent: 140,
                     child: Container(
                       color: Colors.black,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                       child: _buildStatusCard(),
                     ),
                   ),
@@ -176,7 +175,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      _buildNNBRInfo(),
+                      _buildMembershipInfo(),
                       const SizedBox(height: 24),
                       _buildMembershipTiers(),
                       const SizedBox(height: 32),
@@ -198,7 +197,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(14),
@@ -222,11 +221,11 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               color: Color.fromRGBO(230, 240, 89, 1),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
           _infoRow("Status", _membershipStatus),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           _infoRow("Type", _membershipType ?? "Not assigned"),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           _infoRow("Member Since", _memberSince ?? "Not set"),
         ],
       ),
@@ -258,30 +257,25 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildMembershipBadge(String type, Color color) {
-    // Display membership badge with actual logo image
     String assetPath;
+    var invertLogo = false;
+
     switch (type) {
-      case "1st Claim":
-        assetPath = "assets/images/firstclaim.png";
+      case "First Claim (Including UKA)":
+        assetPath = "assets/images/nrrlogo1.png";
         break;
-      case "2nd Claim":
-        assetPath = "assets/images/secondclaim.png";
-        break;
-      case "Social":
-        assetPath = "assets/images/socialclaim.png";
-        break;
-      case "Full-Time Education":
-        assetPath = "assets/images/fulleduc.png";
+      case "Second Claim":
+        assetPath = "assets/images/nrrlogo1.png";
+        invertLogo = true;
         break;
       default:
-        assetPath = "assets/images/nnbr_logo.png";
+        assetPath = "assets/images/rank_logo.png";
     }
 
     return Container(
       width: 70,
       height: 70,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.4),
@@ -291,22 +285,51 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ],
       ),
       child: Center(
-        child: Image.asset(
-          assetPath,
-          width: 65,
-          height: 65,
-          fit: BoxFit.contain,
+        child: ColorFiltered(
+          colorFilter: invertLogo
+              ? const ColorFilter.matrix(<double>[
+                  -1,
+                  0,
+                  0,
+                  0,
+                  255,
+                  0,
+                  -1,
+                  0,
+                  0,
+                  255,
+                  0,
+                  0,
+                  -1,
+                  0,
+                  255,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                ])
+              : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+          child: Image.asset(
+            assetPath,
+            width: 65,
+            height: 65,
+            fit: BoxFit.contain,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMembershipTiers() {
-    // NOTE: Membership type is determined during user registration/signup flow
-    // When a user selects their membership tier during signup, that selection
-    // (\"1st Claim\", \"2nd Claim\", \"Social\", or \"Full-Time Education\") is stored
-    // in the database `user_profiles.membership_type` field.
-    // This page then fetches and displays that stored value.
+    final colorScheme = Theme.of(context).colorScheme;
+    var firstClaimColor = colorScheme.primary;
+    var secondClaimColor = colorScheme.secondary;
+
+    if (secondClaimColor.computeLuminance() > 0.9) {
+      secondClaimColor = Colors.white70;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -320,43 +343,25 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ),
         const SizedBox(height: 16),
         _membershipTierCard(
-          color: const Color(0xFFFFD700),
-          title: "1st Claim",
-          subtitle: "Standard Membership",
-          price: "£30",
-          details: "1 year • £20 to England Athletics",
-          buttonColor: const Color(0xFFFFD700),
+          color: firstClaimColor,
+          title: "First Claim (Including UKA)",
+          subtitle: "Full club membership",
+          price: "£42",
+          details:
+              "1 year membership. Includes £19 England Athletics athlete registration.",
+          buttonColor: firstClaimColor,
           onBuy: () => _handleBuy("1st Claim"),
         ),
         const SizedBox(height: 12),
         _membershipTierCard(
-          color: const Color(0xFF0055FF),
-          title: "2nd Claim",
-          subtitle: "Secondary Membership",
-          price: "£15",
-          details: "1 year for 2nd claim runners",
-          buttonColor: const Color(0xFF0055FF),
+          color: secondClaimColor,
+          title: "Second Claim",
+          subtitle: "Second claim membership",
+          price: "£23",
+          details:
+              "1 year membership for runners registered first claim with another club.",
+          buttonColor: secondClaimColor,
           onBuy: () => _handleBuy("2nd Claim"),
-        ),
-        const SizedBox(height: 12),
-        _membershipTierCard(
-          color: Colors.grey,
-          title: "Social",
-          subtitle: "Social Membership",
-          price: "£5",
-          details: "1 year for social members / non-runners",
-          buttonColor: Colors.grey,
-          onBuy: () => _handleBuy("Social"),
-        ),
-        const SizedBox(height: 12),
-        _membershipTierCard(
-          color: const Color(0xFF2E8B57),
-          title: "Full-Time Education",
-          subtitle: "Student Membership",
-          price: "£15",
-          details: "1 year for students (Limited: 9 remaining)",
-          buttonColor: const Color(0xFF2E8B57),
-          onBuy: () => _handleBuy("Full-Time Education"),
         ),
       ],
     );
@@ -371,6 +376,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     required Color buttonColor,
     required VoidCallback onBuy,
   }) {
+    final buttonTextColor = buttonColor.computeLuminance() > 0.6
+        ? Colors.black
+        : Colors.white;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -437,9 +446,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               child: Text(
                 "Buy",
                 style: TextStyle(
-                  color: color == const Color(0xFFFFD700)
-                      ? Colors.black
-                      : Colors.white,
+                  color: buttonTextColor,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -451,7 +458,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     );
   }
 
-  Widget _buildNNBRInfo() {
+  Widget _buildMembershipInfo() {
     final colorScheme = Theme.of(context).colorScheme;
     Color borderColor = colorScheme.primary;
 
@@ -468,23 +475,27 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         border: Border.all(color: borderColor.withValues(alpha: 0.6)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Expanded(
-                child: Text(
-                  "About NNBR Membership",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color.from(
-                      alpha: 1,
-                      red: 0.941,
-                      green: 0.925,
-                      blue: 0.024,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "About NRR Membership",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color.from(
+                        alpha: 1,
+                        red: 0.941,
+                        green: 0.925,
+                        blue: 0.024,
+                      ),
                     ),
+                    textAlign: TextAlign.left,
                   ),
                 ),
               ),
@@ -497,20 +508,166 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            "North Norfolk Beach Runners welcome runners of all levels. "
-            "Memberships include access to club training sessions, group runs, "
-            "club events, social activities, and being part of a friendly and inclusive community.",
-            style: TextStyle(fontSize: 13, color: Colors.white70),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              children: [
+                const TextSpan(
+                  text:
+                      'Your Norwich Road Runners Membership includes access to all of the clubs training and road running sessions, use of the facilities, affiliation with UK Athletics (£19) with a discount on entering races.\n\nFor more information visit ',
+                ),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _launchEnglandAthleticsRegistration,
+                    child: Text(
+                      'UK Athletic',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(text: '.'),
+              ],
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           const Text(
-            "Membership is renewed annually. Fees directly support club activities, "
-            "equipment, coaching, and community events. \n\n"
-            "Lapsed memberships can be reactivated 30 days after expiration.  Failure to do so will result in profile removal, if not already deactivated.",
+            "When entering races as an affiliated club runner, please note that official club race vests or T-shirts must be worn.\n\n"
+            "Membership also includes:",
             style: TextStyle(fontSize: 13, color: Colors.white70),
+            textAlign: TextAlign.center,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              children: [
+                const TextSpan(text: '• Affiliation with '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _launchAthleticsNorfolk,
+                    child: Text(
+                      'Athletics Norfolk',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(
+                  text:
+                      '. This makes you eligible for county championship team prizes',
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              children: [
+                const TextSpan(text: '• Team access to the '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _openRelayAndCrossCountryPage,
+                    child: Text(
+                      'Round Norfolk Relay',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              children: [
+                const TextSpan(text: '• Free entry and subsidised travel to '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _openRelayAndCrossCountryPage,
+                    child: Text(
+                      'Norfolk',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(text: ' and '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _openRelayAndCrossCountryPage,
+                    child: Text(
+                      'National Cross Country',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(text: ' events'),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Access to our social events (Christmas party, club social nights etc) and most importantly, the ability to meet with, train and socialise with a large group of friendly and like-minded individuals.',
+            style: TextStyle(fontSize: 13, color: Colors.white70),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+              children: [
+                const TextSpan(
+                  text:
+                      'An opportunity to apply for a club London Marathon Ballot space ',
+                ),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: _showEligibilityAndApplicationComingSoon,
+                    child: Text(
+                      '(Eligibility & Application)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.secondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
           if (_isAdmin)
             SizedBox(
               width: double.infinity,
@@ -531,10 +688,14 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
   Future<void> _showMembershipStatusReport() async {
     try {
-      final rows = await _client
+      final clubName = await UserService.currentClubName();
+      var query = _client
           .from('user_profiles')
-          .select('full_name, email, membership_type, member_since')
-          .order('full_name');
+          .select('full_name, email, membership_type, member_since, club');
+      if (clubName != null && clubName.isNotEmpty) {
+        query = query.eq('club', clubName);
+      }
+      final rows = await query.order('full_name');
 
       if (rows.isEmpty) {
         if (!mounted) return;
@@ -546,7 +707,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
       final now = DateTime.now();
       final buffer = StringBuffer();
-      buffer.writeln('NNBR Membership Status Report');
+      buffer.writeln('NRR Membership Status Report');
       buffer.writeln('Generated on ${_formatFullDate(now)}');
       buffer.writeln('');
       buffer.writeln('Name — Membership type — Member since — Renewal due');
@@ -588,7 +749,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       final content = buffer.toString().trimRight();
       if (!mounted) return;
       await _showMembershipReportSheet(
-        title: 'NNBR Membership Status Report',
+        title: 'NRR Membership Status Report',
         content: content,
       );
     } catch (e) {
@@ -601,10 +762,14 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
   Future<void> _showLapsedRenewalsReport() async {
     try {
-      final rows = await _client
+      final clubName = await UserService.currentClubName();
+      var query = _client
           .from('user_profiles')
-          .select('full_name, email, membership_type, member_since')
-          .order('full_name');
+          .select('full_name, email, membership_type, member_since, club');
+      if (clubName != null && clubName.isNotEmpty) {
+        query = query.eq('club', clubName);
+      }
+      final rows = await query.order('full_name');
 
       if (rows.isEmpty) {
         if (!mounted) return;
@@ -855,12 +1020,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       return;
     }
 
-    final amountMap = <String, int>{
-      '1st Claim': 3000, // £30.00
-      '2nd Claim': 1500, // £15.00
-      'Social': 500, // £5.00
-      'Full-Time Education': 1500, // £15.00
-    };
+    final amountMap = <String, int>{'1st Claim': 4200, '2nd Claim': 2300};
 
     final amountCents = amountMap[tierName];
     if (amountCents == null) {
@@ -921,6 +1081,45 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
       }
     }();
+  }
+
+  Future<void> _launchEnglandAthleticsRegistration() async {
+    final uri = Uri.parse(
+      'https://www.englandathletics.org/take-part/athlete-registration/',
+    );
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open England Athletics link.')),
+      );
+    }
+  }
+
+  Future<void> _launchAthleticsNorfolk() async {
+    final uri = Uri.parse('https://athleticsnorfolk.org.uk/');
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Athletics Norfolk link.')),
+      );
+    }
+  }
+
+  void _openRelayAndCrossCountryPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RnrEkidenEacclPage()),
+    );
+  }
+
+  void _showEligibilityAndApplicationComingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Eligibility & Application page coming soon.'),
+      ),
+    );
   }
 }
 
