@@ -7,7 +7,7 @@ import 'package:runrank/widgets/events/event_venue_preview.dart';
 import 'package:runrank/services/user_service.dart';
 
 /// Event details page for simple events (Training, Special Event, Social Run, etc.)
-/// Group 1: Training_1/2, Special_Event, Social_Run, Meet_&_Drink, Swim_or_Cycle, Others
+/// Group 1: Training_1/2, Special_Event, Social_Run, Parkrun_Tourism, Meet_&_Drink, Swim_or_Cycle, Others
 class SimpleEventDetailsPage extends StatefulWidget {
   final ClubEvent event;
   final bool openHostChat;
@@ -444,6 +444,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     final isSpecial = eventType == 'special_event';
     final isSocial =
         eventType == 'social_run' ||
+        eventType == 'parkrun_tourism' ||
         eventType == 'meet_&_drink' ||
         eventType == 'swim_or_cycle' ||
         eventType == 'others';

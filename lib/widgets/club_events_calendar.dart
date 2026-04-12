@@ -491,6 +491,18 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                           displayTitle = 'Training';
                         }
                         subtitleText = e.venue;
+                      } else if (normalizedType == 'social_run' ||
+                          normalizedType == 'parkrun_tourism') {
+                        final host = e.hostOrDirector.trim();
+                        final baseTitle = normalizedType == 'parkrun_tourism'
+                            ? 'Parkrun Tourism'
+                            : 'Social Run';
+                        if (host.isNotEmpty) {
+                          displayTitle = '$baseTitle with $host';
+                        } else {
+                          displayTitle = baseTitle;
+                        }
+                        subtitleText = e.venue;
                       } else {
                         subtitleText = e.venue;
                       }
@@ -741,6 +753,7 @@ class _EventCard extends StatelessWidget {
       case 'special_event':
         return const Color(0x33F8BBD0);
       case 'social_run':
+      case 'parkrun_tourism':
       case 'meet_&_drink':
       case 'swim_or_cycle':
       case 'others':
@@ -767,6 +780,7 @@ class _EventCard extends StatelessWidget {
       case 'special_event':
         return '🎉';
       case 'social_run':
+      case 'parkrun_tourism':
       case 'meet_&_drink':
       case 'swim_or_cycle':
       case 'others':

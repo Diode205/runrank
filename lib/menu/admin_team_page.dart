@@ -1449,7 +1449,7 @@ For security we recommend using this code within the next few days. After it has
                               const Divider(color: Colors.white12, height: 16),
                           itemBuilder: (_, index) {
                             final user = _searchResults[index];
-                            final isAdmin = user['is_admin'] == true;
+                            final isUserAdmin = user['is_admin'] == true;
                             final isBlocked = user['is_blocked'] == true;
 
                             return Column(
@@ -1482,50 +1482,58 @@ For security we recommend using this code within the next few days. After it has
                                               fontSize: 12,
                                             ),
                                           ),
-                                          Wrap(
-                                            spacing: 6,
-                                            runSpacing: 4,
-                                            children: [
-                                              Chip(
-                                                label: Text(
-                                                  isAdmin ? 'Admin' : 'Reader',
-                                                ),
-                                                backgroundColor: isAdmin
-                                                    ? Colors.green.withOpacity(
-                                                        0.2,
-                                                      )
-                                                    : Colors.blue.withOpacity(
-                                                        0.2,
-                                                      ),
-                                                labelStyle: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              Chip(
-                                                label: Text(
-                                                  user['membership_type'] ??
-                                                      '—',
-                                                ),
-                                                backgroundColor: Colors.white
-                                                    .withOpacity(0.08),
-                                                labelStyle: const TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              if (isBlocked)
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: Row(
+                                              children: [
                                                 Chip(
-                                                  label: const Text('Blocked'),
-                                                  backgroundColor: Colors.red
-                                                      .withOpacity(0.2),
+                                                  label: Text(
+                                                    isUserAdmin
+                                                        ? 'Admin'
+                                                        : 'Reader',
+                                                  ),
+                                                  backgroundColor: isUserAdmin
+                                                      ? Colors.green
+                                                            .withOpacity(0.2)
+                                                      : Colors.blue.withOpacity(
+                                                          0.2,
+                                                        ),
                                                   labelStyle: const TextStyle(
-                                                    color: Colors.redAccent,
+                                                    color: Colors.white,
                                                     fontWeight: FontWeight.w600,
+                                                    fontSize: 12,
                                                   ),
                                                 ),
-                                            ],
+                                                const SizedBox(width: 6),
+                                                Chip(
+                                                  label: Text(
+                                                    user['membership_type'] ??
+                                                        '—',
+                                                  ),
+                                                  backgroundColor: Colors.white
+                                                      .withOpacity(0.08),
+                                                  labelStyle: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                if (isBlocked) ...[
+                                                  const SizedBox(width: 6),
+                                                  Chip(
+                                                    label: const Text(
+                                                      'Blocked',
+                                                    ),
+                                                    backgroundColor: Colors.red
+                                                        .withOpacity(0.2),
+                                                    labelStyle: const TextStyle(
+                                                      color: Colors.redAccent,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
                                           ),
                                           if (user['block_reason'] != null &&
                                               (user['block_reason'] as String?)
@@ -1555,19 +1563,19 @@ For security we recommend using this code within the next few days. After it has
                                         minWidth: 36,
                                         minHeight: 36,
                                       ),
-                                      tooltip: isAdmin
+                                      tooltip: isUserAdmin
                                           ? 'Remove admin'
                                           : 'Make admin',
                                       onPressed: () => _setAdminStatus(
                                         user,
-                                        !isAdmin,
+                                        !isUserAdmin,
                                         setModalState,
                                       ),
                                       icon: Icon(
-                                        isAdmin
+                                        isUserAdmin
                                             ? Icons.security_update_warning
                                             : Icons.verified_user,
-                                        color: isAdmin
+                                        color: isUserAdmin
                                             ? Colors.orangeAccent
                                             : Colors.greenAccent,
                                       ),

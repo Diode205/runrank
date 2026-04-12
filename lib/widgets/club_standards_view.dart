@@ -63,6 +63,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _ultraDistanceController =
       TextEditingController();
+  final TextEditingController _iceSearchController = TextEditingController();
 
   DateTime? _selectedRaceDate;
   String _selectedDistance = '5K';
@@ -97,6 +98,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   bool _loadingTop10Snap = false;
   int _top10SnapLoadGeneration = 0;
   bool _showTop10SnapWhenLoaded = false;
+  bool _searchingIceMembers = false;
+  List<Map<String, dynamic>> _iceSearchResults = [];
 
   @override
   void initState() {
@@ -152,6 +155,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     _timeController.dispose();
     _ageController.dispose();
     _ultraDistanceController.dispose();
+    _iceSearchController.dispose();
     super.dispose();
   }
 
@@ -219,6 +223,19 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             _carouselImages = [
               'assets/images/nrr1.png',
               'assets/images/nrr2.png',
+              'assets/images/nrr13.png',
+              'assets/images/nrr14.png',
+              'assets/images/nrr15.png',
+              'assets/images/nrr16.png',
+              'assets/images/nrr17.png',
+              'assets/images/nrr18.png',
+              'assets/images/nrr19.png',
+              'assets/images/nrr20.png',
+              'assets/images/nrr21.png',
+              'assets/images/nrr22.png',
+              'assets/images/nrr23.png',
+              'assets/images/nrr24.png',
+              'assets/images/nrr25.png',
             ];
           } else if (lowerClub.contains('north norfolk beach runners')) {
             _carouselImages = [
@@ -1918,7 +1935,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     if (!_isAdmin) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 80),
+      margin: const EdgeInsets.only(top: 8, bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.7),
@@ -2047,6 +2064,328 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               foregroundColor: Colors.white,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  bool _hasEmergencyPhone(Map<String, dynamic> user) {
+    final hasConsent = user['emergency_details_consent'] == true;
+    final number = (user['emergency_contact_number'] as String?)?.trim();
+    return hasConsent && number != null && number.isNotEmpty;
+  }
+
+  bool _hasMedicalAlert(Map<String, dynamic> user) {
+    final hasConsent = user['emergency_details_consent'] == true;
+    final notes = (user['medical_notes'] as String?)?.trim();
+    return hasConsent && notes != null && notes.isNotEmpty;
+  }
+
+  Future<void> _searchIceMembers(String term) async {
+    final trimmed = term.trim();
+    if (trimmed.length < 2) {
+      if (!mounted) return;
+      setState(() {
+        _iceSearchResults = [];
+        _searchingIceMembers = false;
+      });
+      return;
+    }
+
+    setState(() => _searchingIceMembers = true);
+
+    try {
+      var query = Supabase.instance.client
+          .from('user_profiles')
+          .select(
+            'id, full_name, emergency_contact_name, emergency_contact_number, emergency_contact_relation, emergency_details_consent, medical_notes, club',
+          );
+
+      if (_clubName != null && _clubName!.trim().isNotEmpty) {
+        query = query.eq('club', _clubName!.trim());
+      }
+
+      final rows = await query.ilike('full_name', '$trimmed%').limit(12);
+
+      final results = List<Map<String, dynamic>>.from(
+        rows,
+      ).where(_hasEmergencyPhone).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _iceSearchResults = results;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('ICE search failed: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _searchingIceMembers = false);
+      }
+    }
+  }
+
+  Future<void> _showEmergencyContactDialog(Map<String, dynamic> user) async {
+    final emergencyName =
+        (user['emergency_contact_name'] as String?)?.trim() ?? 'Not set';
+    final emergencyNumber =
+        (user['emergency_contact_number'] as String?)?.trim() ?? '';
+    final emergencyRelation =
+        (user['emergency_contact_relation'] as String?)?.trim() ?? 'Not set';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Emergency contact',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              emergencyName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Relation: $emergencyRelation',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: emergencyNumber.isEmpty
+                  ? null
+                  : () async {
+                      final launched = await launchUrl(
+                        Uri(scheme: 'tel', path: emergencyNumber),
+                      );
+                      if (!launched && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open phone dialler'),
+                          ),
+                        );
+                      }
+                    },
+              child: Text(
+                emergencyNumber.isEmpty ? 'Number not set' : emergencyNumber,
+                style: TextStyle(
+                  color: emergencyNumber.isEmpty
+                      ? Colors.white70
+                      : Colors.lightBlueAccent,
+                  decoration: emergencyNumber.isEmpty
+                      ? TextDecoration.none
+                      : TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showMedicalAlertDialog(Map<String, dynamic> user) async {
+    final medicalNotes = (user['medical_notes'] as String?)?.trim();
+    if (medicalNotes == null || medicalNotes.isEmpty || !_isAdmin) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: const Text(
+          'Medical alert',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          medicalNotes,
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showIceActions(Map<String, dynamic> user) async {
+    final hasMedical = _isAdmin && _hasMedicalAlert(user);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              (user['full_name'] as String?)?.trim().isNotEmpty == true
+                  ? (user['full_name'] as String).trim()
+                  : 'Member',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: 'Emergency contact',
+                  onPressed: () => _showEmergencyContactDialog(user),
+                  icon: const Icon(
+                    Icons.phone_in_talk,
+                    color: Colors.lightBlueAccent,
+                    size: 28,
+                  ),
+                ),
+                if (hasMedical) ...[
+                  const SizedBox(width: 18),
+                  IconButton(
+                    tooltip: 'Medical alert',
+                    onPressed: () => _showMedicalAlertDialog(user),
+                    icon: const Icon(
+                      Icons.medical_services,
+                      color: Colors.redAccent,
+                      size: 28,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIceSearchSection() {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 80),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.manage_search,
+                color: Colors.lightBlueAccent,
+                size: 24,
+              ),
+              SizedBox(height: 6),
+              Text(
+                'ICE Search',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            "Your health and safety is your Club's paramount concern.\nIn case of emergency whilst on training/race, call 999, then inform the next of kin via the ICE search below.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _iceSearchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search member name',
+              hintStyle: const TextStyle(color: Colors.white54),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF151828),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: _searchIceMembers,
+          ),
+          const SizedBox(height: 12),
+          if (_searchingIceMembers)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_iceSearchController.text.trim().length < 2)
+            const Text(
+              'Type at least 2 letters to search.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            )
+          else if (_iceSearchResults.isEmpty)
+            const Text(
+              'No matching consented ICE contacts found.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _iceSearchResults.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(color: Colors.white12, height: 14),
+              itemBuilder: (_, index) {
+                final user = _iceSearchResults[index];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    (user['full_name'] as String?)?.trim().isNotEmpty == true
+                        ? (user['full_name'] as String).trim()
+                        : 'Member',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white54,
+                  ),
+                  onTap: () => _showIceActions(user),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -2396,6 +2735,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         const SizedBox(height: 8),
                         _buildCurrentStatusSection(),
                         _buildAdminAwardsSection(),
+                        _buildIceSearchSection(),
                         const SizedBox(height: 80),
                       ]),
                     ),

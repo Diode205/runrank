@@ -19,12 +19,18 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   final dob = TextEditingController();
   final uka = TextEditingController();
   final password = TextEditingController();
+  final emergencyContactName = TextEditingController();
+  final emergencyContactNumber = TextEditingController();
+  final medicalNotes = TextEditingController();
 
   bool loading = false;
   String? selectedMembershipType;
   String _selectedGender = 'M';
+  String? _selectedEmergencyRelation;
   bool agreeClubPolicy = false;
   bool agreeAppPolicy = false;
+  bool agreeEmergencyConsent = false;
+  bool noMedicalIssue = true;
   String? _appPrivacyUrl; // Set when available
 
   final membershipOptions = [
@@ -32,6 +38,15 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     "2nd Claim",
     "Social",
     "Full-Time Education",
+  ];
+
+  static const emergencyRelations = [
+    'Spouse',
+    'Parent',
+    'Friend',
+    'Child',
+    'Kin',
+    'Carer',
   ];
 
   @override
@@ -100,6 +115,80 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
 
             const SizedBox(height: 20),
+            const Text(
+              "Emergency Contact",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: emergencyContactName,
+              decoration: const InputDecoration(labelText: "ICE contact name"),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emergencyContactNumber,
+              decoration: const InputDecoration(
+                labelText: "ICE contact number",
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedEmergencyRelation,
+              decoration: const InputDecoration(labelText: 'Relationship'),
+              items: emergencyRelations
+                  .map(
+                    (relation) => DropdownMenuItem<String>(
+                      value: relation,
+                      child: Text(relation),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() => _selectedEmergencyRelation = value);
+              },
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              value: noMedicalIssue,
+              onChanged: (value) {
+                setState(() {
+                  noMedicalIssue = value ?? true;
+                  if (noMedicalIssue) {
+                    medicalNotes.clear();
+                  }
+                });
+              },
+              title: const Text(
+                'No medical issue to declare',
+                style: TextStyle(fontSize: 13),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            if (!noMedicalIssue) ...[
+              TextField(
+                controller: medicalNotes,
+                decoration: const InputDecoration(
+                  labelText: 'Medical issue affecting running or training',
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+            ],
+            CheckboxListTile(
+              value: agreeEmergencyConsent,
+              onChanged: (value) {
+                setState(() => agreeEmergencyConsent = value ?? false);
+              },
+              title: const Text(
+                'I consent to my emergency and medical details being accessed by club admins and members in a training or racing emergency.',
+                style: TextStyle(fontSize: 13),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+
+            const SizedBox(height: 20),
             _privacyAtAGlanceCard(context),
             const SizedBox(height: 8),
             CheckboxListTile(
@@ -134,6 +223,41 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         return;
                       }
 
+                      if (emergencyContactName.text.trim().isEmpty ||
+                          emergencyContactNumber.text.trim().isEmpty ||
+                          _selectedEmergencyRelation == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please complete all emergency contact details',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (!noMedicalIssue && medicalNotes.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please enter the medical issue or choose none',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (!agreeEmergencyConsent) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please confirm emergency access consent',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() => loading = true);
 
                       final success = await AuthService.register(
@@ -145,6 +269,14 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         club: widget.selectedClub,
                         membershipType: selectedMembershipType!,
                         gender: _selectedGender,
+                        emergencyContactName: emergencyContactName.text.trim(),
+                        emergencyContactNumber: emergencyContactNumber.text
+                            .trim(),
+                        emergencyContactRelation: _selectedEmergencyRelation!,
+                        emergencyDetailsConsent: agreeEmergencyConsent,
+                        medicalNotes: noMedicalIssue
+                            ? null
+                            : medicalNotes.text.trim(),
                       );
 
                       setState(() => loading = false);

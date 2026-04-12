@@ -46,6 +46,11 @@ class AuthService {
     required String club,
     required String membershipType,
     required String gender,
+    required String emergencyContactName,
+    required String emergencyContactNumber,
+    required String emergencyContactRelation,
+    required bool emergencyDetailsConsent,
+    String? medicalNotes,
   }) async {
     try {
       // 1) Create user in Supabase Auth
@@ -77,6 +82,11 @@ class AuthService {
         "club": club,
         "membership_type": membershipType,
         "gender": gender,
+        "emergency_contact_name": emergencyContactName,
+        "emergency_contact_number": emergencyContactNumber,
+        "emergency_contact_relation": emergencyContactRelation,
+        "emergency_details_consent": emergencyDetailsConsent,
+        "medical_notes": medicalNotes,
         "is_admin": false,
         "admin_since": null,
         // NEW ▶ store member_since (ISO string from today)

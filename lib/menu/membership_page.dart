@@ -5,7 +5,6 @@ import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:runrank/services/payment_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/main.dart' show routeObserver;
 
@@ -23,10 +22,6 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   bool _isAdmin = false;
   String? _memberSince;
   String? _membershipType;
-  String? _fullName;
-  String? _email;
-  String? _ukaNumber;
-  String? _dob;
   final String _membershipStatus = "Active";
 
   @override
@@ -67,9 +62,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     try {
       final row = await _client
           .from('user_profiles')
-          .select(
-            'member_since, membership_type, full_name, email, uka_number, date_of_birth',
-          )
+          .select('member_since, membership_type')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -80,11 +73,6 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       if (row != null && row['membership_type'] != null) {
         _membershipType = row['membership_type'] as String?;
       }
-
-      _fullName = row?['full_name'] as String?;
-      _email = row?['email'] as String?;
-      _ukaNumber = row?['uka_number'] as String?;
-      _dob = row?['date_of_birth'] as String?;
     } catch (e) {
       debugPrint("Error loading membership data: $e");
     }
@@ -444,7 +432,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               ),
               onPressed: onBuy,
               child: Text(
-                "Buy",
+                "Request to Raise an Order",
                 style: TextStyle(
                   color: buttonTextColor,
                   fontWeight: FontWeight.bold,
@@ -1020,65 +1008,81 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       return;
     }
 
-    final amountMap = <String, int>{'1st Claim': 4200, '2nd Claim': 2300};
-
-    final amountCents = amountMap[tierName];
-    if (amountCents == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Unknown membership tier.')));
-      return;
-    }
-
     () async {
       try {
-        final metadata = {
-          'user_id': user.id,
-          'full_name': _fullName,
-          'email': _email,
-          'uka_number': _ukaNumber,
-          'date_of_birth': _dob,
-          'membership_type_requested': tierName,
-        };
+        final clubName = await UserService.currentClubName();
+        if (clubName == null || clubName.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Unable to determine your club. Please contact an administrator.',
+              ),
+            ),
+          );
+          return;
+        }
 
-        final paid = await PaymentService.startMembershipPayment(
-          context: context,
-          tierName: tierName,
-          amountCents: amountCents,
-          metadata: metadata,
+        final committeeRows = await _client
+            .from('committee_roles')
+            .select('role, email')
+            .eq('club', clubName);
+
+        String? membershipSecretaryEmail;
+        for (final row in committeeRows) {
+          final role = ((row['role'] as String?) ?? '').toLowerCase();
+          final email = (row['email'] as String?)?.trim();
+          if (role.contains('membership secretary') &&
+              email != null &&
+              email.isNotEmpty) {
+            membershipSecretaryEmail = email;
+            break;
+          }
+        }
+
+        if (membershipSecretaryEmail == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No Membership Secretary email is configured yet in the admin committee roles.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        final statusText = tierName == '1st Claim'
+            ? 'First Claim'
+            : tierName == '2nd Claim'
+            ? 'Second Claim'
+            : tierName;
+
+        final body =
+            'I intend to renew my club membership on a $statusText status. '
+            'May I therefore request to please raise an order through the UK Athletic to complete my registration and the payment required.';
+
+        final uri = Uri(
+          scheme: 'mailto',
+          path: membershipSecretaryEmail,
+          queryParameters: {'subject': 'Raise Membership Order', 'body': body},
         );
 
-        if (!paid) return;
-
-        // Optimistic update; in production prefer webhook confirmation
-        final updates = {
-          'membership_type': tierName,
-          if (_memberSince == null)
-            'member_since': DateTime.now().toIso8601String(),
-        };
-
-        final updated = await _client
-            .from('user_profiles')
-            .update(updates)
-            .eq('id', user.id)
-            .select()
-            .maybeSingle();
-
-        debugPrint('Membership update saved row: $updated');
-
-        setState(() {
-          _membershipType = tierName;
-          _memberSince ??= _formatMonthYear(DateTime.now().toIso8601String());
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Membership purchased: $tierName')),
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
         );
+
+        if (!launched && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open your email app.')),
+          );
+        }
       } catch (e) {
-        debugPrint('Error updating membership_type: $e');
+        debugPrint('Error requesting membership order: $e');
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+        ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
       }
     }();
   }

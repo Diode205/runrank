@@ -27,8 +27,22 @@ class _UserProfilePageState extends State<UserProfilePage> {
   DateTime? _dob;
   DateTime? _createdAt;
   String? _avatarUrl;
+  String? _emergencyContactName;
+  String? _emergencyContactNumber;
+  String? _emergencyContactRelation;
+  String? _medicalNotes;
+  bool _emergencyDetailsConsent = false;
 
   final ImagePicker _picker = ImagePicker();
+
+  static const _emergencyRelations = [
+    'Spouse',
+    'Parent',
+    'Friend',
+    'Child',
+    'Kin',
+    'Carer',
+  ];
 
   @override
   void initState() {
@@ -63,7 +77,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
             member_since,
             date_of_birth,
             avatar_url,
-            created_at
+            created_at,
+            emergency_contact_name,
+            emergency_contact_number,
+            emergency_contact_relation,
+            emergency_details_consent,
+            medical_notes
           ''')
           .eq('id', user.id)
           .limit(1);
@@ -85,6 +104,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _club = row['club'] as String?;
         _membershipType = row['membership_type'] as String?;
         _avatarUrl = row['avatar_url'] as String?;
+        _emergencyContactName = row['emergency_contact_name'] as String?;
+        _emergencyContactNumber = row['emergency_contact_number'] as String?;
+        _emergencyContactRelation =
+            row['emergency_contact_relation'] as String?;
+        _emergencyDetailsConsent = row['emergency_details_consent'] == true;
+        _medicalNotes = row['medical_notes'] as String?;
 
         final dobStr = row['date_of_birth'] as String?;
         if (dobStr != null && dobStr.isNotEmpty) {
@@ -218,9 +243,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Future<void> _showEditProfileSheet() async {
     final nameController = TextEditingController(text: _fullName ?? '');
-    final ukaController = TextEditingController(text: _ukaNumber ?? '');
+    final emergencyNameController = TextEditingController(
+      text: _emergencyContactName ?? '',
+    );
+    final emergencyNumberController = TextEditingController(
+      text: _emergencyContactNumber ?? '',
+    );
+    final medicalNotesController = TextEditingController(
+      text: _medicalNotes ?? '',
+    );
     String? selectedMembershipType = _membershipType;
     DateTime? selectedMemberSince = _memberSince;
+    String? selectedEmergencyRelation = _emergencyContactRelation;
+    var shareEmergencyDetails = _emergencyDetailsConsent;
+    var noMedicalIssue =
+        (_medicalNotes == null || _medicalNotes!.trim().isEmpty);
 
     const membershipOptions = [
       '1st Claim',
@@ -237,155 +274,320 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ),
       isScrollControlled: true,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(10),
+        return StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              ),
-              const Text(
-                'Edit profile',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Full name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ukaController,
-                decoration: const InputDecoration(labelText: 'UKA number'),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Membership type',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: selectedMembershipType,
-                items: membershipOptions
-                    .map(
-                      (type) => DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(type),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedMembershipType = value;
-                  });
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Select membership',
+                const Text(
+                  'Edit profile',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Member since',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedMemberSince ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      selectedMemberSince = picked;
-                    });
-                  }
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Member since date',
-                    border: OutlineInputBorder(),
-                  ),
-                  child: Text(
-                    selectedMemberSince != null
-                        ? '${selectedMemberSince!.day}/${selectedMemberSince!.month}/${selectedMemberSince!.year}'
-                        : 'Select date',
-                  ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Full name'),
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final user = _supabase.auth.currentUser;
-                    if (user == null) return;
-
-                    final newName = nameController.text.trim();
-                    final newUka = ukaController.text.trim();
-
-                    try {
-                      await _supabase
-                          .from('user_profiles')
-                          .update({
-                            'full_name': newName,
-                            'uka_number': newUka,
-                            'membership_type': selectedMembershipType,
-                            'member_since': selectedMemberSince
-                                ?.toIso8601String(),
-                          })
-                          .eq('id', user.id);
-
-                      setState(() {
-                        _fullName = newName;
-                        _ukaNumber = newUka;
-                        _membershipType = selectedMembershipType;
-                        _memberSince = selectedMemberSince;
-                      });
-
-                      if (!mounted) return;
-                      Navigator.pop(context);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Profile updated')),
-                      );
-                    } catch (e) {
-                      // ignore: avoid_print
-                      print('Error updating profile: $e');
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to update profile'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Membership type',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedMembershipType,
+                  items: membershipOptions
+                      .map(
+                        (type) => DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(type),
                         ),
-                      );
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setModalState(() {
+                      selectedMembershipType = value;
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Select membership',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Member since',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedMemberSince ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setModalState(() {
+                        selectedMemberSince = picked;
+                      });
                     }
                   },
-                  icon: const Icon(Icons.save),
-                  label: const Text('Save changes'),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Member since date',
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Text(
+                      selectedMemberSince != null
+                          ? '${selectedMemberSince!.day}/${selectedMemberSince!.month}/${selectedMemberSince!.year}'
+                          : 'Select date',
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Text(
+                  'Emergency contact',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: emergencyNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'ICE contact name',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emergencyNumberController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'ICE contact number',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedEmergencyRelation,
+                  items: _emergencyRelations
+                      .map(
+                        (relation) => DropdownMenuItem<String>(
+                          value: relation,
+                          child: Text(relation),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setModalState(() {
+                      selectedEmergencyRelation = value;
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Relationship'),
+                ),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: noMedicalIssue,
+                  onChanged: (value) {
+                    setModalState(() {
+                      noMedicalIssue = value ?? true;
+                      if (noMedicalIssue) {
+                        medicalNotesController.clear();
+                      }
+                    });
+                  },
+                  title: const Text('No medical issue to declare'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                if (!noMedicalIssue) ...[
+                  TextField(
+                    controller: medicalNotesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Medical issue affecting running or training',
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: shareEmergencyDetails,
+                  onChanged: (value) {
+                    setModalState(() {
+                      shareEmergencyDetails = value ?? false;
+                    });
+                  },
+                  title: const Text('Allow emergency access to these details'),
+                  subtitle: const Text(
+                    'Used by club admins and members in an emergency during training or racing.',
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final user = _supabase.auth.currentUser;
+                      if (user == null) return;
+
+                      final newName = nameController.text.trim();
+                      final newEmergencyName = emergencyNameController.text
+                          .trim();
+                      final newEmergencyNumber = emergencyNumberController.text
+                          .trim();
+                      final newMedicalNotes = medicalNotesController.text
+                          .trim();
+
+                      final hasAnyEmergencyInput =
+                          newEmergencyName.isNotEmpty ||
+                          newEmergencyNumber.isNotEmpty ||
+                          selectedEmergencyRelation != null ||
+                          shareEmergencyDetails;
+
+                      if (hasAnyEmergencyInput &&
+                          (newEmergencyName.isEmpty ||
+                              newEmergencyNumber.isEmpty ||
+                              selectedEmergencyRelation == null)) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please complete the emergency contact name, number and relationship',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (!noMedicalIssue && newMedicalNotes.isEmpty) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please enter the medical issue or choose none',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      try {
+                        await _supabase
+                            .from('user_profiles')
+                            .update({
+                              'full_name': newName,
+                              'membership_type': selectedMembershipType,
+                              'member_since': selectedMemberSince
+                                  ?.toIso8601String(),
+                              'emergency_contact_name': newEmergencyName.isEmpty
+                                  ? null
+                                  : newEmergencyName,
+                              'emergency_contact_number':
+                                  newEmergencyNumber.isEmpty
+                                  ? null
+                                  : newEmergencyNumber,
+                              'emergency_contact_relation':
+                                  selectedEmergencyRelation,
+                              'emergency_details_consent':
+                                  shareEmergencyDetails,
+                              'medical_notes': noMedicalIssue
+                                  ? null
+                                  : (newMedicalNotes.isEmpty
+                                        ? null
+                                        : newMedicalNotes),
+                            })
+                            .eq('id', user.id);
+
+                        setState(() {
+                          _fullName = newName;
+                          _membershipType = selectedMembershipType;
+                          _memberSince = selectedMemberSince;
+                          _emergencyContactName = newEmergencyName.isEmpty
+                              ? null
+                              : newEmergencyName;
+                          _emergencyContactNumber = newEmergencyNumber.isEmpty
+                              ? null
+                              : newEmergencyNumber;
+                          _emergencyContactRelation = selectedEmergencyRelation;
+                          _emergencyDetailsConsent = shareEmergencyDetails;
+                          _medicalNotes = noMedicalIssue
+                              ? null
+                              : (newMedicalNotes.isEmpty
+                                    ? null
+                                    : newMedicalNotes);
+                        });
+
+                        if (!mounted) return;
+                        Navigator.pop(context);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Profile updated')),
+                        );
+                      } catch (e) {
+                        // ignore: avoid_print
+                        print('Error updating profile: $e');
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to update profile'),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.save),
+                    label: const Text('Save changes'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  String _emergencyContactSummary() {
+    if (!_emergencyDetailsConsent ||
+        _emergencyContactName == null ||
+        _emergencyContactName!.trim().isEmpty ||
+        _emergencyContactNumber == null ||
+        _emergencyContactNumber!.trim().isEmpty) {
+      return 'Not shared';
+    }
+
+    final relation = _emergencyContactRelation?.trim();
+    final relationText = relation == null || relation.isEmpty
+        ? ''
+        : ' ($relation)';
+    return '${_emergencyContactName!}$relationText';
+  }
+
+  String _medicalSummary() {
+    if (!_emergencyDetailsConsent) {
+      return 'Not shared';
+    }
+    if (_medicalNotes == null || _medicalNotes!.trim().isEmpty) {
+      return 'None reported';
+    }
+    return 'Yes';
   }
 
   Widget _buildHexAvatar() {
@@ -577,6 +779,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         ),
                         const Divider(color: Colors.white24),
                         _buildInfoRow('UKA number', _ukaNumber ?? 'Not set'),
+                        const Divider(color: Colors.white24),
+                        _buildInfoRow(
+                          'ICE contact',
+                          _emergencyContactSummary(),
+                        ),
+                        const Divider(color: Colors.white24),
+                        _buildInfoRow('Medical', _medicalSummary()),
                         const Divider(color: Colors.white24),
                         _buildInfoRow('Club', _club ?? 'NNBR'),
                         const Divider(color: Colors.white24),

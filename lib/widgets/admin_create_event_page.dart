@@ -173,7 +173,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "Special Event",
     ];
 
-    socialTypes = ["Social Run", "Meet & Drink", "Swim or Cycle", "Others"];
+    socialTypes = ["Social Run", "Parkrun Tourism"];
 
     // Default NNBR race list; this may be overridden once we know the club.
     raceNames = ["Holt 10K", "Worstead 5M", "Chase The Train"];
@@ -636,6 +636,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           return "Special Event - ${suffix.trim()}";
         }
         return "Special Event";
+      case "Parkrun Tourism":
+        return "Parkrun Tourism";
       default:
         return selectedEventType;
     }
@@ -1054,13 +1056,16 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 "Event Details",
                 Builder(
                   builder: (context) {
-                    final matchingVenuePresets = selectedEventType == 'Training'
+                    final supportsSavedVenues =
+                        selectedEventType == 'Training' ||
+                        selectedEventType == 'Parkrun Tourism';
+                    final matchingVenuePresets = supportsSavedVenues
                         ? _matchingVenuePresets(venueCtrl.text)
                         : const <_SavedVenuePreset>[];
                     final selectedPreset =
                         _selectedVenuePresetForCurrentInput();
                     final showVenueSuggestions =
-                        selectedEventType == 'Training' &&
+                        supportsSavedVenues &&
                         matchingVenuePresets.isNotEmpty &&
                         selectedPreset == null;
 
@@ -1118,7 +1123,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           ),
                         TextFormField(
                           controller: venueCtrl,
-                          onChanged: selectedEventType == 'Training'
+                          onChanged: supportsSavedVenues
                               ? (_) => setState(() {
                                   _selectedSavedVenueId =
                                       _selectedVenuePresetForCurrentInput()?.id;
@@ -1188,7 +1193,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             ),
                           ],
                         ),
-                        if (selectedEventType == 'Training') ...[
+                        if (supportsSavedVenues) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
