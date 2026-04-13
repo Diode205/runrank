@@ -88,21 +88,21 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   };
 
   static const Map<String, _SavedVenuePreset> _crossCountryVenuePresets = {
-    'Broadland Country Park Race 1': _SavedVenuePreset(
-      venue: 'Broadland Country Park',
-      address: 'Horsford Norwich',
+    'Broadland Country Park XC Series 1': _SavedVenuePreset(
+      venue: 'Oakland Organic Egg Farm',
+      address: 'Sandy Ln, Horsford',
       latitude: '52.7108107164322',
       longitude: '1.2260404278394894',
     ),
-    'Broadland Country Park Race 2': _SavedVenuePreset(
-      venue: 'Broadland Country Park',
-      address: 'Horsford Norwich',
+    'Broadland Country Park XC Series 2': _SavedVenuePreset(
+      venue: 'Oakland Organic Egg Farm',
+      address: 'Sandy Ln, Horsford',
       latitude: '52.7108107164322',
       longitude: '1.2260404278394894',
     ),
-    'Broadland Country Park Race 3': _SavedVenuePreset(
-      venue: 'Broadland Country Park',
-      address: 'Horsford Norwich',
+    'Broadland Country Park XC Series 3': _SavedVenuePreset(
+      venue: 'Oakland Organic Egg Farm',
+      address: 'Sandy Ln, Horsford',
       latitude: '52.7108107164322',
       longitude: '1.2260404278394894',
     ),
@@ -205,7 +205,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       venueCtrl.text = widget.initialVenue!;
     }
     if (widget.initialRaceName != null) {
-      crossCountryRaceNameCtrl.text = widget.initialRaceName!;
+      if (selectedEventType == 'Race') {
+        selectedRace = widget.initialRaceName!;
+      } else {
+        crossCountryRaceNameCtrl.text = widget.initialRaceName!;
+      }
     }
     if (widget.initialVenueAddress != null) {
       venueAddressCtrl.text = widget.initialVenueAddress!;
@@ -264,9 +268,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   // NRR-specific Cross Country series races
   static const List<String> _nrrCrossCountryRaces = <String>[
-    'Broadland Country Park Race 1',
-    'Broadland Country Park Race 2',
-    'Broadland Country Park Race 3',
+    'Broadland Country Park XC Series 1',
+    'Broadland Country Park XC Series 2',
+    'Broadland Country Park XC Series 3',
   ];
 
   Future<void> _loadHosts() async {
@@ -318,7 +322,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           ];
 
           // NRR signature races for the Race dropdown.
-          raceNames = ["Royal Norwich HM", "Dinosaur Dash", "Wroxham 5K"];
+          raceNames = ["Wroxham 5K", "Dinosaur Dash"];
         } else {
           // Default (NNBR and other clubs).
           adminTypes = [

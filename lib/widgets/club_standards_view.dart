@@ -2081,6 +2081,274 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     return hasConsent && notes != null && notes.isNotEmpty;
   }
 
+  String _iceMemberName(Map<String, dynamic> user) {
+    final fullName = (user['full_name'] as String?)?.trim();
+    return (fullName != null && fullName.isNotEmpty) ? fullName : 'Member';
+  }
+
+  String _iceFieldValue(dynamic value, {String fallback = 'Not set'}) {
+    final text = (value as String?)?.trim();
+    return (text != null && text.isNotEmpty) ? text : fallback;
+  }
+
+  List<Map<String, dynamic>> _sortedIceMembers(
+    List<Map<String, dynamic>> rows,
+  ) {
+    final members = rows.where(_hasEmergencyPhone).toList();
+    members.sort(
+      (a, b) => _iceMemberName(
+        a,
+      ).toLowerCase().compareTo(_iceMemberName(b).toLowerCase()),
+    );
+    return members;
+  }
+
+  Stream<List<Map<String, dynamic>>> _adminIceMembersStream() {
+    final clubName = _clubName?.trim();
+    if (clubName == null || clubName.isEmpty) {
+      return Stream.value(const <Map<String, dynamic>>[]);
+    }
+
+    return Supabase.instance.client
+        .from('user_profiles')
+        .stream(primaryKey: ['id'])
+        .eq('club', clubName)
+        .map((rows) => List<Map<String, dynamic>>.from(rows));
+  }
+
+  String _buildIceFullListContent({
+    required List<Map<String, dynamic>> allMembers,
+    required List<Map<String, dynamic>> iceMembers,
+  }) {
+    final clubName = (_clubName?.trim().isNotEmpty ?? false)
+        ? _clubName!.trim()
+        : 'Current club';
+    final medicalAlerts = iceMembers.where(_hasMedicalAlert).length;
+    final lines = <String>[
+      'ICE Full List - $clubName',
+      'Generated: ${DateTime.now().toLocal()}',
+      'Total members: ${allMembers.length}',
+      'Members with consented ICE details: ${iceMembers.length}',
+      'Members with medical notes: $medicalAlerts',
+      '',
+    ];
+
+    if (iceMembers.isEmpty) {
+      lines.add('No consented ICE contacts found.');
+      return lines.join('\n');
+    }
+
+    for (var index = 0; index < iceMembers.length; index++) {
+      final user = iceMembers[index];
+      final medicalNotes = (user['medical_notes'] as String?)?.trim();
+      final medicalSummary = (medicalNotes != null && medicalNotes.isNotEmpty)
+          ? medicalNotes
+          : 'None';
+
+      lines
+        ..add('${index + 1}. ${_iceMemberName(user)}')
+        ..add(
+          '   ICE contact: ${_iceFieldValue(user['emergency_contact_name'])}',
+        )
+        ..add(
+          '   Relation: ${_iceFieldValue(user['emergency_contact_relation'])}',
+        )
+        ..add('   Phone: ${_iceFieldValue(user['emergency_contact_number'])}')
+        ..add('   Medical notes: $medicalSummary');
+
+      lines.add('');
+    }
+
+    return lines.join('\n');
+  }
+
+  Future<void> _showAdminIceFullListSheet() async {
+    final clubName = _clubName?.trim();
+    if (clubName == null || clubName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to determine your club.')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              media.viewInsets.bottom + 20,
+            ),
+            child: SizedBox(
+              height: media.size.height * 0.78,
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _adminIceMembersStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Unable to load ICE list: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    );
+                  }
+
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final allMembers = snapshot.data!;
+                  final iceMembers = _sortedIceMembers(allMembers);
+                  final exportText = _buildIceFullListContent(
+                    allMembers: allMembers,
+                    iceMembers: iceMembers,
+                  );
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'ICE Full List',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Expanded(
+                        child: iceMembers.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No consented ICE contacts found for this club.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: iceMembers.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                  color: Colors.white12,
+                                  height: 14,
+                                ),
+                                itemBuilder: (_, index) {
+                                  final user = iceMembers[index];
+                                  final medicalNotes =
+                                      (user['medical_notes'] as String?)
+                                          ?.trim();
+                                  final medicalSummary =
+                                      (medicalNotes != null &&
+                                          medicalNotes.isNotEmpty)
+                                      ? medicalNotes
+                                      : 'None';
+                                  return ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      _iceMemberName(user),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'ICE contact: ${_iceFieldValue(user['emergency_contact_name'])}\n'
+                                        'Relation: ${_iceFieldValue(user['emergency_contact_relation'])}\n'
+                                        'Phone: ${_iceFieldValue(user['emergency_contact_number'])}\n'
+                                        'Medical notes: $medicalSummary',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final navigator = Navigator.of(sheetContext);
+                                final messenger = ScaffoldMessenger.of(context);
+                                await Clipboard.setData(
+                                  ClipboardData(text: exportText),
+                                );
+                                if (navigator.canPop()) {
+                                  navigator.pop();
+                                }
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Copied ICE full list to clipboard.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.copy, size: 18),
+                              label: const Text('Copy'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.white38,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await _exportVaultReportAsPdf(
+                                  'ICE Full List',
+                                  exportText,
+                                );
+                              },
+                              icon: const Icon(Icons.picture_as_pdf, size: 18),
+                              label: const Text('Export PDF'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.white38,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _searchIceMembers(String term) async {
     final trimmed = term.trim();
     if (trimmed.length < 2) {
@@ -2386,6 +2654,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                 );
               },
             ),
+          if (_isAdmin) ...[
+            const SizedBox(height: 16),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: _showAdminIceFullListSheet,
+                icon: const Icon(Icons.list_alt),
+                label: const Text('View Full List'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white38),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -54,6 +54,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _medicalNotes;
   bool _emergencyDetailsConsent = false;
 
+  bool get _isNrrClub {
+    final club = (_club ?? '').trim().toLowerCase();
+    return club == 'nrr' || club.contains('norwich road runners');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -648,7 +653,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.flag,
-                  title: 'Signature & Handicap Races',
+                  title: _isNrrClub
+                      ? 'Signature Races'
+                      : 'Signature & Handicap Races',
                   subtitle: 'Management & Participations',
                   onTap: () {
                     Navigator.push(

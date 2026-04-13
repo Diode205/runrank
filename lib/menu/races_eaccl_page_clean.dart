@@ -14,8 +14,18 @@ class RacesEacclPage extends StatefulWidget {
 
 class _RacesEacclPageState extends State<RacesEacclPage> {
   bool _isAdmin = false;
+  String? _clubName;
+
+  bool get _isNrrClub {
+    final club = (_clubName ?? '').trim().toLowerCase();
+    return club == 'nrr' || club.contains('norwich road runners');
+  }
 
   final Map<String, String> _raceDates = {
+    'wroxham': 'TBD',
+    'broadland_1': 'TBD',
+    'broadland_2': 'TBD',
+    'broadland_3': 'TBD',
     'holt': '25 May 2026',
     'worstead': '25 July 2026',
     'chase': '2 Nov 2026',
@@ -40,13 +50,22 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
+    _clubName = await UserService.currentClubName();
     if (mounted) setState(() {});
   }
 
   Future<void> _loadSavedRaceData() async {
     final prefs = await SharedPreferences.getInstance();
     bool changed = false;
-    for (final key in ['holt', 'worstead', 'chase']) {
+    for (final key in [
+      'wroxham',
+      'broadland_1',
+      'broadland_2',
+      'broadland_3',
+      'holt',
+      'worstead',
+      'chase',
+    ]) {
       final saved = prefs.getString('signature_date_' + key);
       if (saved != null && saved.isNotEmpty) {
         _raceDates[key] = saved;
@@ -310,15 +329,29 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     );
   }
 
-  void _createSignatureEvent(_RaceInfo info) {
-    final initialDate = _parseDateLabel(info.date);
+  void _createSignatureEvent(
+    _RaceInfo info, {
+    String? seriesKey,
+    String? seriesLabel,
+  }) {
+    final initialDate = _parseDateLabel(
+      seriesKey != null ? (info.dateValues[seriesKey] ?? '') : info.date,
+    );
+    final initialRaceName = seriesLabel != null
+        ? '${info.title} $seriesLabel'
+        : info.initialRaceName;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AdminCreateEventPage(
           userRole: _isAdmin ? 'admin' : 'social',
-          initialEventType: 'Race',
+          initialEventType: info.eventType,
           initialDate: initialDate,
-          initialVenue: info.location,
+          initialVenue: info.venueName ?? info.location,
+          initialRaceName: initialRaceName,
+          initialVenueAddress: info.venueAddress,
+          initialLatitude: info.latitude,
+          initialLongitude: info.longitude,
         ),
       ),
     );
@@ -332,9 +365,12 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         backgroundColor: Colors.black,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          'Signature and Handicap Races',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          _isNrrClub ? 'Signature Races' : 'Signature and Handicap Races',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: Column(children: [Expanded(child: _raceCards())]),
@@ -342,59 +378,149 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
   }
 
   Widget _raceCards() {
-    final races = [
+    final nrrRaces = [
       _RaceInfo(
-        keyId: 'holt',
-        title: 'Holt 10K',
+        keyId: 'wroxham',
+        title: 'Wroxham 5K',
         overview:
-            'Fast, mostly flat mix of quiet roads and trail. Perfect for personal bests.',
-        location: "Gresham's School, Holt",
-        date: _raceDates['holt']!,
-        registration: 'Registration from 08:45',
-        raceStart: 'Race start 10:00',
-        specialNote: 'Part of Sportlink Grand Prix Series',
-        specialNoteUrl: 'https://www.sportlinkgp.run/',
-        ticketsUrl: 'https://totalracetiming.co.uk/race/596',
-        resultsUrl: 'https://totalracetiming.co.uk/result',
-        mapUrl: 'https://goo.gl/maps/7hhzQwfBWNtfySbU6',
-        facilities:
-            'Free parking (NR25 6EA) · Toilets · Prizes (age categories & teams) · First aid · Cake & refreshments · No bag drop/changing',
-      ),
-      _RaceInfo(
-        keyId: 'worstead',
-        title: 'Worstead 5 Miles',
-        overview:
-            'Summer evening race with festival vibes. Undulating rural roads on the Worstead Festival weekend.',
-        location: 'Worstead village square',
-        date: _raceDates['worstead']!,
-        registration: 'Numbers posted in advance',
+            'This is a fast course with partial road closure which will be highly competitive and a chance for any runner to get their 5k PB. Due to road closure there is a cut-off time of 50 minutes.',
+        location: 'Broadland High Orniston Academy, Wroxham',
+        date: _raceDates['wroxham']!,
+        registration:
+            'Numbers collection at Catton Parkrun, Sportlink, and Race HQ on the day.',
         raceStart: 'Race start 19:00',
         specialNote: 'Part of Sportlink Grand Prix Series',
         specialNoteUrl: 'https://www.sportlinkgp.run/',
-        ticketsUrl: 'https://totalracetiming.co.uk/race/594',
+        ticketsUrl: 'https://www.sportlinkgp.run/',
         resultsUrl: 'https://totalracetiming.co.uk/result',
-        mapUrl: 'https://goo.gl/maps/bAfXx4dkocZTWD8X6',
+        mapUrl:
+            'https://www.google.com/maps/search/?api=1&query=Broadland+High+Orniston+Academy,+Wroxham',
         facilities:
-            'Parking (festival car park, NR28 9SD) · Toilets (limited) · No changing facilities · Prizes (age group trophies) · First aid',
+            'Parking around the area · No buggies or dogs · No headphones (including bone conducting headphones) · Refreshments and ice creams available on the evening',
+        useClubColors: _isNrrClub,
+        eventType: 'Race',
+        initialRaceName: 'Wroxham 5K',
+        venueName: 'Broadland High Ormiston Academy',
+        venueAddress: 'Wroxham',
+        latitude: 52.71665374668599,
+        longitude: 1.4141447659842001,
       ),
       _RaceInfo(
-        keyId: 'chase',
-        title: 'Chase The Train',
+        keyId: 'broadland_xc',
+        title: 'Broadland Country Park XC',
         overview:
-            'Highly popular 8.9 miles scenic flat trail alongside the train tracks. Special train back for all runners.',
-        location: 'Aylsham → Wroxham (Bure Valley Railway)',
-        date: _raceDates['chase']!,
-        registration: 'Briefing 10:15',
-        raceStart: 'Race start 10:30',
+            'A series of three events in the picturesque Horsford Wood. Down and dirty races that offer plenty of thrills. Expect mud and obstacles!',
+        location: 'Oakland Organic Egg Farm, Sandy Ln, Horsford',
+        date: 'Series 1, 2 and 3',
+        registration: 'Series dates shown below',
+        raceStart: 'Start 09:30',
         specialNote: null,
         specialNoteUrl: null,
-        ticketsUrl: 'https://entries.sublimetiming.com/race/32',
-        resultsUrl: 'https://www.sublimetiming.com/results',
-        mapUrl: 'https://goo.gl/maps/mKE2PoEV1gM6yZC79',
+        ticketsUrl: '',
+        resultsUrl:
+            'https://norwichroadrunners.co.uk/broadland-country-park-xc',
+        mapUrl:
+            'https://www.google.com/maps/search/?api=1&query=Oakland+Organic+Egg+Farm,+Sandy+Ln,+Horsford',
         facilities:
-            'Bag drop via special train · Parking (limited at start) · Toilets (start & finish) · First aid · Very limited changing · No prizes/refreshments included',
+            'Cross-country terrain through Horsford Wood · Mud and obstacles expected · Parking on site as directed',
+        useClubColors: _isNrrClub,
+        eventType: 'Cross Country',
+        venueName: 'Oakland Organic Egg Farm',
+        venueAddress: 'Sandy Ln, Horsford',
+        latitude: 52.7108107164322,
+        longitude: 1.2260404278394894,
+        seriesDates: const [
+          _RaceSeriesDate(keyId: 'broadland_1', label: 'Series 1'),
+          _RaceSeriesDate(keyId: 'broadland_2', label: 'Series 2'),
+          _RaceSeriesDate(keyId: 'broadland_3', label: 'Series 3'),
+        ],
+        dateValues: {
+          'broadland_1': _raceDates['broadland_1']!,
+          'broadland_2': _raceDates['broadland_2']!,
+          'broadland_3': _raceDates['broadland_3']!,
+        },
+      ),
+      _RaceInfo(
+        keyId: 'dinosaur',
+        title: 'Dinosaur Dash',
+        overview:
+            'A summer evening of two races to be held at Roarr! Both races start and finish in the park and feature winding trails and roaring dinosaurs! Both courses are ideal for all abilities from fast, experienced runners to those just starting out.',
+        location: 'Roarr Adventure Park, Lenwade',
+        date: 'TBD',
+        registration: 'Race start 19:00',
+        raceStart: 'Start 19:00',
+        specialNote: null,
+        specialNoteUrl: null,
+        ticketsUrl: '',
+        resultsUrl: 'https://totalracetiming.co.uk/result',
+        mapUrl:
+            'https://www.google.com/maps/search/?api=1&query=Roarr+Adventure+Park,+Lenwade',
+        facilities: 'Ample parking in the park.',
+        useClubColors: _isNrrClub,
+        eventType: 'Race',
+        initialRaceName: 'Dinosaur Dash',
+        venueName: 'Roarr Adventure Park',
+        venueAddress: 'Lenwade',
+        latitude: 52.71297101786584,
+        longitude: 1.1201313893317326,
       ),
     ];
+
+    final races = _isNrrClub
+        ? nrrRaces
+        : [
+            _RaceInfo(
+              keyId: 'holt',
+              title: 'Holt 10K',
+              overview:
+                  'Fast, mostly flat mix of quiet roads and trail. Perfect for personal bests.',
+              location: "Gresham's School, Holt",
+              date: _raceDates['holt']!,
+              registration: 'Registration from 08:45',
+              raceStart: 'Race start 10:00',
+              specialNote: 'Part of Sportlink Grand Prix Series',
+              specialNoteUrl: 'https://www.sportlinkgp.run/',
+              ticketsUrl: 'https://www.sportlinkgp.run/',
+              resultsUrl: 'https://totalracetiming.co.uk/result',
+              mapUrl: 'https://goo.gl/maps/7hhzQwfBWNtfySbU6',
+              facilities:
+                  'Free parking (NR25 6EA) · Toilets · Prizes (age categories & teams) · First aid · Cake & refreshments · No bag drop/changing',
+            ),
+            _RaceInfo(
+              keyId: 'worstead',
+              title: 'Worstead 5 Miles',
+              overview:
+                  'Summer evening race with festival vibes. Undulating rural roads on the Worstead Festival weekend.',
+              location: 'Worstead village square',
+              date: _raceDates['worstead']!,
+              registration: 'Numbers posted in advance',
+              raceStart: 'Race start 19:00',
+              specialNote: 'Part of Sportlink Grand Prix Series',
+              specialNoteUrl: 'https://www.sportlinkgp.run/',
+              ticketsUrl: 'https://www.sportlinkgp.run/',
+              resultsUrl: 'https://totalracetiming.co.uk/result',
+              mapUrl: 'https://goo.gl/maps/bAfXx4dkocZTWD8X6',
+              facilities:
+                  'Parking (festival car park, NR28 9SD) · Toilets (limited) · No changing facilities · Prizes (age group trophies) · First aid',
+            ),
+            _RaceInfo(
+              keyId: 'chase',
+              title: 'Chase The Train',
+              overview:
+                  'Highly popular 8.9 miles scenic flat trail alongside the train tracks. Special train back for all runners.',
+              location: 'Aylsham → Wroxham (Bure Valley Railway)',
+              date: _raceDates['chase']!,
+              registration: 'Briefing 10:15',
+              raceStart: 'Race start 10:30',
+              specialNote: null,
+              specialNoteUrl: null,
+              ticketsUrl: 'https://entries.sublimetiming.com/race/32',
+              resultsUrl: 'https://www.sublimetiming.com/results',
+              mapUrl: 'https://goo.gl/maps/mKE2PoEV1gM6yZC79',
+              facilities:
+                  'Bag drop via special train · Parking (limited at start) · Toilets (start & finish) · First aid · Very limited changing · No prizes/refreshments included',
+            ),
+          ];
 
     final pages = <Widget>[
       for (final r in races)
@@ -404,21 +530,26 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
             info: r,
             isAdmin: _isAdmin,
             onEditDate: () => _editDate(r.keyId, r.title),
-            onPickDate: () => _pickDateForRace(r.keyId),
-            onCreateEvent: () => _createSignatureEvent(r),
+            onPickDate: _pickDateForRace,
+            onCreateEvent: ({seriesKey, seriesLabel}) => _createSignatureEvent(
+              r,
+              seriesKey: seriesKey,
+              seriesLabel: seriesLabel,
+            ),
             onOpen: _openLink,
           ),
         ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: _HandicapCard(
-          races: _handicapRaces,
-          isAdmin: _isAdmin,
-          onEditDate: _editHandicapDate,
-          onEditVenue: _editHandicapVenue,
-          onCreateEvent: _createEventFrom,
+      if (!_isNrrClub)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: _HandicapCard(
+            races: _handicapRaces,
+            isAdmin: _isAdmin,
+            onEditDate: _editHandicapDate,
+            onEditVenue: _editHandicapVenue,
+            onCreateEvent: _createEventFrom,
+          ),
         ),
-      ),
     ];
 
     return PageView.builder(
@@ -443,6 +574,15 @@ class _RaceInfo {
   final String resultsUrl;
   final String mapUrl;
   final String facilities;
+  final bool useClubColors;
+  final String eventType;
+  final String? initialRaceName;
+  final String? venueName;
+  final String? venueAddress;
+  final double? latitude;
+  final double? longitude;
+  final List<_RaceSeriesDate> seriesDates;
+  final Map<String, String> dateValues;
 
   _RaceInfo({
     required this.keyId,
@@ -458,7 +598,23 @@ class _RaceInfo {
     required this.resultsUrl,
     required this.mapUrl,
     required this.facilities,
+    this.useClubColors = false,
+    this.eventType = 'Race',
+    this.initialRaceName,
+    this.venueName,
+    this.venueAddress,
+    this.latitude,
+    this.longitude,
+    this.seriesDates = const [],
+    this.dateValues = const {},
   });
+}
+
+class _RaceSeriesDate {
+  final String keyId;
+  final String label;
+
+  const _RaceSeriesDate({required this.keyId, required this.label});
 }
 
 class _HandicapRace {
@@ -1196,8 +1352,8 @@ class _RaceCard extends StatelessWidget {
   final _RaceInfo info;
   final bool isAdmin;
   final VoidCallback onEditDate;
-  final VoidCallback? onPickDate;
-  final VoidCallback? onCreateEvent;
+  final void Function(String keyId)? onPickDate;
+  final void Function({String? seriesKey, String? seriesLabel})? onCreateEvent;
   final Future<void> Function(String url) onOpen;
 
   const _RaceCard({
@@ -1211,16 +1367,40 @@ class _RaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final useClubColors = info.useClubColors;
+    final hasSeriesDates = info.seriesDates.isNotEmpty;
+    final cardGradient = useClubColors
+        ? const [Color(0xFF161A21), Color(0xFF0D1016)]
+        : const [Color(0xFF141A24), Color(0xFF0D0F18)];
+    final borderColor = useClubColors
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF1F2A3A);
+    final detailBorderColor = useClubColors
+        ? const Color(0x52FFFFFF)
+        : Colors.white12;
+    final detailSurfaceColor = useClubColors
+        ? const Color(0xFF11151C)
+        : Colors.white.withOpacity(0.04);
+    final accentColor = useClubColors
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFFFFD700);
+    final specialNoteGradient = useClubColors
+        ? const [Color(0xFF1A1E26), Color(0xFF11141B)]
+        : const [Color(0xFF1E3A5F), Color(0xFF0F1E3A)];
+    final specialNoteColor = useClubColors
+        ? Colors.white
+        : const Color(0xFF4A90E2);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
+        gradient: LinearGradient(
+          colors: cardGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: const Color(0xFF1F2A3A), width: 1),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.35),
@@ -1287,41 +1467,102 @@ class _RaceCard extends StatelessWidget {
             ),
             if (info.keyId != 'eaccl') ...[
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  if (isAdmin && onPickDate != null) ...[
-                    IconButton(
-                      onPressed: onPickDate,
-                      icon: const Icon(
-                        Icons.calendar_month,
-                        color: Color(0xFFFFD700),
+              if (hasSeriesDates)
+                Column(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < info.seriesDates.length;
+                      index++
+                    )
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            if (isAdmin && onPickDate != null) ...[
+                              IconButton(
+                                onPressed: () =>
+                                    onPickDate!(info.seriesDates[index].keyId),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 28,
+                                  height: 28,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.calendar_month,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
+                                tooltip:
+                                    'Pick ${info.seriesDates[index].label} date',
+                              ),
+                            ] else ...[
+                              Icon(Icons.event, color: accentColor, size: 18),
+                            ],
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${info.seriesDates[index].label}: ${info.dateValues[info.seriesDates[index].keyId] ?? 'TBD'}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (isAdmin && onCreateEvent != null)
+                              IconButton(
+                                onPressed: () => onCreateEvent!(
+                                  seriesKey: info.seriesDates[index].keyId,
+                                  seriesLabel: info.seriesDates[index].label,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 28,
+                                  height: 28,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Create Event',
+                                icon: Icon(
+                                  Icons.add_box_outlined,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                      tooltip: 'Pick race date',
-                    ),
-                  ] else ...[
-                    const Icon(Icons.event, color: Color(0xFFFFD700), size: 20),
                   ],
-                  const SizedBox(width: 8),
-                  Text(
-                    info.date,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  // Keep Create Event on the right for admins (icon-only)
-                  if (isAdmin && onCreateEvent != null)
-                    IconButton(
-                      onPressed: onCreateEvent,
-                      tooltip: 'Create Event',
-                      icon: const Icon(
-                        Icons.add_box_outlined,
-                        color: Color(0xFFFFD700),
+                )
+              else
+                Row(
+                  children: [
+                    if (isAdmin && onPickDate != null) ...[
+                      IconButton(
+                        onPressed: () => onPickDate!(info.keyId),
+                        icon: Icon(Icons.calendar_month, color: accentColor),
+                        tooltip: 'Pick race date',
+                      ),
+                    ] else ...[
+                      Icon(Icons.event, color: accentColor, size: 20),
+                    ],
+                    const SizedBox(width: 8),
+                    Text(
+                      info.date,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                ],
-              ),
+                    const Spacer(),
+                    if (isAdmin && onCreateEvent != null)
+                      IconButton(
+                        onPressed: () => onCreateEvent!(),
+                        tooltip: 'Create Event',
+                        icon: Icon(Icons.add_box_outlined, color: accentColor),
+                      ),
+                  ],
+                ),
               const SizedBox(height: 12),
               // Photo placed below date, slightly zoomed and smaller
               ClipRRect(
@@ -1356,9 +1597,9 @@ class _RaceCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
+                  color: detailSurfaceColor,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: detailBorderColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1386,36 +1627,31 @@ class _RaceCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1E3A5F), Color(0xFF0F1E3A)],
-                    ),
+                    gradient: LinearGradient(colors: specialNoteGradient),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFF4A90E2),
-                      width: 1,
-                    ),
+                    border: Border.all(color: specialNoteColor, width: 1),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.emoji_events,
-                        color: Color(0xFF4A90E2),
+                        color: specialNoteColor,
                         size: 18,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           info.specialNote!,
-                          style: const TextStyle(
-                            color: Color(0xFF4A90E2),
+                          style: TextStyle(
+                            color: specialNoteColor,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                       if (info.specialNoteUrl != null)
-                        const Icon(
+                        Icon(
                           Icons.open_in_new,
-                          color: Color(0xFF4A90E2),
+                          color: specialNoteColor,
                           size: 16,
                         ),
                     ],
@@ -1436,9 +1672,9 @@ class _RaceCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
+                color: detailSurfaceColor,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: detailBorderColor),
               ),
               child: Text(
                 info.facilities,
@@ -1453,8 +1689,10 @@ class _RaceCard extends StatelessWidget {
                     label: 'Results',
                     icon: Icons.emoji_events,
                     onPressed: () => onOpen(info.resultsUrl),
-                    color: const Color(0xFFFFD700),
-                    textColor: Colors.black,
+                    color: useClubColors
+                        ? const Color(0xFFD32F2F)
+                        : const Color(0xFFFFD700),
+                    textColor: useClubColors ? Colors.white : Colors.black,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1463,7 +1701,9 @@ class _RaceCard extends StatelessWidget {
                     label: 'Drive',
                     icon: Icons.map,
                     onPressed: () => onOpen(info.mapUrl),
-                    color: const Color(0xFF1E88E5),
+                    color: useClubColors
+                        ? const Color(0xFF232830)
+                        : const Color(0xFF1E88E5),
                   ),
                 ),
               ],
@@ -1476,6 +1716,12 @@ class _RaceCard extends StatelessWidget {
 
   String _imageForRace(String keyId) {
     switch (keyId) {
+      case 'wroxham':
+        return 'assets/images/wroxham5.png';
+      case 'broadland_xc':
+        return 'assets/images/broadlandxc.png';
+      case 'dinosaur':
+        return 'assets/images/dinodash.png';
       case 'holt':
         return 'assets/images/holt10.png';
       case 'worstead':
