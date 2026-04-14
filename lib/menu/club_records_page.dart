@@ -168,6 +168,9 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
 
   Widget _buildAdminButtons() {
     final colorScheme = Theme.of(context).colorScheme;
+    final syncForegroundColor = colorScheme.secondary.computeLuminance() > 0.6
+        ? Colors.black
+        : Colors.white;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -223,7 +226,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
               label: const Text('Sync from Race Results'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: colorScheme.secondary,
-                foregroundColor: Colors.white,
+                foregroundColor: syncForegroundColor,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,

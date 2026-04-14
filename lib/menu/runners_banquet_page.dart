@@ -583,7 +583,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                   label: const Text('Save settings'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeBlue,
-                    foregroundColor: Colors.white,
+                    foregroundColor: themeBlue.computeLuminance() > 0.6
+                        ? Colors.black
+                        : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -1001,7 +1003,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     backgroundColor: themeBlue,
-                    foregroundColor: Colors.white,
+                    foregroundColor: themeBlue.computeLuminance() > 0.6
+                        ? Colors.black
+                        : Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

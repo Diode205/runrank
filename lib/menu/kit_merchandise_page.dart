@@ -590,10 +590,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
               const SizedBox(height: 4),
               const Text(
                 'Review your items, then tap Send Order to email the kit secretary.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const SizedBox(height: 12),
               Flexible(
