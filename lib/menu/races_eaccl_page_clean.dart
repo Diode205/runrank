@@ -15,6 +15,7 @@ class RacesEacclPage extends StatefulWidget {
 class _RacesEacclPageState extends State<RacesEacclPage> {
   bool _isAdmin = false;
   String? _clubName;
+  bool _clubResolved = false;
 
   bool get _isNrrClub {
     final club = (_clubName ?? '').trim().toLowerCase();
@@ -26,6 +27,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     'broadland_1': 'TBD',
     'broadland_2': 'TBD',
     'broadland_3': 'TBD',
+    'dinosaur': 'TBD',
     'holt': '25 May 2026',
     'worstead': '25 July 2026',
     'chase': '2 Nov 2026',
@@ -45,13 +47,18 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     super.initState();
     _loadAdmin();
     _loadSavedRaceData();
+    _loadRemoteSignatureDates();
     _loadSavedHandicapData();
   }
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
     _clubName = await UserService.currentClubName();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _clubResolved = true;
+      });
+    }
   }
 
   Future<void> _loadSavedRaceData() async {
@@ -62,14 +69,19 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
       'broadland_1',
       'broadland_2',
       'broadland_3',
+      'dinosaur',
       'holt',
       'worstead',
       'chase',
     ]) {
       final saved = prefs.getString('signature_date_' + key);
       if (saved != null && saved.isNotEmpty) {
-        _raceDates[key] = saved;
+        final trimmed = saved.trim();
+        _raceDates[key] = trimmed;
         changed = true;
+        // Ensure any locally stored dates are also synced to Supabase
+        // so other devices and non-admin users can see them.
+        _saveSignatureDateRemote(key, trimmed);
       }
     }
     if (changed && mounted) setState(() {});
@@ -77,7 +89,64 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
 
   Future<void> _saveSignatureDate(String key) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('signature_date_' + key, _raceDates[key] ?? '');
+    final value = _raceDates[key] ?? '';
+    await prefs.setString('signature_date_' + key, value);
+    _saveSignatureDateRemote(key, value);
+  }
+
+  // Load admin-entered signature race dates from Supabase so
+  // all users/devices share the same values.
+  Future<void> _loadRemoteSignatureDates() async {
+    try {
+      final client = Supabase.instance.client;
+      final keys = [
+        'wroxham',
+        'broadland_1',
+        'broadland_2',
+        'broadland_3',
+        'dinosaur',
+        'holt',
+        'worstead',
+        'chase',
+      ];
+
+      final response = await client
+          .from('handicap_top3')
+          .select('race_id, date_label');
+
+      bool changed = false;
+      for (final row in response as List<dynamic>) {
+        final map = row as Map<String, dynamic>;
+        final key = map['race_id'] as String?;
+        final label = map['date_label'] as String?;
+        if (key == null || label == null) continue;
+        if (!keys.contains(key)) continue;
+        final trimmed = label.trim();
+        if (trimmed.isEmpty) continue;
+        if (_raceDates[key] != trimmed) {
+          _raceDates[key] = trimmed;
+          changed = true;
+          // Cache remotely loaded value locally for offline use.
+          _saveSignatureDate(key);
+        }
+      }
+      if (changed && mounted) setState(() {});
+    } catch (_) {
+      // Ignore remote failures; local prefs will still be used.
+    }
+  }
+
+  // Save signature race dates to Supabase so non-admin users
+  // and other devices see the admin-configured dates.
+  Future<void> _saveSignatureDateRemote(String key, String value) async {
+    try {
+      await Supabase.instance.client.from('handicap_top3').upsert({
+        'race_id': key,
+        'date_label': value.isNotEmpty ? value : null,
+      });
+    } catch (_) {
+      // Ignore remote write errors; local persistence still applies.
+    }
   }
 
   Future<void> _loadSavedHandicapData() async {
@@ -359,6 +428,28 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_clubResolved) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          centerTitle: true,
+          title: const Text(
+            'Races',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: const Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -446,7 +537,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         overview:
             'A summer evening of two races to be held at Roarr! Both races start and finish in the park and feature winding trails and roaring dinosaurs! Both courses are ideal for all abilities from fast, experienced runners to those just starting out.',
         location: 'Roarr Adventure Park, Lenwade',
-        date: 'TBD',
+        date: _raceDates['dinosaur']!,
         registration: 'Race start 19:00',
         raceStart: 'Start 19:00',
         specialNote: null,
@@ -525,7 +616,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     final pages = <Widget>[
       for (final r in races)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 24),
           child: _RaceCard(
             info: r,
             isAdmin: _isAdmin,
@@ -541,7 +632,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         ),
       if (!_isNrrClub)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
           child: _HandicapCard(
             races: _handicapRaces,
             isAdmin: _isAdmin,
@@ -554,7 +645,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
 
     return PageView.builder(
       itemCount: pages.length,
-      controller: PageController(viewportFraction: 0.92),
+      controller: PageController(viewportFraction: 0.94),
       itemBuilder: (context, index) => pages[index],
     );
   }
@@ -1372,9 +1463,9 @@ class _RaceCard extends StatelessWidget {
     final cardGradient = useClubColors
         ? const [Color(0xFF161A21), Color(0xFF0D1016)]
         : const [Color(0xFF141A24), Color(0xFF0D0F18)];
-    final borderColor = useClubColors
-        ? const Color(0xFFD32F2F)
-        : const Color(0xFF1F2A3A);
+    // Use a neutral border for the outer card so that
+    // NRR race pages match the NNBR race styling.
+    const borderColor = Color(0xFF1F2A3A);
     final detailBorderColor = useClubColors
         ? const Color(0x52FFFFFF)
         : Colors.white12;
@@ -1392,7 +1483,7 @@ class _RaceCard extends StatelessWidget {
         : const Color(0xFF4A90E2);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
@@ -1404,312 +1495,305 @@ class _RaceCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Column(
-          crossAxisAlignment: info.keyId == 'eaccl'
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: info.keyId == 'eaccl'
-                        ? CrossAxisAlignment.center
-                        : CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        info.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        textAlign: info.keyId == 'eaccl'
-                            ? TextAlign.center
-                            : null,
-                      ),
-                      if (info.keyId == 'eaccl') ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          info.location,
-                          style: const TextStyle(
-                            color: Color(0xFF56D3FF),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        info.overview,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.5,
-                          fontSize: 14,
-                        ),
-                        textAlign: info.keyId == 'eaccl'
-                            ? TextAlign.center
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-                // Per latest request, no edit icons on title row
-              ],
-            ),
-            if (info.keyId != 'eaccl') ...[
-              const SizedBox(height: 18),
-              if (hasSeriesDates)
-                Column(
+      child: Column(
+        crossAxisAlignment: info.keyId == 'eaccl'
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: info.keyId == 'eaccl'
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
                   children: [
-                    for (
-                      var index = 0;
-                      index < info.seriesDates.length;
-                      index++
-                    )
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          children: [
-                            if (isAdmin && onPickDate != null) ...[
-                              IconButton(
-                                onPressed: () =>
-                                    onPickDate!(info.seriesDates[index].keyId),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 28,
-                                  height: 28,
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                icon: Icon(
-                                  Icons.calendar_month,
-                                  color: accentColor,
-                                  size: 18,
-                                ),
-                                tooltip:
-                                    'Pick ${info.seriesDates[index].label} date',
-                              ),
-                            ] else ...[
-                              Icon(Icons.event, color: accentColor, size: 18),
-                            ],
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${info.seriesDates[index].label}: ${info.dateValues[info.seriesDates[index].keyId] ?? 'TBD'}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (isAdmin && onCreateEvent != null)
-                              IconButton(
-                                onPressed: () => onCreateEvent!(
-                                  seriesKey: info.seriesDates[index].keyId,
-                                  seriesLabel: info.seriesDates[index].label,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 28,
-                                  height: 28,
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                tooltip: 'Create Event',
-                                icon: Icon(
-                                  Icons.add_box_outlined,
-                                  color: accentColor,
-                                  size: 18,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    if (isAdmin && onPickDate != null) ...[
-                      IconButton(
-                        onPressed: () => onPickDate!(info.keyId),
-                        icon: Icon(Icons.calendar_month, color: accentColor),
-                        tooltip: 'Pick race date',
-                      ),
-                    ] else ...[
-                      Icon(Icons.event, color: accentColor, size: 20),
-                    ],
-                    const SizedBox(width: 8),
                     Text(
-                      info.date,
+                      info.title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
                       ),
+                      textAlign: info.keyId == 'eaccl'
+                          ? TextAlign.center
+                          : null,
                     ),
-                    const Spacer(),
-                    if (isAdmin && onCreateEvent != null)
-                      IconButton(
-                        onPressed: () => onCreateEvent!(),
-                        tooltip: 'Create Event',
-                        icon: Icon(Icons.add_box_outlined, color: accentColor),
-                      ),
-                  ],
-                ),
-              const SizedBox(height: 12),
-              // Photo placed below date, slightly zoomed and smaller
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 140,
-                  width: double.infinity,
-                  child: Stack(
-                    children: [
-                      Transform.scale(
-                        scale: 1.07,
-                        child: Image.asset(
-                          _imageForRace(info.keyId),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.transparent, Colors.black54],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
+                    if (info.keyId == 'eaccl') ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        info.location,
+                        style: const TextStyle(
+                          color: Color(0xFF56D3FF),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      info.overview,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.4,
+                        fontSize: 14,
+                      ),
+                      textAlign: info.keyId == 'eaccl'
+                          ? TextAlign.center
+                          : null,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
-              // Race Info box (Venue, Registration, Start)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: detailSurfaceColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: detailBorderColor),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Per latest request, no edit icons on title row
+            ],
+          ),
+          if (info.keyId != 'eaccl') ...[
+            const SizedBox(height: 12),
+            if (hasSeriesDates)
+              Column(
+                children: [
+                  for (var index = 0; index < info.seriesDates.length; index++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          if (isAdmin && onPickDate != null) ...[
+                            IconButton(
+                              onPressed: () =>
+                                  onPickDate!(info.seriesDates[index].keyId),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 28,
+                                height: 28,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                Icons.calendar_month,
+                                color: accentColor,
+                                size: 18,
+                              ),
+                              tooltip:
+                                  'Pick ${info.seriesDates[index].label} date',
+                            ),
+                          ] else ...[
+                            Icon(Icons.event, color: accentColor, size: 18),
+                          ],
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${info.seriesDates[index].label}: ${info.dateValues[info.seriesDates[index].keyId] ?? 'TBD'}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          if (isAdmin && onCreateEvent != null)
+                            IconButton(
+                              onPressed: () => onCreateEvent!(
+                                seriesKey: info.seriesDates[index].keyId,
+                                seriesLabel: info.seriesDates[index].label,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 28,
+                                height: 28,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Create Event',
+                              icon: Icon(
+                                Icons.add_box_outlined,
+                                color: accentColor,
+                                size: 18,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  if (isAdmin && onPickDate != null) ...[
+                    IconButton(
+                      onPressed: () => onPickDate!(info.keyId),
+                      icon: Icon(Icons.calendar_month, color: accentColor),
+                      tooltip: 'Pick race date',
+                    ),
+                  ] else ...[
+                    Icon(Icons.event, color: accentColor, size: 20),
+                  ],
+                  const SizedBox(width: 8),
+                  Text(
+                    info.date,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (isAdmin && onCreateEvent != null)
+                    IconButton(
+                      onPressed: () => onCreateEvent!(),
+                      tooltip: 'Create Event',
+                      icon: Icon(Icons.add_box_outlined, color: accentColor),
+                    ),
+                ],
+              ),
+            const SizedBox(height: 6),
+            // Photo placed below date, slightly zoomed and smaller
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 150,
+                width: double.infinity,
+                child: Stack(
                   children: [
-                    _InfoRow(icon: Icons.place, text: info.location),
-                    const SizedBox(height: 8),
-                    _InfoRow(
-                      icon: Icons.assignment_ind,
-                      text: info.registration,
+                    Transform.scale(
+                      scale: 1.1,
+                      child: Image.asset(
+                        _imageForRace(info.keyId),
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    _InfoRow(icon: Icons.flag_circle, text: info.raceStart),
+                    Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.transparent, Colors.black54],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            const SizedBox(height: 14),
-            if (info.specialNote != null) ...[
-              const SizedBox(height: 14),
-              GestureDetector(
-                onTap: info.specialNoteUrl != null
-                    ? () => onOpen(info.specialNoteUrl!)
-                    : null,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: specialNoteGradient),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: specialNoteColor, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.emoji_events,
-                        color: specialNoteColor,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          info.specialNote!,
-                          style: TextStyle(
-                            color: specialNoteColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (info.specialNoteUrl != null)
-                        Icon(
-                          Icons.open_in_new,
-                          color: specialNoteColor,
-                          size: 16,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Text(
-              'Facilities',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.2,
               ),
             ),
             const SizedBox(height: 10),
+            // Race Info box (Venue, Registration, Start)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: detailSurfaceColor,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: detailBorderColor),
               ),
-              child: Text(
-                info.facilities,
-                style: const TextStyle(color: Colors.white70, height: 1.6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _InfoRow(icon: Icons.place, text: info.location),
+                  const SizedBox(height: 6),
+                  _InfoRow(icon: Icons.assignment_ind, text: info.registration),
+                  const SizedBox(height: 6),
+                  _InfoRow(icon: Icons.flag_circle, text: info.raceStart),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Results',
-                    icon: Icons.emoji_events,
-                    onPressed: () => onOpen(info.resultsUrl),
-                    color: useClubColors
-                        ? const Color(0xFFD32F2F)
-                        : const Color(0xFFFFD700),
-                    textColor: useClubColors ? Colors.white : Colors.black,
-                  ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 6),
+          if (info.specialNote != null) ...[
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: info.specialNoteUrl != null
+                  ? () => onOpen(info.specialNoteUrl!)
+                  : null,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: specialNoteGradient),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: specialNoteColor, width: 1),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Drive',
-                    icon: Icons.map,
-                    onPressed: () => onOpen(info.mapUrl),
-                    color: useClubColors
-                        ? const Color(0xFF232830)
-                        : const Color(0xFF1E88E5),
-                  ),
+                child: Row(
+                  children: [
+                    Icon(Icons.emoji_events, color: specialNoteColor, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        info.specialNote!,
+                        style: TextStyle(
+                          color: specialNoteColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (info.specialNoteUrl != null)
+                      Icon(
+                        Icons.open_in_new,
+                        color: specialNoteColor,
+                        size: 16,
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
-        ),
+          const SizedBox(height: 8),
+          Text(
+            'Facilities',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.2,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: detailSurfaceColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: detailBorderColor),
+            ),
+            child: Text(
+              info.facilities,
+              style: const TextStyle(
+                color: Colors.white70,
+                height: 1.4,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  label: 'Results',
+                  icon: Icons.emoji_events,
+                  onPressed: () => onOpen(info.resultsUrl),
+                  color: useClubColors
+                      ? const Color(0xFFD32F2F)
+                      : const Color(0xFFFFD700),
+                  textColor: useClubColors ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ActionButton(
+                  label: 'Drive',
+                  icon: Icons.map,
+                  onPressed: () => onOpen(info.mapUrl),
+                  color: useClubColors
+                      ? const Color(0xFF232830)
+                      : const Color(0xFF1E88E5),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1758,7 +1842,7 @@ class _ActionButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: textColor,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -1780,7 +1864,7 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
           ),
         ),
       ],

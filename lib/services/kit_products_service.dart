@@ -2,7 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class KitProduct {
   final String id;
-  final String category; // 'male', 'female', 'hoodie'
+  final String
+  category; // e.g. 'male', 'female', 'hoodie', 'race', 'training', 'leisure'
   final String productName;
   final double price;
   final String stripeUrl;
@@ -33,6 +34,7 @@ class KitProduct {
         'L': json['stock_l'] as int? ?? 0,
         'XL': json['stock_xl'] as int? ?? 0,
         'XXL': json['stock_xxl'] as int? ?? 0,
+        'OS': json['stock_os'] as int? ?? 0,
       },
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'].toString())
@@ -52,6 +54,7 @@ class KitProduct {
       'stock_l': stock['L'] ?? 0,
       'stock_xl': stock['XL'] ?? 0,
       'stock_xxl': stock['XXL'] ?? 0,
+      'stock_os': stock['OS'] ?? 0,
     };
   }
 }
@@ -114,6 +117,7 @@ class KitProductsService {
         'stock_l': stock['L'] ?? 0,
         'stock_xl': stock['XL'] ?? 0,
         'stock_xxl': stock['XXL'] ?? 0,
+        'stock_os': stock['OS'] ?? 0,
       };
 
       if (price != null) {
