@@ -3,7 +3,8 @@ import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
@@ -278,7 +279,7 @@ class _RnrPageState extends State<_RnrPage> {
                       end: Alignment.bottomRight,
                     ),
                     border: Border.all(
-                      color: const Color(0xFFFFD700),
+                      color: const Color(0xFFD32F2F),
                       width: 1,
                     ),
                   ),
@@ -312,7 +313,7 @@ class _RnrPageState extends State<_RnrPage> {
                               onPressed: _createEvent,
                               icon: const Icon(
                                 Icons.add_circle_outline,
-                                color: Color(0xFFFFD700),
+                                color: Color(0xFFD32F2F),
                               ),
                             )
                           else
@@ -323,7 +324,7 @@ class _RnrPageState extends State<_RnrPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                              style: const TextStyle(color: Color(0xFFD32F2F)),
                             ),
                           ),
                         ],
@@ -339,20 +340,38 @@ class _RnrPageState extends State<_RnrPage> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      // Blue link button, centered label
+                      // Visit site button with NRR red/white blended gradient
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () =>
-                              _openLink('https://theroundnorfolkrelay.com/'),
-                          icon: const Icon(Icons.open_in_new, size: 18),
-                          label: const Text('Visit The RNR Site'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF56D3FF),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              // Match UserService.clubBrandGradient for NRR
+                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                _openLink('https://theroundnorfolkrelay.com/'),
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            label: const Text(
+                              'Visit The RNR Site',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
@@ -372,7 +391,7 @@ class _RnrPageState extends State<_RnrPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E406A),
+                          backgroundColor: const Color(0xFFD32F2F),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -398,7 +417,7 @@ class _RnrPageState extends State<_RnrPage> {
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFD700),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -637,7 +656,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                 child: Text(
                   'Ipswich JAFFA Ekiden Relay',
                   style: const TextStyle(
-                    color: Color(0xFFFFD700),
+                    color: Color(0xFFD32F2F),
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     shadows: [
@@ -669,7 +688,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                       end: Alignment.bottomRight,
                     ),
                     border: Border.all(
-                      color: const Color(0xFFFFD700),
+                      color: const Color(0xFFD32F2F),
                       width: 1,
                     ),
                   ),
@@ -693,7 +712,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                               onPressed: _createEvent,
                               icon: const Icon(
                                 Icons.add_circle_outline,
-                                color: Color(0xFFFFD700),
+                                color: Color(0xFFD32F2F),
                               ),
                             )
                           else
@@ -704,7 +723,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                              style: const TextStyle(color: Color(0xFFD32F2F)),
                             ),
                           ),
                         ],
@@ -722,17 +741,34 @@ class _EkidenPageState extends State<_EkidenPage> {
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () =>
-                              _openLink('https://www.ipswichekiden.co.uk/'),
-                          icon: const Icon(Icons.open_in_new, size: 18),
-                          label: const Text('Visit Ipswich JAFFA Ekiden Relay'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF56D3FF),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                _openLink('https://www.ipswichekiden.co.uk/'),
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            label: const Text(
+                              'Visit Ipswich JAFFA Ekiden Relay',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
@@ -756,11 +792,11 @@ class _EkidenPageState extends State<_EkidenPage> {
                             _openLink('https://portal.ipswichekiden.co.uk/'),
                         icon: const Icon(
                           Icons.group_add,
-                          color: Color(0xFF56D3FF),
+                          color: Color(0xFFD32F2F),
                         ),
                         label: const Text(
                           'Register your team',
-                          style: TextStyle(color: Color(0xFF56D3FF)),
+                          style: TextStyle(color: Color(0xFFD32F2F)),
                         ),
                       ),
                     ],
@@ -777,7 +813,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E406A),
+                          backgroundColor: const Color(0xFFD32F2F),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -795,7 +831,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                         icon: const Icon(Icons.directions, size: 18),
                         label: const Text('Drive To'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD700),
+                          backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -829,11 +865,68 @@ class _EacclPageState extends State<_EacclPage> {
   void initState() {
     super.initState();
     _loadAdmin();
+    _loadRaceOverrides();
   }
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadRaceOverrides() async {
+    // Try Supabase first; fall back to local storage if unavailable
+    try {
+      final rows = await Supabase.instance.client
+          .from('handicap_top3')
+          .select('race_id, date_label, venue');
+
+      for (final row in rows) {
+        final id = (row['race_id'] as String?) ?? '';
+        if (id.isEmpty) continue;
+
+        final dateLabel = (row['date_label'] as String?)?.trim();
+        final venue = (row['venue'] as String?)?.trim();
+        if ((dateLabel == null || dateLabel.isEmpty) &&
+            (venue == null || venue.isEmpty)) {
+          continue;
+        }
+
+        for (final r in _races) {
+          if (r.id == id) {
+            if (dateLabel != null && dateLabel.isNotEmpty) {
+              r.date = dateLabel;
+            }
+            if (venue != null && venue.isNotEmpty) {
+              r.venue = venue;
+            }
+            break;
+          }
+        }
+      }
+
+      if (mounted) setState(() {});
+    } catch (_) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        for (final r in _races) {
+          final raw = prefs.getString('eaccl_${r.id}_meta');
+          if (raw == null || raw.isEmpty) continue;
+          final parts = raw.split('|');
+          if (parts.isNotEmpty && parts[0].trim().isNotEmpty) {
+            r.date = parts[0].trim();
+          }
+          if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+            r.venue = parts[1].trim();
+          }
+          if (parts.length > 2 && parts[2].trim().isNotEmpty) {
+            r.postcode = parts[2].trim();
+          }
+        }
+        if (mounted) setState(() {});
+      } catch (_) {
+        // Ignore local storage errors; fall back to hard-coded values
+      }
+    }
   }
 
   Future<void> _openLink(String url) async {
@@ -988,6 +1081,42 @@ class _EacclPageState extends State<_EacclPage> {
     }
   }
 
+  String _formatEacclDate(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    String suffix(int day) {
+      if (day >= 11 && day <= 13) return 'th';
+      switch (day % 10) {
+        case 1:
+          return 'st';
+        case 2:
+          return 'nd';
+        case 3:
+          return 'rd';
+        default:
+          return 'th';
+      }
+    }
+
+    final day = date.day;
+    final monthName = months[date.month - 1];
+    final year = date.year;
+    return '$day${suffix(day)} $monthName $year';
+  }
+
   void _createEventFor(String venue, String postcode, String date, int raceNo) {
     final parsedDate = _parseEacclDate(date);
 
@@ -1005,68 +1134,187 @@ class _EacclPageState extends State<_EacclPage> {
     );
   }
 
+  Future<void> _saveRaceOverride(_EacclRace race) async {
+    final dateLabel = race.date.trim();
+    final venue = race.venue.trim();
+
+    try {
+      await Supabase.instance.client.from('handicap_top3').upsert({
+        'race_id': race.id,
+        'date_label': dateLabel,
+        'venue': venue,
+      });
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'eaccl_${race.id}_meta',
+        '${dateLabel}|${venue}|${race.postcode}',
+      );
+    }
+  }
+
+  Future<void> _editRace(_EacclRace race) async {
+    final dateController = TextEditingController(text: race.date);
+    final venueController = TextEditingController(text: race.venue);
+    final postcodeController = TextEditingController(text: race.postcode);
+
+    Future<void> pickDate() async {
+      final now = DateTime.now();
+      final initial = _parseEacclDate(dateController.text) ?? now;
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: now.subtract(const Duration(days: 365)),
+        lastDate: now.add(const Duration(days: 365 * 3)),
+      );
+      if (picked != null) {
+        dateController.text = _formatEacclDate(picked);
+      }
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit Race ${race.no}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: dateController,
+                readOnly: true,
+                onTap: pickDate,
+                decoration: InputDecoration(
+                  labelText: 'Date label',
+                  helperText: 'Tap calendar to pick date',
+                  suffixIcon: IconButton(
+                    tooltip: 'Pick date',
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    onPressed: pickDate,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: venueController,
+                decoration: const InputDecoration(labelText: 'Venue'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: postcodeController,
+                decoration: const InputDecoration(labelText: 'Postcode'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        race.date = dateController.text.trim().isEmpty
+            ? race.date
+            : dateController.text.trim();
+        race.venue = venueController.text.trim().isEmpty
+            ? race.venue
+            : venueController.text.trim();
+        race.postcode = postcodeController.text.trim().isEmpty
+            ? race.postcode
+            : postcodeController.text.trim();
+      });
+
+      await _saveRaceOverride(race);
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Race ${race.no} updated')));
+      }
+    }
+  }
+
   static const String _visiblePara =
       'The East Anglian Cross Country League (EACCL) is a cross country league run through the winter months at various locations through Norfolk and Suffolk. Originating as a forces league with events at various Army and RAF bases. This has now expanded to include local domestic running clubs and groups. It has been running since the early 1960’s. It was initially set up on a Wednesday as this was when the forces were encouraged to do sporting activities, a lot of colleges also adopted this practice.\nThe series is open as team or as individual.';
 
   static const String _morePara =
       'The series consists of around ten races per season. This can vary per season depending on availability of clubs, venues and weather. Two races per season can be dropped individually to be eligible to participate in the awards for the season or as a team they have to have participation in all races.\n\nCosts are per season, as a team or individual. See the forms page for more details. All payments are required prior to participation in any event\n\nMen’s races are generally 10k and the ladies are approx 5k, these distances do vary according to location and access. We endeavour to do our best to adhere to this but some sites are working areas and we have to work within authorisations and local restrictions. All races start at 2:30pm unless stated.  The league also raises money for several local charities and projects through the hosting clubs charging for car parking and providing refreshments where possible, as all the venues are kindly used with no charge.';
 
-  final List<_EacclRace> _races = const [
+  final List<_EacclRace> _races = [
     _EacclRace(
+      id: 'eaccl_r1',
       no: 1,
       venue: 'Chilton Fields (Stowmarket) Rugby Club',
       postcode: 'IP14 1SZ',
       date: '29th October 2025',
     ),
     _EacclRace(
+      id: 'eaccl_r2',
       no: 2,
       venue: 'Mousehold Heath',
       postcode: 'NR3 4JB',
       date: '12th November 2025',
     ),
     _EacclRace(
+      id: 'eaccl_r3',
       no: 3,
       venue: 'Cart Gap',
       postcode: 'NR12 0QL',
       date: '26th November 2025',
     ),
     _EacclRace(
+      id: 'eaccl_r4',
       no: 4,
       venue: 'Whitwell Station',
       postcode: 'NR10 4GA',
       date: '10th December 2025',
     ),
     _EacclRace(
+      id: 'eaccl_r5',
       no: 5,
       venue: 'Broadland Country Park',
       postcode: 'NR10 3FB',
       date: '14th January 2026',
     ),
     _EacclRace(
+      id: 'eaccl_r6',
       no: 6,
       venue: 'Woburn Farm, Corton',
       postcode: 'NR32 5LE',
       date: '28th January 2026',
     ),
     _EacclRace(
+      id: 'eaccl_r7',
       no: 7,
       venue: 'Cromer',
       postcode: 'NR27 9AU',
       date: '4th February 2026',
     ),
     _EacclRace(
+      id: 'eaccl_r8',
       no: 8,
       venue: 'Ladybelt Country Park',
       postcode: 'NR14 8HX',
       date: '11th February 2026',
     ),
     _EacclRace(
+      id: 'eaccl_r9',
       no: 9,
       venue: 'Cawston Park',
       postcode: 'NR10 4JD',
       date: '11th March 2026',
     ),
     _EacclRace(
+      id: 'eaccl_r10',
       no: 10,
       venue: 'High Lodge, Thetford Forest',
       postcode: 'IP27 0AF',
@@ -1102,7 +1350,7 @@ class _EacclPageState extends State<_EacclPage> {
                 child: Text(
                   'East Anglian Cross Country League',
                   style: const TextStyle(
-                    color: Color(0xFFFFD700),
+                    color: Color(0xFFD32F2F),
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     shadows: [
@@ -1134,7 +1382,7 @@ class _EacclPageState extends State<_EacclPage> {
                       end: Alignment.bottomRight,
                     ),
                     border: Border.all(
-                      color: const Color(0xFFFFD700),
+                      color: const Color(0xFFD32F2F),
                       width: 1,
                     ),
                   ),
@@ -1158,7 +1406,7 @@ class _EacclPageState extends State<_EacclPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFF56D3FF)),
+                              style: const TextStyle(color: Color(0xFFD32F2F)),
                             ),
                           ),
                         ],
@@ -1176,16 +1424,33 @@ class _EacclPageState extends State<_EacclPage> {
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _openLink('https://eaccl.org.uk/'),
-                          icon: const Icon(Icons.open_in_new, size: 18),
-                          label: const Text('Visit EACCL Website'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF56D3FF),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () => _openLink('https://eaccl.org.uk/'),
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            label: const Text(
+                              'Visit EACCL Website',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
@@ -1201,7 +1466,7 @@ class _EacclPageState extends State<_EacclPage> {
                     borderRadius: BorderRadius.circular(16),
                     color: const Color(0x0FFFFFFF),
                     border: Border.all(
-                      color: const Color(0xFF1F2A3A),
+                      color: const Color(0xFFD32F2F),
                       width: 1,
                     ),
                   ),
@@ -1209,8 +1474,23 @@ class _EacclPageState extends State<_EacclPage> {
                     children: [
                       for (final r in _races) ...[
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            if (_isAdmin)
+                              IconButton(
+                                tooltip: 'Add event',
+                                onPressed: () => _createEventFor(
+                                  r.venue,
+                                  r.postcode,
+                                  r.date,
+                                  r.no,
+                                ),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Color(0xFFD32F2F),
+                                ),
+                              ),
+                            if (_isAdmin) const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1234,16 +1514,11 @@ class _EacclPageState extends State<_EacclPage> {
                             ),
                             if (_isAdmin)
                               IconButton(
-                                tooltip: 'Add event',
-                                onPressed: () => _createEventFor(
-                                  r.venue,
-                                  r.postcode,
-                                  r.date,
-                                  r.no,
-                                ),
+                                tooltip: 'Edit race details',
+                                onPressed: () => _editRace(r),
                                 icon: const Icon(
-                                  Icons.add_circle_outline,
-                                  color: Color(0xFFFFD700),
+                                  Icons.edit,
+                                  color: Color(0xFFD32F2F),
                                 ),
                               ),
                           ],
@@ -1264,7 +1539,7 @@ class _EacclPageState extends State<_EacclPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E406A),
+                          backgroundColor: const Color(0xFFD32F2F),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -1292,7 +1567,7 @@ class _EacclPageState extends State<_EacclPage> {
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFD700),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1331,11 +1606,13 @@ class _EacclPageState extends State<_EacclPage> {
 }
 
 class _EacclRace {
+  final String id;
   final int no;
-  final String venue;
-  final String postcode;
-  final String date;
-  const _EacclRace({
+  String venue;
+  String postcode;
+  String date;
+  _EacclRace({
+    required this.id,
     required this.no,
     required this.venue,
     required this.postcode,

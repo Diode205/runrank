@@ -106,6 +106,68 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       latitude: '52.7108107164322',
       longitude: '1.2260404278394894',
     ),
+
+    // EACCL preset venues (used when creating events from the EACCL page)
+    'EACCL Race 1': _SavedVenuePreset(
+      venue: 'Chilton Fields (Stowmarket) Rugby Club',
+      address: 'IP14 1SZ',
+      latitude: '52.194928943614755',
+      longitude: '0.9736349359399866',
+    ),
+    'EACCL Race 2': _SavedVenuePreset(
+      venue: 'Mousehold Heath',
+      address: 'NR3 4JB',
+      latitude: '52.6456293816159',
+      longitude: '1.3053020539832265',
+    ),
+    'EACCL Race 3': _SavedVenuePreset(
+      venue: 'Cart Gap',
+      address: 'NR12 0QL',
+      latitude: '52.813993848969545',
+      longitude: '1.5559508723398736',
+    ),
+    'EACCL Race 4': _SavedVenuePreset(
+      venue: 'Whitwell Station',
+      address: 'NR10 4GA',
+      latitude: '52.75213734380336',
+      longitude: '1.0976076815697193',
+    ),
+    'EACCL Race 5': _SavedVenuePreset(
+      venue: 'Broadland Country Park',
+      address: 'NR10 3FB',
+      latitude: '52.70864077472078',
+      longitude: '1.2325142321897717',
+    ),
+    'EACCL Race 6': _SavedVenuePreset(
+      venue: 'Woburn Farm, Corton',
+      address: 'NR32 5LE',
+      latitude: '52.52188865016863',
+      longitude: '1.7337329963973074',
+    ),
+    'EACCL Race 7': _SavedVenuePreset(
+      venue: 'Cromer',
+      address: 'NR27 9AU',
+      latitude: '52.9336054467087',
+      longitude: '1.2898943747112603',
+    ),
+    'EACCL Race 8': _SavedVenuePreset(
+      venue: 'Ladybelt Country Park',
+      address: 'NR14 8HX',
+      latitude: '52.57296936611113',
+      longitude: '1.21047899764725',
+    ),
+    'EACCL Race 9': _SavedVenuePreset(
+      venue: 'Cawston Park',
+      address: 'NR10 4JD',
+      latitude: '52.7758986780014',
+      longitude: '1.2065194249995728',
+    ),
+    'EACCL Race 10': _SavedVenuePreset(
+      venue: 'High Lodge, Thetford Forest',
+      address: 'IP27 0AF',
+      latitude: '52.43419930176653',
+      longitude: '0.6619943176235326',
+    ),
   };
 
   static const Map<String, _SavedVenuePreset> _relayVenuePresets = {
