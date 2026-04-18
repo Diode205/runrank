@@ -13,9 +13,12 @@ class AppSettingsPage extends StatefulWidget {
 }
 
 class _AppSettingsPageState extends State<AppSettingsPage> {
+  static const String _appPrivacyUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vSTrQ3pEMf5sGX1EItOjY4U72Am2R0ORxdJFzzEy2U2zNXDc1WFFo7Qp-JuTLctrwuwG6eMQAEyMdf7/pub';
+  static const String _termsOfUseUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vQWuKHlmIfJWxZiyr-sT2pXhGaU4zTAGFL3G1Cm_keLnja76E6eXzkUYFyPkyR4rL95JftlQK63FV8N/pub';
+
   String _version = '';
-  // Set this when the public URL is available.
-  String? _appPrivacyUrl;
 
   @override
   void initState() {
@@ -24,14 +27,12 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   }
 
   Future<void> _openAppPrivacy() async {
-    if (_appPrivacyUrl == null || _appPrivacyUrl!.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('App privacy policy link coming soon')),
-      );
-      return;
-    }
-    final uri = Uri.parse(_appPrivacyUrl!);
+    final uri = Uri.parse(_appPrivacyUrl);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openTermsOfUse() async {
+    final uri = Uri.parse(_termsOfUseUrl);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -82,12 +83,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       if (encodedBody != null) 'body=$encodedBody',
     ].join('&');
 
-    final uri = Uri(
-      scheme: 'mailto',
-      // No default recipient to avoid hardcoding; user can choose.
-      path: to,
-      query: query,
-    );
+    final uri = Uri(scheme: 'mailto', path: to, query: query);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -146,18 +142,15 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             .select('role, name, email, user_id')
             .eq('club', clubName);
 
-        if (committeeRows is List) {
-          for (final r in committeeRows) {
-            final row = r as Map<String, dynamic>;
-            final roleRaw = (row['role'] as String?) ?? '';
-            final roleLower = roleRaw.toLowerCase();
+        for (final row in committeeRows) {
+          final roleRaw = (row['role'] as String?) ?? '';
+          final roleLower = roleRaw.toLowerCase();
 
-            if (roleLower.contains('membership secretary')) {
-              membershipRow ??= row;
-            } else if (roleLower.contains('secretary') &&
-                !roleLower.contains('membership')) {
-              secretaryRow ??= row;
-            }
+          if (roleLower.contains('membership secretary')) {
+            membershipRow ??= row;
+          } else if (roleLower.contains('secretary') &&
+              !roleLower.contains('membership')) {
+            secretaryRow ??= row;
           }
         }
       } catch (e) {
@@ -407,7 +400,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                         );
                       },
                       child: Text(
-                        'Read more',
+                        'View Club Policy',
                         style: TextStyle(color: primary),
                       ),
                     ),
@@ -434,12 +427,25 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
               'Terms of Use',
               style: TextStyle(color: Colors.white),
             ),
-            children: const [
-              Padding(
+            children: [
+              const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Text(
                   'By using RunRank, you agree to use the app responsibly and comply with your club\'s code of conduct. Do not misuse features, attempt to access other users\' data, or violate local laws.',
                   style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _openTermsOfUse,
+                    child: Text(
+                      'View Full Terms of Use',
+                      style: TextStyle(color: primary),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -458,10 +464,13 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                 style: TextStyle(color: Colors.white),
               ),
               subtitle: const Text(
-                'Open your email app to contact us',
+                'Contact diodefernan@gmail.com for help or feedback',
                 style: TextStyle(color: Colors.white70),
               ),
-              onTap: () => _launchEmail(subject: 'RunRank feedback'),
+              onTap: () => _launchEmail(
+                to: 'diodefernan@gmail.com',
+                subject: 'RunRank feedback',
+              ),
               trailing: const Icon(Icons.open_in_new, color: Colors.white70),
             ),
           ),

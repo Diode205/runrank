@@ -26,7 +26,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
   List<ClubEvent> _events = [];
   bool _loading = true;
-  String userRole = "reader"; // reader or admin
+  String userRole = "social"; // social or admin
 
   // Per-event weather cache for upcoming events so we can show
   // a small forecast next to the time on each calendar card.
@@ -132,18 +132,11 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
   Future<void> _loadRole() async {
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-      final row = await supabase
-          .from("user_profiles")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
+      final isAdmin = await UserService.isAdmin();
 
       if (mounted) {
         setState(() {
-          userRole = row?["role"] ?? "reader";
+          userRole = isAdmin ? 'admin' : 'social';
         });
       }
     } catch (e) {
@@ -685,7 +678,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
         child: const Icon(Icons.add),
         onPressed: () async {
           // ADMIN → full event creation
-          // READER → social events only
+          // SOCIAL → social events only
           await Navigator.push(
             context,
             MaterialPageRoute(

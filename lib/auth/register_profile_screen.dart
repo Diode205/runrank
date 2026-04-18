@@ -14,6 +14,9 @@ class RegisterProfileScreen extends StatefulWidget {
 }
 
 class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
+  static const String _appPrivacyUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vSTrQ3pEMf5sGX1EItOjY4U72Am2R0ORxdJFzzEy2U2zNXDc1WFFo7Qp-JuTLctrwuwG6eMQAEyMdf7/pub';
+
   final email = TextEditingController();
   final name = TextEditingController();
   final dob = TextEditingController();
@@ -31,7 +34,6 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   bool agreeAppPolicy = false;
   bool agreeEmergencyConsent = false;
   bool noMedicalIssue = true;
-  String? _appPrivacyUrl; // Set when available
 
   final membershipOptions = [
     "1st Claim",
@@ -398,15 +400,8 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   }
 
   Future<void> _openAppPrivacy() async {
-    if (_appPrivacyUrl == null || _appPrivacyUrl!.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('App privacy policy link coming soon')),
-      );
-      return;
-    }
     await launchUrl(
-      Uri.parse(_appPrivacyUrl!),
+      Uri.parse(_appPrivacyUrl),
       mode: LaunchMode.externalApplication,
     );
   }

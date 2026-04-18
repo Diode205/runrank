@@ -15,6 +15,42 @@ class AdministrativeTeamPage extends StatefulWidget {
 }
 
 class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
+  static const List<String> _defaultCommitteeRoles = [
+    'President',
+    'Chairperson',
+    'Vice-Chairperson',
+    'Secretary',
+    'Treasurer',
+    'Membership Secretary',
+    'Minutes Secretary',
+    'Clothing Manager',
+    'Club Head Coach',
+    'Equipment Store Manager',
+    'General Committee Member',
+    'General Committee Member',
+    'Webmaster',
+    'Press Officer',
+  ];
+
+  static const List<String> _nrrCommitteeRoles = [
+    'Chairperson',
+    'Vice Chairperson',
+    'Club Secretary',
+    'Treasurer',
+    'Membership Secretary',
+    'Welfare Officer',
+    'Health & Safety Officer',
+    'New Members Officer',
+    'Kit Secretary',
+    'Junior Section Head',
+    'Horford XC Race Director',
+    'Road Racing Director',
+    'Parkrun On Tour Lead',
+    'Committee Member',
+    'Committee Member',
+    'Committee Member',
+  ];
+
   final _supabase = Supabase.instance.client;
   bool _isAdmin = false;
   String? _adminClub;
@@ -25,23 +61,39 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   ClubConfig? _clubConfig;
   int _deletionRequestCount = 0;
 
-  final List<Map<String, dynamic>> _committee = [
-    // Initial roles only; names/emails left blank so clubs can configure their own holders
-    {'role': 'President', 'name': '', 'email': ''},
-    {'role': 'Chairperson', 'name': '', 'email': ''},
-    {'role': 'Vice-Chairperson', 'name': '', 'email': ''},
-    {'role': 'Secretary', 'name': '', 'email': ''},
-    {'role': 'Treasurer', 'name': '', 'email': ''},
-    {'role': 'Membership Secretary', 'name': '', 'email': ''},
-    {'role': 'Minutes Secretary', 'name': '', 'email': ''},
-    {'role': 'Clothing Manager', 'name': '', 'email': ''},
-    {'role': 'Club Head Coach', 'name': '', 'email': ''},
-    {'role': 'Equipment Store Manager', 'name': '', 'email': ''},
-    {'role': 'General Committee Member', 'name': '', 'email': ''},
-    {'role': 'General Committee Member', 'name': '', 'email': ''},
-    {'role': 'Webmaster', 'name': '', 'email': ''},
-    {'role': 'Press Officer', 'name': '', 'email': ''},
-  ];
+  final List<Map<String, dynamic>> _committee = [];
+
+  bool _isNrrClubName(String clubName) {
+    final lower = clubName.trim().toLowerCase();
+    return lower == 'nrr' || lower.contains('norwich road runners');
+  }
+
+  List<Map<String, dynamic>> _buildCommitteeTemplate(String clubName) {
+    final roles = _isNrrClubName(clubName)
+        ? _nrrCommitteeRoles
+        : _defaultCommitteeRoles;
+    return roles
+        .map((role) => <String, dynamic>{'role': role, 'name': '', 'email': ''})
+        .toList();
+  }
+
+  int? _resolveCommitteeIndexFromDisplayOrder(dynamic rawOrder) {
+    if (rawOrder is! int) {
+      return null;
+    }
+
+    final candidates = <int>[];
+    if (rawOrder >= 0 && rawOrder < _committee.length) {
+      candidates.add(rawOrder);
+    }
+
+    final oneBased = rawOrder - 1;
+    if (oneBased >= 0 && oneBased < _committee.length) {
+      candidates.add(oneBased);
+    }
+
+    return candidates.isEmpty ? null : candidates.first;
+  }
 
   @override
   void initState() {
@@ -69,6 +121,11 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     try {
       final config = await ClubConfigService.loadForCurrentUser();
       final clubName = config.name;
+      final isNrrClub = _isNrrClubName(clubName);
+
+      _committee
+        ..clear()
+        ..addAll(_buildCommitteeTemplate(clubName));
 
       final data = await _supabase
           .from('committee_roles')
@@ -79,9 +136,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
           .order('display_order', ascending: true);
 
       final rows = (data as List).cast<dynamic>();
-      // Map rows to slots primarily by role name so we handle
-      // both legacy 1-based display_order and any newer 0-based
-      // entries without losing or duplicating roles.
+      // Map rows to slots primarily by role name for the default clubs.
+      // For NRR, prefer display order so old generic rows can still land in
+      // the intended slot while the new role titles are shown in the UI.
       final baseRoles = _committee
           .map((m) => (m['role'] ?? '').toString())
           .toList();
@@ -92,8 +149,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         final isKnownRole = baseRoles.contains(rowRole);
         int? index;
 
+        if (isNrrClub) {
+          index = _resolveCommitteeIndexFromDisplayOrder(row['display_order']);
+          if (index != null && used[index]) {
+            index = null;
+          }
+        }
+
         // First, try to match by role name against the template list.
-        if (isKnownRole) {
+        if (index == null && isKnownRole) {
           for (var i = 0; i < baseRoles.length; i++) {
             if (!used[i] && baseRoles[i] == rowRole) {
               index = i;
@@ -105,22 +169,11 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         // If this is a custom role (not in the template list),
         // fall back to using display_order as either 0-based or 1-based.
         if (!isKnownRole && index == null) {
-          final rawOrder = row['display_order'];
-          if (rawOrder is int) {
-            final candidates = <int>[];
-            if (rawOrder >= 0 && rawOrder < _committee.length) {
-              candidates.add(rawOrder);
-            }
-            final oneBased = rawOrder - 1;
-            if (oneBased >= 0 && oneBased < _committee.length) {
-              candidates.add(oneBased);
-            }
-            for (final c in candidates) {
-              if (!used[c]) {
-                index = c;
-                break;
-              }
-            }
+          final displayOrderIndex = _resolveCommitteeIndexFromDisplayOrder(
+            row['display_order'],
+          );
+          if (displayOrderIndex != null && !used[displayOrderIndex]) {
+            index = displayOrderIndex;
           }
         }
 
@@ -131,7 +184,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         final target = _committee[index];
         used[index] = true;
         target['id'] = row['id']?.toString();
-        target['role'] = row['role'] ?? target['role'];
+        if (!isNrrClub || isKnownRole) {
+          target['role'] = row['role'] ?? target['role'];
+        }
         target['name'] = (row['name'] ?? '').toString();
         target['email'] = (row['email'] ?? '').toString();
         final rawUserId = row['user_id'];
@@ -325,13 +380,16 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
                   if (id != null && id.isNotEmpty) {
                     // Existing row: update without needing the club name.
+                    final role = (_committee[index]['role'] ?? '').toString();
                     await _supabase
                         .from('committee_roles')
                         .update({
+                          'role': role,
                           'name': newName,
                           'email': newName.isEmpty ? '' : newEmail,
                           'user_id': userIdValue,
                           'avatar_url': _committee[index]['avatarUrl'] ?? null,
+                          'display_order': index,
                         })
                         .eq('id', id);
                   } else {

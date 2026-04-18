@@ -227,6 +227,7 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
   Timer? _carouselTimer;
 
   static const List<String> _imagePaths = [
+    'assets/images/nrrhistory.png',
     'assets/images/nrr11.png',
     'assets/images/nrr12.png',
   ];
@@ -276,12 +277,16 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
           transitionBuilder: (child, animation) {
             return FadeTransition(opacity: animation, child: child);
           },
-          child: SizedBox.expand(
+          child: Container(
             key: ValueKey(_imagePaths[_currentPage]),
+            width: double.infinity,
+            height: double.infinity,
             child: Image.asset(
               _imagePaths[_currentPage],
               fit: BoxFit.cover,
               alignment: Alignment.center,
+              width: double.infinity,
+              height: double.infinity,
             ),
           ),
         ),

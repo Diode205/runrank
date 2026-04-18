@@ -108,6 +108,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      useSafeArea: true,
       backgroundColor: const Color(0xFF0F111A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -144,13 +147,31 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Quick edit',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(sheetContext),
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
                       const Text(
-                        'Quick edit',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        'Swipe down or tap close to dismiss.',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                       const SizedBox(height: 14),
                       TextField(
@@ -759,7 +780,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.description,
-                  title: 'Policies, Forms, and Notices',
+                  title: 'Club Governance',
                   subtitle: 'Club policies, waivers, and key updates',
                   onTap: () {
                     Navigator.push(
