@@ -43,11 +43,32 @@ class ClubMilestone {
 class ClubMilestonesService {
   final _supabase = Supabase.instance.client;
 
-  Future<List<ClubMilestone>> getAllMilestones() async {
+  static String canonicalClubName(String? clubName) {
+    final normalized = (clubName ?? '').trim();
+    final lower = normalized.toLowerCase();
+    if (lower == 'nrr' ||
+        lower == 'norwich-road-runners' ||
+        lower.contains('norwich road runners')) {
+      return 'Norwich Road Runners';
+    }
+    if (lower == 'nnbr' ||
+        lower == 'north-norfolk-beach-runners' ||
+        lower.contains('north norfolk beach runners')) {
+      return 'NNBR (North Norfolk Beach Runners)';
+    }
+    return normalized;
+  }
+
+  Future<List<ClubMilestone>> getAllMilestones({
+    required String clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return [];
     try {
       final response = await _supabase
           .from('club_milestones')
           .select()
+          .eq('club_name', canonicalClub)
           .order('display_order', ascending: true);
 
       return (response as List)
@@ -59,18 +80,25 @@ class ClubMilestonesService {
     }
   }
 
-  Future<bool> addMilestone(ClubMilestone milestone) async {
+  Future<bool> addMilestone(
+    ClubMilestone milestone, {
+    required String clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return false;
     try {
       print('Attempting to add milestone: ${milestone.toJson()}');
-      final response = await _supabase
-          .from('club_milestones')
-          .insert(milestone.toJson());
+      final response = await _supabase.from('club_milestones').insert({
+        ...milestone.toJson(),
+        'club_name': canonicalClub,
+      });
       print('Milestone added successfully: $response');
 
       // Notify all users about the new milestone so it appears in Alerts
       // and can deep-link back to the Club Milestones page.
       try {
-        await NotificationService.notifyAllUsers(
+        await NotificationService.notifyUsersInClub(
+          clubName: canonicalClub,
           title: 'New club milestone added',
           body: '${milestone.milestoneDate}: ${milestone.title}',
           route: 'club_milestones',
@@ -86,12 +114,19 @@ class ClubMilestonesService {
     }
   }
 
-  Future<bool> updateMilestone(String id, ClubMilestone milestone) async {
+  Future<bool> updateMilestone(
+    String id,
+    ClubMilestone milestone, {
+    required String clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return false;
     try {
       await _supabase
           .from('club_milestones')
           .update(milestone.toJson())
-          .eq('id', id);
+          .eq('id', id)
+          .eq('club_name', canonicalClub);
       return true;
     } catch (e) {
       print('Error updating milestone: $e');
@@ -99,9 +134,15 @@ class ClubMilestonesService {
     }
   }
 
-  Future<bool> deleteMilestone(String id) async {
+  Future<bool> deleteMilestone(String id, {required String clubName}) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return false;
     try {
-      await _supabase.from('club_milestones').delete().eq('id', id);
+      await _supabase
+          .from('club_milestones')
+          .delete()
+          .eq('id', id)
+          .eq('club_name', canonicalClub);
       return true;
     } catch (e) {
       print('Error deleting milestone: $e');
@@ -109,13 +150,19 @@ class ClubMilestonesService {
     }
   }
 
-  Future<bool> reorderMilestones(List<ClubMilestone> milestones) async {
+  Future<bool> reorderMilestones(
+    List<ClubMilestone> milestones, {
+    required String clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return false;
     try {
       for (int i = 0; i < milestones.length; i++) {
         await _supabase
             .from('club_milestones')
             .update({'display_order': i + 1})
-            .eq('id', milestones[i].id);
+            .eq('id', milestones[i].id)
+            .eq('club_name', canonicalClub);
       }
       return true;
     } catch (e) {

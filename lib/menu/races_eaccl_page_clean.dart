@@ -1500,187 +1500,258 @@ class _RaceCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: info.keyId == 'eaccl'
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: info.keyId == 'eaccl'
-                      ? CrossAxisAlignment.center
-                      : CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: info.keyId == 'eaccl'
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: info.keyId == 'eaccl'
+                        ? CrossAxisAlignment.center
+                        : CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        info.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: info.keyId == 'eaccl'
+                            ? TextAlign.center
+                            : null,
+                      ),
+                      if (info.keyId == 'eaccl') ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          info.location,
+                          style: const TextStyle(
+                            color: Color(0xFF56D3FF),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        info.overview,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.4,
+                          fontSize: 14,
+                        ),
+                        textAlign: info.keyId == 'eaccl'
+                            ? TextAlign.center
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+                // Per latest request, no edit icons on title row
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (info.keyId != 'eaccl') ...[
+              const SizedBox(height: 12),
+              if (hasSeriesDates)
+                Column(
                   children: [
+                    for (var index = 0; index < info.seriesDates.length; index++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            if (isAdmin && onPickDate != null) ...[
+                              IconButton(
+                                onPressed: () =>
+                                    onPickDate!(info.seriesDates[index].keyId),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 28,
+                                  height: 28,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.calendar_month,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
+                                tooltip:
+                                    'Pick ${info.seriesDates[index].label} date',
+                              ),
+                            ] else ...[
+                              Icon(Icons.event, color: accentColor, size: 18),
+                            ],
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${info.seriesDates[index].label}: ${info.dateValues[info.seriesDates[index].keyId] ?? 'TBD'}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            if (isAdmin && onCreateEvent != null)
+                              IconButton(
+                                onPressed: () => onCreateEvent!(
+                                  seriesKey: info.seriesDates[index].keyId,
+                                  seriesLabel: info.seriesDates[index].label,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 28,
+                                  height: 28,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Create Event',
+                                icon: Icon(
+                                  Icons.add_box_outlined,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    if (isAdmin && onPickDate != null) ...[
+                      IconButton(
+                        onPressed: () => onPickDate!(info.keyId),
+                        icon: Icon(Icons.calendar_month, color: accentColor),
+                        tooltip: 'Pick race date',
+                      ),
+                    ] else ...[
+                      Icon(Icons.event, color: accentColor, size: 20),
+                    ],
+                    const SizedBox(width: 8),
                     Text(
-                      info.title,
+                      info.date,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
-                      textAlign: info.keyId == 'eaccl'
-                          ? TextAlign.center
-                          : null,
                     ),
-                    if (info.keyId == 'eaccl') ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        info.location,
-                        style: const TextStyle(
-                          color: Color(0xFF56D3FF),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                    const Spacer(),
+                    if (isAdmin && onCreateEvent != null)
+                      IconButton(
+                        onPressed: () => onCreateEvent!(),
+                        tooltip: 'Create Event',
+                        icon: Icon(Icons.add_box_outlined, color: accentColor),
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 6),
+              // Photo placed below date, slightly zoomed and smaller
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 150,
+                  width: double.infinity,
+                  child: Stack(
+                    children: [
+                      Transform.scale(
+                        scale: 1.1,
+                        child: Image.asset(
+                          _imageForRace(info.keyId),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.transparent, Colors.black54],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Text(
-                      info.overview,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        height: 1.4,
-                        fontSize: 14,
-                      ),
-                      textAlign: info.keyId == 'eaccl'
-                          ? TextAlign.center
-                          : null,
-                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Race Info box (Venue, Registration, Start)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: detailSurfaceColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: detailBorderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _InfoRow(icon: Icons.place, text: info.location),
+                    const SizedBox(height: 6),
+                    _InfoRow(icon: Icons.assignment_ind, text: info.registration),
+                    const SizedBox(height: 6),
+                    _InfoRow(icon: Icons.flag_circle, text: info.raceStart),
                   ],
                 ),
               ),
-              // Per latest request, no edit icons on title row
+              const SizedBox(height: 8),
             ],
-          ),
-          if (info.keyId != 'eaccl') ...[
-            const SizedBox(height: 12),
-            if (hasSeriesDates)
-              Column(
-                children: [
-                  for (var index = 0; index < info.seriesDates.length; index++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          if (isAdmin && onPickDate != null) ...[
-                            IconButton(
-                              onPressed: () =>
-                                  onPickDate!(info.seriesDates[index].keyId),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 28,
-                                height: 28,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              icon: Icon(
-                                Icons.calendar_month,
-                                color: accentColor,
-                                size: 18,
-                              ),
-                              tooltip:
-                                  'Pick ${info.seriesDates[index].label} date',
-                            ),
-                          ] else ...[
-                            Icon(Icons.event, color: accentColor, size: 18),
-                          ],
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${info.seriesDates[index].label}: ${info.dateValues[info.seriesDates[index].keyId] ?? 'TBD'}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          if (isAdmin && onCreateEvent != null)
-                            IconButton(
-                              onPressed: () => onCreateEvent!(
-                                seriesKey: info.seriesDates[index].keyId,
-                                seriesLabel: info.seriesDates[index].label,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 28,
-                                height: 28,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              tooltip: 'Create Event',
-                              icon: Icon(
-                                Icons.add_box_outlined,
-                                color: accentColor,
-                                size: 18,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  if (isAdmin && onPickDate != null) ...[
-                    IconButton(
-                      onPressed: () => onPickDate!(info.keyId),
-                      icon: Icon(Icons.calendar_month, color: accentColor),
-                      tooltip: 'Pick race date',
-                    ),
-                  ] else ...[
-                    Icon(Icons.event, color: accentColor, size: 20),
-                  ],
-                  const SizedBox(width: 8),
-                  Text(
-                    info.date,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (isAdmin && onCreateEvent != null)
-                    IconButton(
-                      onPressed: () => onCreateEvent!(),
-                      tooltip: 'Create Event',
-                      icon: Icon(Icons.add_box_outlined, color: accentColor),
-                    ),
-                ],
-              ),
             const SizedBox(height: 6),
-            // Photo placed below date, slightly zoomed and smaller
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 150,
-                width: double.infinity,
-                child: Stack(
-                  children: [
-                    Transform.scale(
-                      scale: 1.1,
-                      child: Image.asset(
-                        _imageForRace(info.keyId),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.transparent, Colors.black54],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+            if (info.specialNote != null) ...[
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: info.specialNoteUrl != null
+                    ? () => onOpen(info.specialNoteUrl!)
+                    : null,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: specialNoteGradient),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: specialNoteColor, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.emoji_events, color: specialNoteColor, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          info.specialNote!,
+                          style: TextStyle(
+                            color: specialNoteColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      if (info.specialNoteUrl != null)
+                        Icon(
+                          Icons.open_in_new,
+                          color: specialNoteColor,
+                          size: 16,
+                        ),
+                    ],
+                  ),
                 ),
               ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              'Facilities',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.2,
+                fontSize: 15,
+              ),
             ),
-            const SizedBox(height: 10),
-            // Race Info box (Venue, Registration, Start)
+            const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -1688,112 +1759,44 @@ class _RaceCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: detailBorderColor),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _InfoRow(icon: Icons.place, text: info.location),
-                  const SizedBox(height: 6),
-                  _InfoRow(icon: Icons.assignment_ind, text: info.registration),
-                  const SizedBox(height: 6),
-                  _InfoRow(icon: Icons.flag_circle, text: info.raceStart),
-                ],
+              child: Text(
+                info.facilities,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  height: 1.4,
+                  fontSize: 15,
+                ),
               ),
             ),
             const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 6),
-          if (info.specialNote != null) ...[
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: info.specialNoteUrl != null
-                  ? () => onOpen(info.specialNoteUrl!)
-                  : null,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: specialNoteGradient),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: specialNoteColor, width: 1),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    label: 'Results',
+                    icon: Icons.emoji_events,
+                    onPressed: () => onOpen(info.resultsUrl),
+                    color: useClubColors
+                        ? const Color(0xFFD32F2F)
+                        : const Color(0xFFFFD700),
+                    textColor: useClubColors ? Colors.white : Colors.black,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.emoji_events, color: specialNoteColor, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        info.specialNote!,
-                        style: TextStyle(
-                          color: specialNoteColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (info.specialNoteUrl != null)
-                      Icon(
-                        Icons.open_in_new,
-                        color: specialNoteColor,
-                        size: 16,
-                      ),
-                  ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ActionButton(
+                    label: 'Drive',
+                    icon: Icons.map,
+                    onPressed: () => onOpen(info.mapUrl),
+                    color: useClubColors
+                        ? const Color(0xFF232830)
+                        : const Color(0xFF1E88E5),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            'Facilities',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.2,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: detailSurfaceColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: detailBorderColor),
-            ),
-            child: Text(
-              info.facilities,
-              style: const TextStyle(
-                color: Colors.white70,
-                height: 1.4,
-                fontSize: 15,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  label: 'Results',
-                  icon: Icons.emoji_events,
-                  onPressed: () => onOpen(info.resultsUrl),
-                  color: useClubColors
-                      ? const Color(0xFFD32F2F)
-                      : const Color(0xFFFFD700),
-                  textColor: useClubColors ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ActionButton(
-                  label: 'Drive',
-                  icon: Icons.map,
-                  onPressed: () => onOpen(info.mapUrl),
-                  color: useClubColors
-                      ? const Color(0xFF232830)
-                      : const Color(0xFF1E88E5),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

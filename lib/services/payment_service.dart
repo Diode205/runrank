@@ -4,9 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:http/http.dart' as http;
 
+enum PaymentFlow { club, platform }
+
+class _PaymentFlowConfig {
+  const _PaymentFlowConfig({
+    required this.publishableKey,
+    required this.paymentIntentEndpoint,
+    required this.label,
+  });
+
+  final String publishableKey;
+  final String paymentIntentEndpoint;
+  final String label;
+
+  bool get isConfigured =>
+      publishableKey.isNotEmpty && paymentIntentEndpoint.isNotEmpty;
+}
+
 class PaymentService {
   // Configure via --dart-define or environment variables when building
-  // e.g., flutter run --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_xxx --dart-define=PAYMENT_INTENT_ENDPOINT=https://your-edge-function/create-payment-intent
+  // Club payments default to the legacy STRIPE_PUBLISHABLE_KEY and
+  // PAYMENT_INTENT_ENDPOINT values to preserve current behavior.
+  // Platform/app-subscription payments can be configured separately.
   static const String _publishableKey = String.fromEnvironment(
     'STRIPE_PUBLISHABLE_KEY',
     defaultValue: '',
@@ -17,52 +36,150 @@ class PaymentService {
     defaultValue: '',
   );
 
-  static bool get isConfigured =>
-      _publishableKey.isNotEmpty && _paymentIntentEndpoint.isNotEmpty;
+  static const String _clubPublishableKey = String.fromEnvironment(
+    'CLUB_STRIPE_PUBLISHABLE_KEY',
+    defaultValue: '',
+  );
+
+  static const String _clubPaymentIntentEndpoint = String.fromEnvironment(
+    'CLUB_PAYMENT_INTENT_ENDPOINT',
+    defaultValue: '',
+  );
+
+  static const String _platformPublishableKey = String.fromEnvironment(
+    'PLATFORM_STRIPE_PUBLISHABLE_KEY',
+    defaultValue: '',
+  );
+
+  static const String _platformPaymentIntentEndpoint = String.fromEnvironment(
+    'PLATFORM_PAYMENT_INTENT_ENDPOINT',
+    defaultValue: '',
+  );
+
+  static const String _applePayMerchantId = String.fromEnvironment(
+    'STRIPE_APPLE_PAY_MERCHANT_ID',
+    defaultValue: '',
+  );
+
+  static const bool _enableNrrMembershipPayments = bool.fromEnvironment(
+    'ENABLE_NRR_MEMBERSHIP_PAYMENTS',
+    defaultValue: false,
+  );
+
+  static const bool _enableNrrKitPayments = bool.fromEnvironment(
+    'ENABLE_NRR_KIT_PAYMENTS',
+    defaultValue: false,
+  );
+
+  static String? _activePublishableKey;
+
+  static _PaymentFlowConfig _configFor(PaymentFlow flow) {
+    switch (flow) {
+      case PaymentFlow.club:
+        return _PaymentFlowConfig(
+          publishableKey: _clubPublishableKey.isNotEmpty
+              ? _clubPublishableKey
+              : _publishableKey,
+          paymentIntentEndpoint: _clubPaymentIntentEndpoint.isNotEmpty
+              ? _clubPaymentIntentEndpoint
+              : _paymentIntentEndpoint,
+          label: 'club',
+        );
+      case PaymentFlow.platform:
+        return const _PaymentFlowConfig(
+          publishableKey: _platformPublishableKey,
+          paymentIntentEndpoint: _platformPaymentIntentEndpoint,
+          label: 'platform',
+        );
+    }
+  }
+
+  static bool get isConfigured => _configFor(PaymentFlow.club).isConfigured;
+
+  static bool get clubPaymentsConfigured =>
+      _configFor(PaymentFlow.club).isConfigured;
+
+  static bool get platformPaymentsConfigured =>
+      _configFor(PaymentFlow.platform).isConfigured;
+
+  static bool get applePayConfigured => _applePayMerchantId.isNotEmpty;
+
+  static bool get nrrMembershipPaymentsEnabled => _enableNrrMembershipPayments;
+
+  static bool get nrrKitPaymentsEnabled => _enableNrrKitPayments;
 
   static Future<void> init() async {
-    if (_publishableKey.isEmpty) {
+    final clubConfig = _configFor(PaymentFlow.club);
+
+    if (clubConfig.publishableKey.isEmpty) {
       debugPrint('Stripe publishable key missing. Skipping Stripe init.');
-      return;
+    } else {
+      Stripe.publishableKey = clubConfig.publishableKey;
+      _activePublishableKey = clubConfig.publishableKey;
     }
-    Stripe.publishableKey = _publishableKey;
+
+    if (_applePayMerchantId.isNotEmpty) {
+      Stripe.merchantIdentifier = _applePayMerchantId;
+    }
+
     await Stripe.instance.applySettings();
   }
 
-  static Future<bool> startMembershipPayment({
+  static Future<void> _ensureStripeConfigured(PaymentFlow flow) async {
+    final config = _configFor(flow);
+    if (!config.isConfigured) {
+      return;
+    }
+
+    if (_activePublishableKey == config.publishableKey) {
+      return;
+    }
+
+    Stripe.publishableKey = config.publishableKey;
+    if (_applePayMerchantId.isNotEmpty) {
+      Stripe.merchantIdentifier = _applePayMerchantId;
+    }
+    await Stripe.instance.applySettings();
+    _activePublishableKey = config.publishableKey;
+  }
+
+  static Future<bool> startPayment({
     required BuildContext context,
-    required String tierName,
+    required PaymentFlow flow,
+    required String itemName,
     required int amountCents,
     required Map<String, dynamic> metadata,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final config = _configFor(flow);
 
-    if (!isConfigured) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Payments not configured. Set STRIPE_PUBLISHABLE_KEY and PAYMENT_INTENT_ENDPOINT.',
-          ),
-        ),
-      );
+    if (!config.isConfigured) {
+      final missingMessage = flow == PaymentFlow.club
+          ? 'Payments not configured. Set CLUB_STRIPE_PUBLISHABLE_KEY/CLUB_PAYMENT_INTENT_ENDPOINT or the legacy STRIPE_PUBLISHABLE_KEY/PAYMENT_INTENT_ENDPOINT values.'
+          : 'Platform payments not configured. Set PLATFORM_STRIPE_PUBLISHABLE_KEY and PLATFORM_PAYMENT_INTENT_ENDPOINT.';
+      messenger.showSnackBar(SnackBar(content: Text(missingMessage)));
       return false;
     }
 
+    await _ensureStripeConfigured(flow);
+
     try {
       final response = await http.post(
-        Uri.parse(_paymentIntentEndpoint),
+        Uri.parse(config.paymentIntentEndpoint),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'amount': amountCents,
           'currency': 'gbp',
-          'tier': tierName,
-          'metadata': metadata,
+          'itemName': itemName,
+          'metadata': {...metadata, 'payment_flow': config.label},
         }),
       );
 
       if (response.statusCode != 200) {
         final body = response.body;
-        debugPrint('Payment intent error: ${response.statusCode} $body');
+        debugPrint(
+          'Payment intent error (${config.label}): ${response.statusCode} $body',
+        );
         final snippet = body.length > 140 ? '${body.substring(0, 140)}…' : body;
         messenger.showSnackBar(
           SnackBar(
@@ -99,8 +216,9 @@ class PaymentService {
           paymentIntentClientSecret: clientSecret,
           merchantDisplayName: 'RunRank',
           style: ThemeMode.dark,
-          // Disable Apple Pay until merchant ID is configured
-          // applePay: const PaymentSheetApplePay(merchantCountryCode: 'GB'),
+          applePay: applePayConfigured
+              ? const PaymentSheetApplePay(merchantCountryCode: 'GB')
+              : null,
           googlePay: const PaymentSheetGooglePay(
             merchantCountryCode: 'GB',
             testEnv: true,
@@ -117,16 +235,31 @@ class PaymentService {
       } on StripeException catch (se) {
         final msg =
             se.error.localizedMessage ?? se.error.message ?? 'Stripe error';
-        debugPrint('Stripe exception: $msg');
+        debugPrint('Stripe exception (${config.label}): $msg');
         messenger.showSnackBar(SnackBar(content: Text('Payment failed: $msg')));
         return false;
       }
     } catch (e) {
-      debugPrint('Payment error: $e');
+      debugPrint('Payment error (${config.label}): $e');
       messenger.showSnackBar(
         SnackBar(content: Text('Payment cancelled or failed: $e')),
       );
       return false;
     }
+  }
+
+  static Future<bool> startMembershipPayment({
+    required BuildContext context,
+    required String tierName,
+    required int amountCents,
+    required Map<String, dynamic> metadata,
+  }) async {
+    return startPayment(
+      context: context,
+      flow: PaymentFlow.club,
+      itemName: tierName,
+      amountCents: amountCents,
+      metadata: {'tier': tierName, ...metadata},
+    );
   }
 }

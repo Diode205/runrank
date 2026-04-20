@@ -15,6 +15,18 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
   List<TeamAchievement> _achievements = [];
   bool _loading = true;
   bool _isAdmin = false;
+  String? _clubName;
+
+  bool get _isNrrClub {
+    final club = _clubName?.toLowerCase() ?? '';
+    return club == 'nrr' || club.contains('norwich road runners');
+  }
+
+  Color get _primaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+
+  Color get _secondaryColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
 
   @override
   void initState() {
@@ -24,19 +36,20 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
+    _clubName = await UserService.currentClubName();
     _isAdmin = await UserService.isAdmin();
-    _achievements = await _service.getAllAchievements();
+    _achievements = await _service.getAllAchievements(
+      clubName: _clubName ?? '',
+    );
     setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Colors.black,
         elevation: 0,
         title: const Text(
           'Team Achievements',
@@ -45,14 +58,14 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
         centerTitle: true,
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          ? Center(child: CircularProgressIndicator(color: _primaryColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Our team achievements celebrate the collective successes of Norwich Road Runners across various competitions.',
+                    'Our team achievements celebrate the collective successes of our club across various competitions.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
@@ -76,13 +89,11 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
   }
 
   Widget _buildAdminButton() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.secondary],
+          colors: [_primaryColor, _secondaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -92,14 +103,14 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
         onPressed: _showAddDialog,
         icon: Icon(
           Icons.add,
-          color: colorScheme.primary.computeLuminance() > 0.6
+          color: _primaryColor.computeLuminance() > 0.6
               ? Colors.black
               : Colors.white,
         ),
         label: Text(
           'Add Achievement',
           style: TextStyle(
-            color: colorScheme.primary.computeLuminance() > 0.6
+            color: _primaryColor.computeLuminance() > 0.6
                 ? Colors.black
                 : Colors.white,
             fontWeight: FontWeight.bold,
@@ -275,8 +286,6 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
   }
 
   Map<String, dynamic> _getAwardConfig(String award) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     switch (award) {
       case 'Gold':
         return {'color': const Color(0xFFFFD700), 'icon': Icons.emoji_events};
@@ -285,7 +294,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
       case 'Bronze':
         return {'color': const Color(0xFFCD7F32), 'icon': Icons.emoji_events};
       case 'Champion':
-        return {'color': colorScheme.primary, 'icon': Icons.military_tech};
+        return {'color': _primaryColor, 'icon': Icons.military_tech};
       default:
         return {'color': Colors.white, 'icon': Icons.emoji_events};
     }
@@ -419,7 +428,10 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                   teams: teamsController.text.trim(),
                 );
 
-                final success = await _service.addAchievement(achievement);
+                final success = await _service.addAchievement(
+                  achievement,
+                  clubName: _clubName ?? '',
+                );
                 if (success && mounted) {
                   Navigator.pop(context);
                   _loadData();
@@ -597,6 +609,7 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
                 final success = await _service.updateAchievement(
                   achievement.id,
                   updated,
+                  clubName: _clubName ?? '',
                 );
                 if (success && mounted) {
                   Navigator.pop(context);
@@ -638,7 +651,10 @@ class _TeamAchievementsPageState extends State<TeamAchievementsPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final success = await _service.deleteAchievement(achievement.id);
+              final success = await _service.deleteAchievement(
+                achievement.id,
+                clubName: _clubName ?? '',
+              );
               if (success && mounted) {
                 Navigator.pop(context);
                 _loadData();

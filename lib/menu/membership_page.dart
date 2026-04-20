@@ -4,6 +4,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
+import 'package:runrank/services/membership_tier_config_service.dart';
+import 'package:runrank/services/payment_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/main.dart' show routeObserver;
@@ -17,11 +19,18 @@ class MembershipPage extends StatefulWidget {
 
 class _MembershipPageState extends State<MembershipPage> with RouteAware {
   final _client = Supabase.instance.client;
+  final _tierConfigService = MembershipTierConfigService();
+  static const _nnbrYellow = Color(0xFFF5C542);
+  static const _nnbrBlue = Color(0xFF0057B7);
+  static const _socialGray = Color(0xFF8A8F98);
+  static const _educationGreen = Color(0xFF2E8B57);
 
   bool _loading = true;
   bool _isAdmin = false;
   String? _memberSince;
   String? _membershipType;
+  String? _clubName;
+  Map<String, MembershipTierConfig> _tierConfigs = const {};
   final String _membershipStatus = "Active";
 
   @override
@@ -60,6 +69,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     }
 
     try {
+      _clubName = await UserService.currentClubName();
+      _tierConfigs = await _tierConfigService.fetchConfigs(_clubName);
+
       final row = await _client
           .from('user_profiles')
           .select('member_since, membership_type')
@@ -81,6 +93,265 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  bool get _isNrrClub {
+    final normalized = (_clubName ?? '').trim().toLowerCase();
+    return normalized == 'norwich road runners' || normalized == 'nrr';
+  }
+
+  bool get _showDigitalMembershipBackup =>
+      _isNrrClub && PaymentService.nrrMembershipPaymentsEnabled;
+
+  Color get _clubPrimaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : _nnbrYellow;
+
+  Color get _clubSecondaryColor => _isNrrClub ? Colors.white : _nnbrBlue;
+
+  Map<String, int> get _defaultTierAmounts => _isNrrClub
+      ? const {'1st Claim': 4200, '2nd Claim': 2300}
+      : const {
+          '1st Claim': 3000,
+          '2nd Claim': 1500,
+          'Social': 500,
+          'Full-Time Education': 1500,
+        };
+
+  int _amountPenceForTier(String tierName) =>
+      _tierConfigs[tierName]?.amountPence ?? _defaultTierAmounts[tierName] ?? 0;
+
+  String _priceLabelForTier(String tierName) =>
+      '£${(_amountPenceForTier(tierName) / 100).toStringAsFixed(0)}';
+
+  Future<void> _showEditAmountDialog(String tierName) async {
+    final clubName = _clubName;
+    if (!_isAdmin || clubName == null || clubName.trim().isEmpty) return;
+
+    final controller = TextEditingController(
+      text: (_amountPenceForTier(tierName) / 100).toStringAsFixed(2),
+    );
+    final messenger = ScaffoldMessenger.of(context);
+
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF0F111A),
+        title: Text(
+          'Edit $tierName amount',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Amount (£)',
+            labelStyle: TextStyle(color: Colors.white70),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave != true) return;
+
+    final parsedAmount = double.tryParse(
+      controller.text.trim().replaceAll('£', ''),
+    );
+    if (parsedAmount == null || parsedAmount < 0) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please enter a valid amount.')),
+      );
+      return;
+    }
+
+    try {
+      await _tierConfigService.updateAmount(
+        clubName: clubName,
+        tierName: tierName,
+        amountPence: (parsedAmount * 100).round(),
+      );
+      final refreshed = await _tierConfigService.fetchConfigs(clubName);
+      if (!mounted) return;
+      setState(() {
+        _tierConfigs = refreshed;
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text('$tierName amount updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update amount: $e')),
+      );
+    }
+  }
+
+  Future<String?> _membershipSecretaryEmailForClub(String clubName) async {
+    final committeeRows = await _client
+        .from('committee_roles')
+        .select('role, email')
+        .eq('club', clubName);
+
+    for (final row in committeeRows) {
+      final role = ((row['role'] as String?) ?? '').toLowerCase();
+      final email = (row['email'] as String?)?.trim();
+      if (role.contains('membership secretary') &&
+          email != null &&
+          email.isNotEmpty) {
+        return email;
+      }
+    }
+
+    return null;
+  }
+
+  String _membershipStatusLabel(String tierName) {
+    return tierName == '1st Claim'
+        ? 'First Claim'
+        : tierName == '2nd Claim'
+        ? 'Second Claim'
+        : tierName;
+  }
+
+  Future<bool> _launchMembershipRequestEmail({
+    required String membershipSecretaryEmail,
+    required String tierName,
+    bool paymentCompleted = false,
+  }) async {
+    final statusText = _membershipStatusLabel(tierName);
+    final body = paymentCompleted
+        ? 'I have completed a Stripe payment for my $statusText club membership renewal. '
+              'May I therefore request that the UK Athletics registration order is now raised and confirmed.'
+        : 'I intend to renew my club membership on a $statusText status. '
+              'May I therefore request to please raise an order through the UK Athletic to complete my registration and the payment required.';
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: membershipSecretaryEmail,
+      queryParameters: {
+        'subject': paymentCompleted
+            ? 'Membership Payment Completed'
+            : 'Raise Membership Order',
+        'body': body,
+      },
+    );
+
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _handleDigitalBuy({
+    required String tierName,
+    required int amountCents,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please log in to continue')),
+      );
+      return;
+    }
+
+    try {
+      final clubName = _clubName ?? await UserService.currentClubName();
+      if (clubName == null || clubName.isEmpty) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to determine your club. Please contact an administrator.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      final paid = await PaymentService.startMembershipPayment(
+        context: context,
+        tierName: tierName,
+        amountCents: amountCents,
+        metadata: {
+          'context': 'membership_renewal',
+          'club': clubName,
+          'membership_tier': tierName,
+          'user_id': user.id,
+        },
+      );
+
+      if (!paid || !mounted) {
+        return;
+      }
+
+      final membershipSecretaryEmail = await _membershipSecretaryEmailForClub(
+        clubName,
+      );
+
+      if (!mounted) return;
+
+      if (membershipSecretaryEmail == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payment succeeded, but no Membership Secretary email is configured yet.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Payment received'),
+            content: const Text(
+              'Your payment has been completed. Email the Membership Secretary now to finish the current NRR renewal process.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Later'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  final launched = await _launchMembershipRequestEmail(
+                    membershipSecretaryEmail: membershipSecretaryEmail,
+                    tierName: tierName,
+                    paymentCompleted: true,
+                  );
+
+                  if (!launched && mounted) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not open your email app.'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Email Membership Secretary'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Error starting digital membership payment: $e');
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Payment failed: $e')));
     }
   }
 
@@ -176,13 +447,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildStatusCard() {
-    final colorScheme = Theme.of(context).colorScheme;
-    Color borderColor = colorScheme.primary;
-
-    // Avoid washed-out white borders if the primary is very bright
-    if (borderColor.computeLuminance() > 0.8) {
-      borderColor = colorScheme.secondary;
-    }
+    final borderColor = _clubPrimaryColor.computeLuminance() > 0.8
+        ? _clubSecondaryColor
+        : _clubPrimaryColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -206,7 +473,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color.fromRGBO(230, 240, 89, 1),
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 6),
@@ -245,6 +512,45 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildMembershipBadge(String type, Color color) {
+    if (!_isNrrClub) {
+      String assetPath;
+      switch (type) {
+        case '1st Claim':
+          assetPath = 'assets/images/firstclaim.png';
+          break;
+        case '2nd Claim':
+          assetPath = 'assets/images/secondclaim.png';
+          break;
+        case 'Social':
+          assetPath = 'assets/images/socialclaim.png';
+          break;
+        case 'Full-Time Education':
+          assetPath = 'assets/images/fulleduc.png';
+          break;
+        default:
+          assetPath = 'assets/images/nnbr_logo.png';
+      }
+
+      return Container(
+        width: 74,
+        height: 74,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(assetPath, fit: BoxFit.contain),
+        ),
+      );
+    }
+
     String assetPath;
     var invertLogo = false;
 
@@ -310,13 +616,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildMembershipTiers() {
-    final colorScheme = Theme.of(context).colorScheme;
-    var firstClaimColor = colorScheme.primary;
-    var secondClaimColor = colorScheme.secondary;
-
-    if (secondClaimColor.computeLuminance() > 0.9) {
-      secondClaimColor = Colors.white70;
-    }
+    final firstClaimColor = _isNrrClub ? _clubPrimaryColor : _nnbrYellow;
+    final secondClaimColor = _isNrrClub ? _clubSecondaryColor : _nnbrBlue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,39 +631,98 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
           ),
         ),
         const SizedBox(height: 16),
-        _membershipTierCard(
-          color: firstClaimColor,
-          title: "First Claim (Including UKA)",
-          subtitle: "Full club membership",
-          price: "£42",
-          details:
-              "1 year membership. Includes £19 England Athletics athlete registration.",
-          buttonColor: firstClaimColor,
-          onBuy: () => _handleBuy("1st Claim"),
-        ),
-        const SizedBox(height: 12),
-        _membershipTierCard(
-          color: secondClaimColor,
-          title: "Second Claim",
-          subtitle: "Second claim membership",
-          price: "£23",
-          details:
-              "1 year membership for runners registered first claim with another club.",
-          buttonColor: secondClaimColor,
-          onBuy: () => _handleBuy("2nd Claim"),
-        ),
+        if (_isNrrClub) ...[
+          _membershipTierCard(
+            color: firstClaimColor,
+            tierName: '1st Claim',
+            title: "First Claim (Including UKA)",
+            subtitle: "Full club membership",
+            details:
+                "1 year membership. Includes £19 England Athletics athlete registration.",
+            buttonColor: firstClaimColor,
+            onBuy: () => _handleBuy("1st Claim"),
+            onDigitalBuy: _showDigitalMembershipBackup
+                ? () => _handleDigitalBuy(
+                    tierName: '1st Claim',
+                    amountCents: _amountPenceForTier('1st Claim'),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 12),
+          _membershipTierCard(
+            color: secondClaimColor,
+            tierName: '2nd Claim',
+            title: "Second Claim",
+            subtitle: "Second claim membership",
+            details:
+                "1 year membership for runners registered first claim with another club.",
+            buttonColor: secondClaimColor,
+            onBuy: () => _handleBuy("2nd Claim"),
+            onDigitalBuy: _showDigitalMembershipBackup
+                ? () => _handleDigitalBuy(
+                    tierName: '2nd Claim',
+                    amountCents: _amountPenceForTier('2nd Claim'),
+                  )
+                : null,
+          ),
+        ] else ...[
+          _membershipTierCard(
+            color: _nnbrYellow,
+            tierName: '1st Claim',
+            title: "1st Claim",
+            subtitle: "Standard membership",
+            details:
+                "1 year membership. Includes £20 England Athletics athlete registration.",
+            buttonColor: _nnbrYellow,
+            onBuy: () => _handleBuy("1st Claim"),
+          ),
+          const SizedBox(height: 12),
+          _membershipTierCard(
+            color: _nnbrBlue,
+            tierName: '2nd Claim',
+            title: "2nd Claim",
+            subtitle: "Secondary membership",
+            details:
+                "1 year membership for runners registered first claim with another club.",
+            buttonColor: _nnbrBlue,
+            onBuy: () => _handleBuy("2nd Claim"),
+          ),
+          const SizedBox(height: 12),
+          _membershipTierCard(
+            color: _socialGray,
+            tierName: 'Social',
+            title: "Social",
+            subtitle: "Social membership",
+            details:
+                "1 year membership for social members and non-runners who want to stay involved with the club.",
+            buttonColor: _socialGray,
+            onBuy: () => _handleBuy("Social"),
+          ),
+          const SizedBox(height: 12),
+          _membershipTierCard(
+            color: _educationGreen,
+            tierName: 'Full-Time Education',
+            title: "Full-Time Education",
+            subtitle: "Student membership",
+            details:
+                "1 year membership for full-time students who want full access to club membership benefits.",
+            buttonColor: _educationGreen,
+            onBuy: () => _handleBuy("Full-Time Education"),
+          ),
+        ],
       ],
     );
   }
 
   Widget _membershipTierCard({
     required Color color,
+    required String tierName,
     required String title,
     required String subtitle,
-    required String price,
     required String details,
     required Color buttonColor,
     required VoidCallback onBuy,
+    VoidCallback? onDigitalBuy,
   }) {
     final buttonTextColor = buttonColor.computeLuminance() > 0.6
         ? Colors.black
@@ -404,13 +764,31 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   ],
                 ),
               ),
-              Text(
-                price,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _priceLabelForTier(tierName),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  if (_isAdmin)
+                    TextButton.icon(
+                      onPressed: () => _showEditAmountDialog(tierName),
+                      icon: const Icon(Icons.edit_outlined, size: 14),
+                      label: const Text('Edit'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 24),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -432,7 +810,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               ),
               onPressed: onBuy,
               child: Text(
-                "Request to Raise an Order",
+                _isNrrClub ? "Request to Raise an Order" : "Buy",
                 style: TextStyle(
                   color: buttonTextColor,
                   fontWeight: FontWeight.bold,
@@ -441,19 +819,37 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               ),
             ),
           ),
+          if (onDigitalBuy != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onDigitalBuy,
+                icon: const Icon(Icons.payment),
+                label: const Text(
+                  'Pay in App with Stripe',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: color.withValues(alpha: 0.75)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildMembershipInfo() {
-    final colorScheme = Theme.of(context).colorScheme;
-    Color borderColor = colorScheme.primary;
-
-    // Fall back to accent if primary is too close to white
-    if (borderColor.computeLuminance() > 0.8) {
-      borderColor = colorScheme.secondary;
-    }
+    final borderColor = _clubPrimaryColor.computeLuminance() > 0.8
+        ? _clubSecondaryColor
+        : _clubPrimaryColor;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -468,20 +864,19 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Expanded(
+              Expanded(
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "About NRR Membership",
+                    _isNrrClub
+                        ? "About NRR Membership"
+                        : "About NNBR Membership",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color.from(
-                        alpha: 1,
-                        red: 0.941,
-                        green: 0.925,
-                        blue: 0.024,
-                      ),
+                      color: _clubPrimaryColor.computeLuminance() > 0.8
+                          ? _clubSecondaryColor
+                          : _clubPrimaryColor,
                     ),
                     textAlign: TextAlign.left,
                   ),
@@ -500,19 +895,20 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             TextSpan(
               style: const TextStyle(fontSize: 13, color: Colors.white70),
               children: [
-                const TextSpan(
-                  text:
-                      'Your Norwich Road Runners Membership includes access to all of the clubs training and road running sessions, use of the facilities, affiliation with UK Athletics (£19) with a discount on entering races.\n\nFor more information visit ',
+                TextSpan(
+                  text: _isNrrClub
+                      ? 'Your Norwich Road Runners Membership includes access to all of the clubs training and road running sessions, use of the facilities, affiliation with UK Athletics (£19) with a discount on entering races.\n\nFor more information visit '
+                      : 'NNBR membership keeps you connected to club training, racing, social events and member activities across the year.\n\nFor more information visit ',
                 ),
                 WidgetSpan(
                   alignment: PlaceholderAlignment.middle,
                   child: GestureDetector(
                     onTap: _launchEnglandAthleticsRegistration,
                     child: Text(
-                      'UK Athletic',
+                      _isNrrClub ? 'UK Athletic' : 'England Athletics',
                       style: TextStyle(
                         fontSize: 13,
-                        color: colorScheme.secondary,
+                        color: _clubSecondaryColor,
                         decoration: TextDecoration.underline,
                       ),
                     ),
@@ -524,137 +920,159 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          const Text(
-            "When entering races as an affiliated club runner, please note that official club race vests or T-shirts must be worn.\n\n"
-            "Membership also includes:",
-            style: TextStyle(fontSize: 13, color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-              children: [
-                const TextSpan(text: '• Affiliation with '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: _launchAthleticsNorfolk,
-                    child: Text(
-                      'Athletics Norfolk',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.secondary,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
-                const TextSpan(
-                  text:
-                      '. This makes you eligible for county championship team prizes',
-                ),
-              ],
+          if (_isNrrClub) ...[
+            const Text(
+              "When entering races as an affiliated club runner, please note that official club race vests or T-shirts must be worn.\n\n"
+              "Membership also includes:",
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-              children: [
-                const TextSpan(text: '• Team access to the '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: _openRelayAndCrossCountryPage,
-                    child: Text(
-                      'Round Norfolk Relay',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.secondary,
-                        decoration: TextDecoration.underline,
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+                children: [
+                  const TextSpan(text: '• Affiliation with '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _launchAthleticsNorfolk,
+                      child: Text(
+                        'Athletics Norfolk',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _clubSecondaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const TextSpan(
+                    text:
+                        '. This makes you eligible for county championship team prizes',
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-              children: [
-                const TextSpan(text: '• Free entry and subsidised travel to '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: _openRelayAndCrossCountryPage,
-                    child: Text(
-                      'Norfolk',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.secondary,
-                        decoration: TextDecoration.underline,
+            const SizedBox(height: 10),
+            Text.rich(
+              TextSpan(
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+                children: [
+                  const TextSpan(text: '• Team access to the '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _openRelayAndCrossCountryPage,
+                      child: Text(
+                        'Round Norfolk Relay',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _clubSecondaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const TextSpan(text: ' and '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: _openRelayAndCrossCountryPage,
-                    child: Text(
-                      'National Cross Country',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.secondary,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
-                const TextSpan(text: ' events'),
-              ],
+                ],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Access to our social events (Christmas party, club social nights etc) and most importantly, the ability to meet with, train and socialise with a large group of friendly and like-minded individuals.',
-            style: TextStyle(fontSize: 13, color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-              children: [
-                const TextSpan(
-                  text:
-                      'An opportunity to apply for a club London Marathon Ballot space ',
-                ),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: GestureDetector(
-                    onTap: _showEligibilityAndApplicationComingSoon,
-                    child: Text(
-                      '(Eligibility & Application)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.secondary,
-                        decoration: TextDecoration.underline,
+            const SizedBox(height: 10),
+            Text.rich(
+              TextSpan(
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+                children: [
+                  const TextSpan(
+                    text: '• Free entry and subsidised travel to ',
+                  ),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _openRelayAndCrossCountryPage,
+                      child: Text(
+                        'Norfolk',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _clubSecondaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const TextSpan(text: ' and '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _openRelayAndCrossCountryPage,
+                      child: Text(
+                        'National Cross Country',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _clubSecondaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const TextSpan(text: ' events'),
+                ],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
+            const SizedBox(height: 12),
+            const Text(
+              'Access to our social events (Christmas party, club social nights etc) and most importantly, the ability to meet with, train and socialise with a large group of friendly and like-minded individuals.',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+                children: [
+                  const TextSpan(
+                    text:
+                        'An opportunity to apply for a club London Marathon Ballot space ',
+                  ),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _showEligibilityAndApplicationComingSoon,
+                      child: Text(
+                        '(Eligibility & Application)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _clubSecondaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ] else ...[
+            const Text(
+              'NNBR membership offers four membership types so runners, social members and students can choose the option that fits them best.',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Choose First Claim, Second Claim, Social or Full-Time Education membership depending on your current athletics status and how you want to take part in club life.',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Membership supports training, racing, club communications and social events throughout the year.',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 12),
           if (_isAdmin)
             SizedBox(
@@ -903,21 +1321,22 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
+                            final navigator = Navigator.of(sheetContext);
+                            final messenger = ScaffoldMessenger.of(context);
                             await Clipboard.setData(
                               ClipboardData(text: content),
                             );
-                            if (Navigator.canPop(sheetContext)) {
-                              Navigator.pop(sheetContext);
+                            if (!mounted) return;
+                            if (navigator.canPop()) {
+                              navigator.pop();
                             }
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Copied membership report to clipboard.',
-                                  ),
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Copied membership report to clipboard.',
                                 ),
-                              );
-                            }
+                              ),
+                            );
                           },
                           icon: const Icon(Icons.copy, size: 18),
                           label: const Text('Copy'),
@@ -1010,7 +1429,43 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
     () async {
       try {
-        final clubName = await UserService.currentClubName();
+        final amountCents = _amountPenceForTier(tierName);
+        if (!_isNrrClub) {
+          final paid = await PaymentService.startMembershipPayment(
+            context: context,
+            tierName: tierName,
+            amountCents: amountCents,
+            metadata: {
+              'context': 'membership_renewal',
+              'club': _clubName,
+              'membership_tier': tierName,
+              'user_id': user.id,
+            },
+          );
+
+          if (!paid) return;
+
+          final updates = {
+            'membership_type': tierName,
+            if (_memberSince == null)
+              'member_since': DateTime.now().toIso8601String(),
+          };
+
+          await _client.from('user_profiles').update(updates).eq('id', user.id);
+
+          if (!mounted) return;
+          setState(() {
+            _membershipType = tierName;
+            _memberSince ??= _formatMonthYear(DateTime.now().toIso8601String());
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Membership purchased: $tierName')),
+          );
+          return;
+        }
+
+        final clubName = _clubName ?? await UserService.currentClubName();
         if (clubName == null || clubName.isEmpty) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1023,22 +1478,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
           return;
         }
 
-        final committeeRows = await _client
-            .from('committee_roles')
-            .select('role, email')
-            .eq('club', clubName);
-
-        String? membershipSecretaryEmail;
-        for (final row in committeeRows) {
-          final role = ((row['role'] as String?) ?? '').toLowerCase();
-          final email = (row['email'] as String?)?.trim();
-          if (role.contains('membership secretary') &&
-              email != null &&
-              email.isNotEmpty) {
-            membershipSecretaryEmail = email;
-            break;
-          }
-        }
+        final membershipSecretaryEmail = await _membershipSecretaryEmailForClub(
+          clubName,
+        );
 
         if (membershipSecretaryEmail == null) {
           if (!mounted) return;
@@ -1052,25 +1494,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
           return;
         }
 
-        final statusText = tierName == '1st Claim'
-            ? 'First Claim'
-            : tierName == '2nd Claim'
-            ? 'Second Claim'
-            : tierName;
-
-        final body =
-            'I intend to renew my club membership on a $statusText status. '
-            'May I therefore request to please raise an order through the UK Athletic to complete my registration and the payment required.';
-
-        final uri = Uri(
-          scheme: 'mailto',
-          path: membershipSecretaryEmail,
-          queryParameters: {'subject': 'Raise Membership Order', 'body': body},
-        );
-
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
+        final launched = await _launchMembershipRequestEmail(
+          membershipSecretaryEmail: membershipSecretaryEmail,
+          tierName: tierName,
         );
 
         if (!launched && mounted) {
@@ -1080,6 +1506,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         }
       } catch (e) {
         debugPrint('Error requesting membership order: $e');
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Request failed: $e')));

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runrank/main.dart' show routeObserver;
 import 'package:runrank/services/runners_awards_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,9 +11,11 @@ class RunnersOfTheYearPage extends StatefulWidget {
   State<RunnersOfTheYearPage> createState() => _RunnersOfTheYearPageState();
 }
 
-class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
+class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
+    with RouteAware {
   static const yellow = Color(0xFFFFD300);
   static const blue = Color(0xFF0057B7);
+  static const nrrRed = Color(0xFFD32F2F);
 
   final _service = RunnersAwardsService();
   bool _isAdmin = false;
@@ -20,6 +23,51 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   bool _loading = true;
   List<String> _memberNames = [];
   String? _clubName;
+
+  bool get _isNrrClub {
+    final lower = (_clubName ?? '').trim().toLowerCase();
+    return lower == 'nrr' || lower.contains('norwich road runners');
+  }
+
+  List<Color> get _appBarGradient => _isNrrClub
+      ? const [Color(0xFF000000), Color(0xFF6E1118)]
+      : UserService.clubBrandGradient(_clubName);
+
+  List<Color> get _pageBackgroundGradient => _isNrrClub
+      ? const [Color(0xFF050505), Color(0xFF19090C), Color(0xFF000000)]
+      : UserService.clubBrandGradient(
+          _clubName,
+        ).map((c) => c.withValues(alpha: 0.1)).toList();
+
+  String get _heroImageAsset =>
+      _isNrrClub ? 'assets/images/nrraward.png' : 'assets/images/awards.png';
+
+  List<Color> get _heroRibbonGradient => _isNrrClub
+      ? const [Color(0xFFB71C1C), Color(0xFF111111)]
+      : const [blue, yellow];
+
+  List<Color> get _heroShadeGradient => _isNrrClub
+      ? const [Color(0x33000000), Color(0x99000000), Color(0xEE000000)]
+      : const [Colors.transparent, Colors.black54];
+
+  Color get _pageSurfaceColor =>
+      _isNrrClub ? const Color(0xFF101010) : const Color(0xFF0F111A);
+
+  Color get _pageBorderColor => _isNrrClub ? const Color(0x66D32F2F) : yellow;
+
+  Color get _titleAccentColor => Colors.white;
+
+  Color get _headerLabelColor =>
+      _isNrrClub ? Colors.white70 : const Color.fromRGBO(30, 145, 233, 0.702);
+
+  Color get _addButtonColor => _isNrrClub ? Colors.white : yellow;
+
+  Color get _tabStripColor =>
+      _isNrrClub ? const Color(0xFF050505) : const Color(0xFF0F111A);
+
+  Color get _tabSelectedColor => _isNrrClub ? nrrRed : yellow;
+
+  Color get _tabUnselectedColor => _isNrrClub ? Colors.white30 : Colors.white24;
 
   final List<Map<String, String>> _awards = const [
     {'key': 'short_performance', 'title': '🏃‍♀️Short Distance🏃‍➡️'},
@@ -38,25 +86,59 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     _load();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _load();
+  }
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _winnersByAward.clear();
+      _memberNames = [];
+    });
     try {
       final isAdmin = await UserService.isAdmin();
       final clubName = await UserService.currentClubName();
+      final canonicalClub = RunnersAwardsService.canonicalClubName(clubName);
       final Map<String, List<AwardWinnerRow>> map = {};
-      for (final a in _awards) {
-        final key = a['key']!;
-        map[key] = await _service.fetchWinners(key);
+      if (canonicalClub.isNotEmpty) {
+        for (final a in _awards) {
+          final key = a['key']!;
+          map[key] = await _service.fetchWinners(key, clubName: canonicalClub);
+        }
       }
-      // Fetch member names for typeahead
+
+      // Fetch member names for typeahead, scoped to the current club.
       final membersRows = await Supabase.instance.client
           .from('user_profiles')
-          .select('full_name')
+          .select('full_name, club')
           .order('full_name');
       final names = (membersRows as List)
+          .where((r) {
+            final profileClub = RunnersAwardsService.canonicalClubName(
+              r['club'] as String?,
+            );
+            return profileClub.isNotEmpty && profileClub == canonicalClub;
+          })
           .map((r) => (r['full_name'] as String?)?.trim())
-          .where((n) => n != null && n.isNotEmpty)
-          .map((n) => n!)
+          .whereType<String>()
+          .where((n) => n.isNotEmpty)
           .toList();
       if (!mounted) return;
       setState(() {
@@ -245,9 +327,11 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     );
     if (ok != true) return;
     final year = int.tryParse(yearController.text.trim());
-    if (year == null) return;
+    final clubName = _clubName;
+    if (year == null || clubName == null || clubName.trim().isEmpty) return;
     await _service.addWinner(
       awardKey: awardKey,
+      clubName: clubName,
       year: year,
       femaleName: isNewcomer
           ? (newcomerController.text.trim().isEmpty
@@ -346,8 +430,14 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                                 ),
                               );
                               if (confirm == true) {
+                                final clubName = _clubName;
+                                if (clubName == null ||
+                                    clubName.trim().isEmpty) {
+                                  return;
+                                }
                                 await _service.deleteWinner(
                                   awardKey: awardKey,
+                                  clubName: clubName,
                                   year: r.year,
                                 );
                                 await _load();
@@ -514,8 +604,11 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
       ),
     );
     if (ok != true) return;
+    final clubName = _clubName;
+    if (clubName == null || clubName.trim().isEmpty) return;
     await _service.updateWinner(
       awardKey: awardKey,
+      clubName: clubName,
       year: row.year,
       femaleName: isNewcomer
           ? (newcomerController.text.trim().isEmpty
@@ -535,8 +628,6 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColors = UserService.clubBrandGradient(_clubName);
-
     return DefaultTabController(
       length: _awards.length,
       child: Scaffold(
@@ -546,7 +637,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: brandColors,
+                colors: _appBarGradient,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -559,9 +650,7 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
             : Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: brandColors
-                        .map((c) => c.withValues(alpha: 0.1))
-                        .toList(),
+                    colors: _pageBackgroundGradient,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -575,45 +664,64 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Container(color: blue.withOpacity(0.06)),
+                          Container(
+                            color: (_isNrrClub ? nrrRed : blue).withValues(
+                              alpha: _isNrrClub ? 0.10 : 0.06,
+                            ),
+                          ),
                           Opacity(
-                            opacity: 0.9,
+                            opacity: _isNrrClub ? 0.82 : 0.9,
                             child: Image.asset(
-                              'assets/images/awards.png',
+                              _heroImageAsset,
                               fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
+                              alignment: _isNrrClub
+                                  ? Alignment.center
+                                  : Alignment.topCenter,
                             ),
                           ),
                           Container(
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Colors.transparent, Colors.black54],
+                                colors: _heroShadeGradient,
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                               ),
                             ),
                           ),
+                          if (_isNrrClub)
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.12),
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.28),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                              ),
+                            ),
                           Positioned(
                             left: 0,
                             right: 0,
                             bottom: 0,
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF0057B7),
-                                    Color(0xFFFFD300),
-                                  ],
+                                  colors: _heroRibbonGradient,
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Text(
                                   "🏆The Winners' List🏆",
                                   style: TextStyle(
-                                    color: Colors.black,
+                                    color: _isNrrClub
+                                        ? Colors.white
+                                        : Colors.black,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.3,
@@ -628,12 +736,12 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
                     // Tight, even spacing around dots indicator
                     const SizedBox(height: 2),
                     Container(
-                      color: const Color(0xFF0F111A),
+                      color: _tabStripColor,
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Builder(
                         builder: (ctx) => TabPageSelector(
-                          selectedColor: yellow,
-                          color: Colors.white24,
+                          selectedColor: _tabSelectedColor,
+                          color: _tabUnselectedColor,
                           controller: DefaultTabController.of(ctx),
                         ),
                       ),
@@ -676,88 +784,112 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Card(
-        color: const Color(0xFF0F111A),
+        color: _pageSurfaceColor,
+        elevation: 0,
+        shadowColor: Colors.black,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: yellow, width: 1),
+          side: BorderSide(color: _pageBorderColor, width: 1),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            switchInCurve: Curves.easeInOut,
-            switchOutCurve: Curves.easeInOut,
-            child: Column(
-              key: ValueKey<String>(awardKey),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  height: 28,
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      if (_isAdmin) ...[
-                        Align(
-                          alignment: Alignment.topLeft,
-                          child: IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            color: Colors.redAccent,
-                            tooltip: 'Manage entries',
-                            onPressed: () =>
-                                _manageAwardEntries(awardKey, rows, isNewcomer),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            color: yellow,
-                            tooltip: 'Add winner',
-                            onPressed: () => _addWinnerDialogForAward(
-                              awardKey: awardKey,
-                              title: title,
-                              isNewcomer: isNewcomer,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              colors: _isNrrClub
+                  ? const [Color(0xFF181818), Color(0xFF080808)]
+                  : const [Color(0xFF141722), Color(0xFF0F111A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _isNrrClub ? 0.28 : 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              child: Column(
+                key: ValueKey<String>(awardKey),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 28,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _titleAccentColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _columnsHeader(isNewcomer: isNewcomer),
-                const Divider(color: Colors.white12),
-                Expanded(
-                  child: rows.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No winners recorded yet',
-                            style: TextStyle(color: Colors.white54),
+                        if (_isAdmin) ...[
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: IconButton(
+                              icon: const Icon(Icons.remove_circle_outline),
+                              color: Colors.redAccent,
+                              tooltip: 'Manage entries',
+                              onPressed: () => _manageAwardEntries(
+                                awardKey,
+                                rows,
+                                isNewcomer,
+                              ),
+                            ),
                           ),
-                        )
-                      : ListView.separated(
-                          itemCount: rows.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(color: Colors.white10),
-                          itemBuilder: (ctx, i) {
-                            final r = rows[i];
-                            return isNewcomer
-                                ? _rowNewcomer(r)
-                                : _rowStandard(r);
-                          },
-                        ),
-                ),
-              ],
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              color: _addButtonColor,
+                              tooltip: 'Add winner',
+                              onPressed: () => _addWinnerDialogForAward(
+                                awardKey: awardKey,
+                                title: title,
+                                isNewcomer: isNewcomer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _columnsHeader(isNewcomer: isNewcomer),
+                  const Divider(color: Colors.white12),
+                  Expanded(
+                    child: rows.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No winners recorded yet',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: rows.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(color: Colors.white10),
+                            itemBuilder: (ctx, i) {
+                              final r = rows[i];
+                              return isNewcomer
+                                  ? _rowNewcomer(r)
+                                  : _rowStandard(r);
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -766,8 +898,8 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage> {
   }
 
   Widget _columnsHeader({required bool isNewcomer}) {
-    final style = const TextStyle(
-      color: Color.fromRGBO(30, 145, 233, 0.702),
+    final style = TextStyle(
+      color: _headerLabelColor,
       fontWeight: FontWeight.w600,
     );
     return Row(

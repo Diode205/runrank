@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 class AppSettingsPage extends StatefulWidget {
   const AppSettingsPage({super.key});
@@ -19,11 +20,40 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       'https://docs.google.com/document/d/e/2PACX-1vQWuKHlmIfJWxZiyr-sT2pXhGaU4zTAGFL3G1Cm_keLnja76E6eXzkUYFyPkyR4rL95JftlQK63FV8N/pub';
 
   String _version = '';
+  String? _clubName;
+
+  bool get _isNrrClub {
+    final lower = (_clubName ?? '').trim().toLowerCase();
+    return lower == 'nrr' || lower.contains('norwich road runners');
+  }
+
+  Color get _primaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFFFD300);
+
+  Color get _secondaryColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+
+  List<Color> get _appBarGradient => _isNrrClub
+      ? const [Color(0xFF8E1D24), Color(0xFF200608)]
+      : const [Color(0xFF0057B7), Color(0xFFFFD300)];
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _loadClubName();
+  }
+
+  Future<void> _loadClubName() async {
+    try {
+      final clubName = await UserService.currentClubName();
+      if (!mounted) return;
+      setState(() {
+        _clubName = clubName;
+      });
+    } catch (_) {
+      // ignore
+    }
   }
 
   Future<void> _openAppPrivacy() async {
@@ -259,11 +289,22 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final primary = _primaryColor;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: _appBarGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -395,7 +436,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                       onPressed: _openAppPrivacy,
                       child: Text(
                         'View Full App Privacy Policy',
-                        style: TextStyle(color: primary),
+                        style: TextStyle(color: _secondaryColor),
                       ),
                     ),
                     TextButton(
@@ -409,7 +450,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                       },
                       child: Text(
                         'View Club Policy',
-                        style: TextStyle(color: primary),
+                        style: TextStyle(color: _secondaryColor),
                       ),
                     ),
                   ],
@@ -451,7 +492,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                     onPressed: _openTermsOfUse,
                     child: Text(
                       'View Full Terms of Use',
-                      style: TextStyle(color: primary),
+                      style: TextStyle(color: _secondaryColor),
                     ),
                   ),
                 ),

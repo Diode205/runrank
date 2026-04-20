@@ -15,6 +15,18 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
   List<ClubMilestone> _milestones = [];
   bool _loading = true;
   bool _isAdmin = false;
+  String? _clubName;
+
+  bool get _isNrrClub {
+    final club = _clubName?.toLowerCase() ?? '';
+    return club == 'nrr' || club.contains('norwich road runners');
+  }
+
+  Color get _primaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+
+  Color get _secondaryColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
 
   @override
   void initState() {
@@ -24,19 +36,18 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
+    _clubName = await UserService.currentClubName();
     _isAdmin = await UserService.isAdmin();
-    _milestones = await _service.getAllMilestones();
+    _milestones = await _service.getAllMilestones(clubName: _clubName ?? '');
     setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Colors.black,
         elevation: 0,
         title: const Text(
           'Club Milestones',
@@ -45,7 +56,7 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
         centerTitle: true,
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          ? Center(child: CircularProgressIndicator(color: _primaryColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -84,13 +95,11 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
   }
 
   Widget _buildAdminButton() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.secondary],
+          colors: [_primaryColor, _secondaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -139,8 +148,6 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
     required ClubMilestone milestone,
     required bool isLast,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return InkWell(
       onLongPress: _isAdmin ? () => _showOptionsDialog(milestone) : null,
       child: Container(
@@ -156,11 +163,11 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [colorScheme.primary, colorScheme.secondary],
+                      colors: [_primaryColor, _secondaryColor],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
+                        color: _primaryColor.withOpacity(0.3),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -190,7 +197,7 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
+                      color: _primaryColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -360,7 +367,10 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                   displayOrder: _milestones.length + 1,
                 );
 
-                final success = await _service.addMilestone(milestone);
+                final success = await _service.addMilestone(
+                  milestone,
+                  clubName: _clubName ?? '',
+                );
                 if (mounted) {
                   if (success) {
                     Navigator.pop(context);
@@ -564,6 +574,7 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
                 final success = await _service.updateMilestone(
                   milestone.id,
                   updated,
+                  clubName: _clubName ?? '',
                 );
                 if (success && mounted) {
                   Navigator.pop(context);
@@ -605,7 +616,10 @@ class _ClubMilestonesPageState extends State<ClubMilestonesPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final success = await _service.deleteMilestone(milestone.id);
+              final success = await _service.deleteMilestone(
+                milestone.id,
+                clubName: _clubName ?? '',
+              );
               if (success && mounted) {
                 Navigator.pop(context);
                 _loadData();

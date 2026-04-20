@@ -16,6 +16,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
 
   bool _loading = true;
   bool _isAdmin = false;
+  String? _clubName;
   Map<String, List<ClubRecord>> _recordsByDistance = {};
   // 'M' or 'F' – defaults based on current user's gender
   String _currentGender = 'M';
@@ -32,6 +33,17 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   late final PageController _pageController;
   int _currentIndex = 0;
 
+  bool get _isNrrClub {
+    final club = _clubName?.toLowerCase() ?? '';
+    return club == 'nrr' || club.contains('norwich road runners');
+  }
+
+  Color get _primaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+
+  Color get _secondaryColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +59,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   Future<void> _loadData() async {
     setState(() => _loading = true);
 
+    _clubName = await UserService.currentClubName();
     _isAdmin = await UserService.isAdmin();
     final defaultGender = await _recordsService.getDefaultGenderFilter();
     if (defaultGender != null &&
@@ -79,12 +92,10 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   @override
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Colors.black,
         elevation: 0,
         title: Text(
           'Club Records — ${_distances[_currentIndex]}',
@@ -98,9 +109,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: _loading
-            ? Center(
-                child: CircularProgressIndicator(color: colorScheme.primary),
-              )
+            ? Center(child: CircularProgressIndicator(color: _primaryColor))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -167,8 +176,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildAdminButtons() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final syncForegroundColor = colorScheme.secondary.computeLuminance() > 0.6
+    final syncForegroundColor = _secondaryColor.computeLuminance() > 0.6
         ? Colors.black
         : Colors.white;
 
@@ -177,17 +185,13 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+        border: Border.all(color: _primaryColor.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(
-                Icons.admin_panel_settings,
-                color: colorScheme.primary,
-                size: 20,
-              ),
+              Icon(Icons.admin_panel_settings, color: _primaryColor, size: 20),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
@@ -203,8 +207,8 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add Record'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.primary.computeLuminance() > 0.6
+                  backgroundColor: _primaryColor,
+                  foregroundColor: _primaryColor.computeLuminance() > 0.6
                       ? Colors.black
                       : Colors.white,
                   padding: const EdgeInsets.symmetric(
@@ -225,7 +229,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
               icon: const Icon(Icons.sync, size: 18),
               label: const Text('Sync from Race Results'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.secondary,
+                backgroundColor: _secondaryColor,
                 foregroundColor: syncForegroundColor,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -240,7 +244,6 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildGenderToggle() {
-    final colorScheme = Theme.of(context).colorScheme;
     final isMale = _currentGender == 'M';
     final currentLabel = isMale
         ? "Showing Men's Records"
@@ -268,7 +271,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: BorderSide(color: colorScheme.primary),
+              side: BorderSide(color: _primaryColor),
             ),
             child: Text(
               buttonLabel,
@@ -362,15 +365,13 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildDistanceHeader(String distance) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Row(
       children: [
         Container(
           width: 4,
           height: 24,
           decoration: BoxDecoration(
-            color: colorScheme.primary,
+            color: _primaryColor,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -380,7 +381,7 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: colorScheme.primary,
+            color: _primaryColor,
           ),
         ),
       ],

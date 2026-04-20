@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/kit_products_service.dart';
+import 'package:runrank/services/payment_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -250,6 +251,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
           ),
           ElevatedButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
               final updatedStock = <String, int>{};
               controllers.forEach((size, controller) {
                 updatedStock[size] = int.tryParse(controller.text) ?? 0;
@@ -281,8 +283,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                   price: newPrice,
                 );
               }
-              if (success && mounted) {
-                Navigator.pop(context);
+              if (!mounted) return;
+              if (success) {
+                navigator.pop();
                 _loadData();
               }
             },
@@ -351,7 +354,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
           style: const TextStyle(color: Colors.white),
         ),
         content: DropdownButtonFormField<String>(
-          value: selectedSize,
+          initialValue: selectedSize,
           dropdownColor: Colors.black,
           decoration: const InputDecoration(
             labelText: 'Size',
@@ -921,6 +924,10 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
     final visibleSizes = _visibleSizesForProduct(product);
     final hasStock = visibleSizes.any((size) => (product.stock[size] ?? 0) > 0);
     final nrrConfig = _isNrrClub ? _findNrrConfig(product.productName) : null;
+    final showOnlineBackupCheckout =
+        _isNrrClub &&
+        PaymentService.nrrKitPaymentsEnabled &&
+        product.stripeUrl.trim().isNotEmpty;
     final borderColor = _isNrrClub
         ? (hasStock ? const Color(0xFFD32F2F) : const Color(0x66D32F2F))
         : (hasStock
@@ -1156,6 +1163,30 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                   ),
                 ),
               ),
+              if (showOnlineBackupCheckout) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: hasStock
+                        ? () => _showStripeCheckout(product.stripeUrl)
+                        : null,
+                    icon: const Icon(Icons.payment_outlined, size: 18),
+                    label: const Text(
+                      'Backup Online Checkout',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFD32F2F)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

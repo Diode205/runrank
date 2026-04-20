@@ -58,6 +58,22 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
+  Color get _clubPrimaryColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFFFD300);
+
+  Color get _clubSecondaryColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+
+  Color get _quickEditBackgroundColor =>
+      _isNrrClub ? const Color(0xFF140708) : const Color(0xFF0F111A);
+
+  Color get _quickEditFieldFillColor =>
+      _isNrrClub ? const Color(0xFF211012) : const Color(0xFF161B26);
+
+  List<Color> get _quickEditHeaderGradient => _isNrrClub
+      ? const [Color(0xFF7B1620), Color(0xFF200608)]
+      : const [Color(0xFF0057B7), Color(0xFFFFD300)];
+
   @override
   void initState() {
     super.initState();
@@ -105,14 +121,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       isDismissible: true,
       enableDrag: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFF0F111A),
+      backgroundColor: _quickEditBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final colorScheme = Theme.of(context).colorScheme;
             final messenger = ScaffoldMessenger.of(this.context);
             return Padding(
               padding: EdgeInsets.only(
@@ -130,38 +145,50 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _quickEditHeaderGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Quick edit',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(sheetContext),
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Center(
                         child: Container(
                           width: 44,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.white24,
+                            color: _clubSecondaryColor.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Quick edit',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Close',
-                            onPressed: () => Navigator.pop(sheetContext),
-                            icon: const Icon(
-                              Icons.close,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
                       ),
                       const Text(
                         'Swipe down or tap close to dismiss.',
@@ -210,7 +237,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                           setModalState(() => selectedMembershipType = val);
                         },
                         decoration: _inputDecoration('Select membership'),
-                        dropdownColor: const Color(0xFF0F111A),
+                        dropdownColor: _quickEditBackgroundColor,
                         style: const TextStyle(color: Colors.white),
                       ),
                       const SizedBox(height: 12),
@@ -228,7 +255,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white38),
+                          side: BorderSide(color: _clubSecondaryColor),
                         ),
                         onPressed: () async {
                           final now = DateTime.now();
@@ -285,7 +312,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                           );
                         },
                         decoration: _inputDecoration('Relationship'),
-                        dropdownColor: const Color(0xFF0F111A),
+                        dropdownColor: _quickEditBackgroundColor,
                         style: const TextStyle(color: Colors.white),
                       ),
                       const SizedBox(height: 12),
@@ -305,8 +332,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                           'Used by club admins and members in an emergency during training or racing.',
                           style: TextStyle(color: Colors.white54, fontSize: 12),
                         ),
-                        activeColor: colorScheme.primary,
-                        checkColor: colorScheme.onPrimary,
+                        activeColor: _clubPrimaryColor,
+                        checkColor: _isNrrClub ? Colors.white : Colors.black,
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
                       const SizedBox(height: 18),
@@ -314,8 +341,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
+                            backgroundColor: _clubPrimaryColor,
+                            foregroundColor: _isNrrClub
+                                ? Colors.white
+                                : Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -416,10 +445,14 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                               Navigator.pop(sheetContext);
                               messenger.showSnackBar(
                                 SnackBar(
-                                  backgroundColor: colorScheme.primary,
-                                  content: const Text(
+                                  backgroundColor: _clubPrimaryColor,
+                                  content: Text(
                                     'Profile updated',
-                                    style: TextStyle(color: Colors.white),
+                                    style: TextStyle(
+                                      color: _isNrrClub
+                                          ? Colors.white
+                                          : Colors.black,
+                                    ),
                                   ),
                                 ),
                               );
@@ -461,23 +494,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   InputDecoration _inputDecoration(String label) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final accent = theme.colorScheme.secondary;
-
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
       filled: true,
-      fillColor: const Color(0xFF161B26),
+      fillColor: _quickEditFieldFillColor,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: accent),
+        borderSide: BorderSide(color: _clubSecondaryColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primary),
+        borderSide: BorderSide(color: _clubPrimaryColor),
       ),
     );
   }

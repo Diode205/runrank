@@ -10,6 +10,22 @@ class NotificationService {
   static final _unreadCountController = StreamController<int>.broadcast();
   static final _eventActivityController = StreamController<int>.broadcast();
 
+  static String _canonicalClubName(String? clubName) {
+    final normalized = (clubName ?? '').trim();
+    final lower = normalized.toLowerCase();
+    if (lower == 'nrr' ||
+        lower == 'norwich-road-runners' ||
+        lower.contains('norwich road runners')) {
+      return 'Norwich Road Runners';
+    }
+    if (lower == 'nnbr' ||
+        lower == 'north-norfolk-beach-runners' ||
+        lower.contains('north norfolk beach runners')) {
+      return 'NNBR (North Norfolk Beach Runners)';
+    }
+    return normalized;
+  }
+
   // ---------------------------------------------------------------
   // SEND NOTIFICATION TO ALL USERS
   // ---------------------------------------------------------------
@@ -63,15 +79,18 @@ class NotificationService {
       "DEBUG: notifyUsersInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
     );
     try {
+      final canonicalClub = _canonicalClubName(clubName);
       final users = await _supabase
           .from('user_profiles')
           .select('id, club')
-          .eq('club', clubName);
+          .not('club', 'is', null);
 
       for (final u in users) {
         try {
           final userId = u['id'] as String?;
           if (userId == null || userId.isEmpty) continue;
+          final userClub = _canonicalClubName(u['club'] as String?);
+          if (userClub != canonicalClub) continue;
 
           final bodyWithRoute = route != null && route.isNotEmpty
               ? '[route:' + route + '] ' + body
@@ -112,16 +131,19 @@ class NotificationService {
       "DEBUG: notifyClubAdminsInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
     );
     try {
+      final canonicalClub = _canonicalClubName(clubName);
       final admins = await _supabase
           .from('user_profiles')
           .select('id, club, is_admin')
-          .eq('club', clubName)
+          .not('club', 'is', null)
           .eq('is_admin', true);
 
       for (final u in admins) {
         try {
           final userId = u['id'] as String?;
           if (userId == null || userId.isEmpty) continue;
+          final userClub = _canonicalClubName(u['club'] as String?);
+          if (userClub != canonicalClub) continue;
 
           final bodyWithRoute = route != null && route.isNotEmpty
               ? '[route:' + route + '] ' + body
