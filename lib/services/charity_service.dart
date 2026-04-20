@@ -7,7 +7,21 @@ class CharityService {
 
   static String? normalizeClubName(String? clubName) {
     final trimmed = clubName?.trim();
-    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    if (trimmed == null || trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    if (lower == 'nrr' ||
+        lower == 'norwich-road-runners' ||
+        lower.contains('norwich road runners')) {
+      return 'Norwich Road Runners';
+    }
+    if (lower == 'nnbr' ||
+        lower == 'north-norfolk-beach-runners' ||
+        lower.contains('north norfolk beach runners')) {
+      return 'NNBR (North Norfolk Beach Runners)';
+    }
+
+    return trimmed;
   }
 
   static Map<String, dynamic>? pickCharityForClub(
@@ -17,38 +31,47 @@ class CharityService {
     if (rows.isEmpty) return null;
 
     final normalizedClub = normalizeClubName(clubName);
-    if (normalizedClub != null) {
-      for (final row in rows) {
-        final rowClub = normalizeClubName(row['club'] as String?);
-        if (rowClub == normalizedClub) {
-          return row;
-        }
-      }
-    }
+    if (normalizedClub == null) return null;
 
     for (final row in rows) {
       final rowClub = normalizeClubName(row['club'] as String?);
-      if (rowClub == null) {
+      if (rowClub == normalizedClub) {
         return row;
       }
     }
 
-    return rows.first;
+    return null;
   }
 
-  static Stream<List<Map<String, dynamic>>> watchCharities() {
+  static Stream<List<Map<String, dynamic>>> watchCharities({
+    required String? clubName,
+  }) {
+    final normalizedClub = normalizeClubName(clubName);
+    if (normalizedClub == null) {
+      return Stream.value(const <Map<String, dynamic>>[]);
+    }
+
     return _supabase
         .from('charity_fundraising')
         .stream(primaryKey: ['id'])
+        .eq('club', normalizedClub)
         .order('updated_at')
         .map((rows) => List<Map<String, dynamic>>.from(rows));
   }
 
   /// Fetch the current charity record (only 1 row expected)
   static Future<Map<String, dynamic>?> getCharity({String? clubName}) async {
-    final response = await _supabase.from('charity_fundraising').select();
-    final rows = List<Map<String, dynamic>>.from(response);
-    return pickCharityForClub(rows, clubName);
+    final normalizedClub = normalizeClubName(clubName);
+    if (normalizedClub == null) return null;
+
+    final response = await _supabase
+        .from('charity_fundraising')
+        .select()
+        .eq('club', normalizedClub)
+        .maybeSingle();
+
+    if (response == null) return null;
+    return Map<String, dynamic>.from(response);
   }
 
   static Future<void> saveCharity({
@@ -61,21 +84,9 @@ class CharityService {
     required double totalRaised,
   }) async {
     final normalizedClub = normalizeClubName(clubName);
-    final response = await _supabase.from('charity_fundraising').select();
-    final rows = List<Map<String, dynamic>>.from(response);
+    if (normalizedClub == null) return;
 
-    Map<String, dynamic>? existing;
-    if (normalizedClub != null) {
-      existing = rows.cast<Map<String, dynamic>?>().firstWhere(
-        (row) => normalizeClubName(row?['club'] as String?) == normalizedClub,
-        orElse: () => null,
-      );
-    }
-
-    existing ??= rows.cast<Map<String, dynamic>?>().firstWhere(
-      (row) => normalizeClubName(row?['club'] as String?) == null,
-      orElse: () => null,
-    );
+    final existing = await getCharity(clubName: normalizedClub);
 
     final payload = <String, dynamic>{
       'club': normalizedClub,

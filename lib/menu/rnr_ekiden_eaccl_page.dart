@@ -6,6 +6,24 @@ import 'package:runrank/widgets/admin_create_event_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+bool _isNrrClubName(String? clubName) {
+  final club = (clubName ?? '').trim().toLowerCase();
+  return club == 'nrr' || club.contains('norwich road runners');
+}
+
+Color _clubPrimaryColor(String? clubName) => _isNrrClubName(clubName)
+    ? const Color(0xFFD32F2F)
+    : const Color(0xFFF5C542);
+
+Color _clubSecondaryColor(String? clubName) =>
+    _isNrrClubName(clubName) ? Colors.white : const Color(0xFF0057B7);
+
+Color _clubPrimaryForegroundColor(String? clubName) =>
+    _isNrrClubName(clubName) ? Colors.white : Colors.black;
+
+Color _clubGradientForegroundColor(String? clubName) =>
+    _isNrrClubName(clubName) ? Colors.black : Colors.white;
+
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
 
@@ -43,6 +61,15 @@ class _RnrPage extends StatefulWidget {
 class _RnrPageState extends State<_RnrPage> {
   bool _expanded = false;
   bool _isAdmin = false;
+  String? _clubName;
+
+  Color get _accentColor => _clubPrimaryColor(_clubName);
+  Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
+  List<Color> get _heroButtonGradient => [
+    _accentColor.withOpacity(0.35),
+    _clubSecondaryColor(_clubName).withOpacity(0.35),
+  ];
   final List<_StageInfo> _stages = const [
     _StageInfo(
       label: "S1: King's Lynn — PE30 2NB",
@@ -226,6 +253,7 @@ class _RnrPageState extends State<_RnrPage> {
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
+    _clubName = await UserService.currentClubName();
     if (mounted) setState(() {});
   }
 
@@ -278,10 +306,7 @@ class _RnrPageState extends State<_RnrPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(
-                      color: const Color(0xFFD32F2F),
-                      width: 1,
-                    ),
+                    border: Border.all(color: _accentColor, width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -311,9 +336,9 @@ class _RnrPageState extends State<_RnrPage> {
                             IconButton(
                               tooltip: 'Create event',
                               onPressed: _createEvent,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.add_circle_outline,
-                                color: Color(0xFFD32F2F),
+                                color: _accentColor,
                               ),
                             )
                           else
@@ -324,7 +349,7 @@ class _RnrPageState extends State<_RnrPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFFD32F2F)),
+                              style: TextStyle(color: _accentColor),
                             ),
                           ),
                         ],
@@ -345,9 +370,8 @@ class _RnrPageState extends State<_RnrPage> {
                         width: double.infinity,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              // Match UserService.clubBrandGradient for NRR
-                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                            gradient: LinearGradient(
+                              colors: _heroButtonGradient,
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -359,15 +383,12 @@ class _RnrPageState extends State<_RnrPage> {
                             icon: const Icon(Icons.open_in_new, size: 18),
                             label: const Text(
                               'Visit The RNR Site',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.transparent,
                               shadowColor: Colors.transparent,
-                              foregroundColor: Colors.black,
+                              foregroundColor: _heroButtonTextColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -391,8 +412,8 @@ class _RnrPageState extends State<_RnrPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD32F2F),
-                          foregroundColor: Colors.white,
+                          backgroundColor: _accentColor,
+                          foregroundColor: _accentForegroundColor,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -481,6 +502,15 @@ class _EkidenPage extends StatefulWidget {
 class _EkidenPageState extends State<_EkidenPage> {
   bool _expanded = false;
   bool _isAdmin = false;
+  String? _clubName;
+
+  Color get _accentColor => _clubPrimaryColor(_clubName);
+  Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
+  List<Color> get _heroButtonGradient => [
+    _accentColor.withOpacity(0.35),
+    _clubSecondaryColor(_clubName).withOpacity(0.35),
+  ];
 
   @override
   void initState() {
@@ -490,6 +520,7 @@ class _EkidenPageState extends State<_EkidenPage> {
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
+    _clubName = await UserService.currentClubName();
     if (mounted) setState(() {});
   }
 
@@ -655,11 +686,11 @@ class _EkidenPageState extends State<_EkidenPage> {
                 bottom: 56,
                 child: Text(
                   'Ipswich JAFFA Ekiden Relay',
-                  style: const TextStyle(
-                    color: Color(0xFFD32F2F),
+                  style: TextStyle(
+                    color: _accentColor,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    shadows: [
+                    shadows: const [
                       Shadow(
                         offset: Offset(0, 1.5),
                         blurRadius: 3,
@@ -687,10 +718,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(
-                      color: const Color(0xFFD32F2F),
-                      width: 1,
-                    ),
+                    border: Border.all(color: _accentColor, width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -710,9 +738,9 @@ class _EkidenPageState extends State<_EkidenPage> {
                             IconButton(
                               tooltip: 'Create event',
                               onPressed: _createEvent,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.add_circle_outline,
-                                color: Color(0xFFD32F2F),
+                                color: _accentColor,
                               ),
                             )
                           else
@@ -723,7 +751,7 @@ class _EkidenPageState extends State<_EkidenPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFFD32F2F)),
+                              style: TextStyle(color: _accentColor),
                             ),
                           ),
                         ],
@@ -743,8 +771,8 @@ class _EkidenPageState extends State<_EkidenPage> {
                         width: double.infinity,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                            gradient: LinearGradient(
+                              colors: _heroButtonGradient,
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -756,15 +784,12 @@ class _EkidenPageState extends State<_EkidenPage> {
                             icon: const Icon(Icons.open_in_new, size: 18),
                             label: const Text(
                               'Visit Ipswich JAFFA Ekiden Relay',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.transparent,
                               shadowColor: Colors.transparent,
-                              foregroundColor: Colors.black,
+                              foregroundColor: _heroButtonTextColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -790,13 +815,10 @@ class _EkidenPageState extends State<_EkidenPage> {
                       TextButton.icon(
                         onPressed: () =>
                             _openLink('https://portal.ipswichekiden.co.uk/'),
-                        icon: const Icon(
-                          Icons.group_add,
-                          color: Color(0xFFD32F2F),
-                        ),
-                        label: const Text(
+                        icon: Icon(Icons.group_add, color: _accentColor),
+                        label: Text(
                           'Register your team',
-                          style: TextStyle(color: Color(0xFFD32F2F)),
+                          style: TextStyle(color: _accentColor),
                         ),
                       ),
                     ],
@@ -813,8 +835,8 @@ class _EkidenPageState extends State<_EkidenPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD32F2F),
-                          foregroundColor: Colors.white,
+                          backgroundColor: _accentColor,
+                          foregroundColor: _accentForegroundColor,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -860,6 +882,15 @@ class _EacclPage extends StatefulWidget {
 class _EacclPageState extends State<_EacclPage> {
   bool _expanded = false;
   bool _isAdmin = false;
+  String? _clubName;
+
+  Color get _accentColor => _clubPrimaryColor(_clubName);
+  Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
+  List<Color> get _heroButtonGradient => [
+    _accentColor.withOpacity(0.35),
+    _clubSecondaryColor(_clubName).withOpacity(0.35),
+  ];
 
   @override
   void initState() {
@@ -870,6 +901,7 @@ class _EacclPageState extends State<_EacclPage> {
 
   Future<void> _loadAdmin() async {
     _isAdmin = await UserService.isAdmin();
+    _clubName = await UserService.currentClubName();
     if (mounted) setState(() {});
   }
 
@@ -1349,11 +1381,11 @@ class _EacclPageState extends State<_EacclPage> {
                 bottom: 56,
                 child: Text(
                   'East Anglian Cross Country League',
-                  style: const TextStyle(
-                    color: Color(0xFFD32F2F),
+                  style: TextStyle(
+                    color: _accentColor,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    shadows: [
+                    shadows: const [
                       Shadow(
                         offset: Offset(0, 1.5),
                         blurRadius: 3,
@@ -1381,10 +1413,7 @@ class _EacclPageState extends State<_EacclPage> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    border: Border.all(
-                      color: const Color(0xFFD32F2F),
-                      width: 1,
-                    ),
+                    border: Border.all(color: _accentColor, width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1406,7 +1435,7 @@ class _EacclPageState extends State<_EacclPage> {
                                 setState(() => _expanded = !_expanded),
                             child: Text(
                               _expanded ? 'Show less' : 'Read more…',
-                              style: const TextStyle(color: Color(0xFFD32F2F)),
+                              style: TextStyle(color: _accentColor),
                             ),
                           ),
                         ],
@@ -1426,8 +1455,8 @@ class _EacclPageState extends State<_EacclPage> {
                         width: double.infinity,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0x4DD32F2F), Color(0x4DFFFFFF)],
+                            gradient: LinearGradient(
+                              colors: _heroButtonGradient,
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -1438,15 +1467,12 @@ class _EacclPageState extends State<_EacclPage> {
                             icon: const Icon(Icons.open_in_new, size: 18),
                             label: const Text(
                               'Visit EACCL Website',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.transparent,
                               shadowColor: Colors.transparent,
-                              foregroundColor: Colors.black,
+                              foregroundColor: _heroButtonTextColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -1465,10 +1491,7 @@ class _EacclPageState extends State<_EacclPage> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: const Color(0x0FFFFFFF),
-                    border: Border.all(
-                      color: const Color(0xFFD32F2F),
-                      width: 1,
-                    ),
+                    border: Border.all(color: _accentColor, width: 1),
                   ),
                   child: Column(
                     children: [
@@ -1485,9 +1508,9 @@ class _EacclPageState extends State<_EacclPage> {
                                   r.date,
                                   r.no,
                                 ),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.add_circle_outline,
-                                  color: Color(0xFFD32F2F),
+                                  color: _accentColor,
                                 ),
                               ),
                             if (_isAdmin) const SizedBox(width: 8),
@@ -1516,10 +1539,7 @@ class _EacclPageState extends State<_EacclPage> {
                               IconButton(
                                 tooltip: 'Edit race details',
                                 onPressed: () => _editRace(r),
-                                icon: const Icon(
-                                  Icons.edit,
-                                  color: Color(0xFFD32F2F),
-                                ),
+                                icon: Icon(Icons.edit, color: _accentColor),
                               ),
                           ],
                         ),
@@ -1539,8 +1559,8 @@ class _EacclPageState extends State<_EacclPage> {
                         icon: const Icon(Icons.list_alt, size: 18),
                         label: const Text('Results'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD32F2F),
-                          foregroundColor: Colors.white,
+                          backgroundColor: _accentColor,
+                          foregroundColor: _accentForegroundColor,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),

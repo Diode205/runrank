@@ -27,6 +27,39 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   List<AwardChatMessage> _chatMessages = [];
   Map<String, Map<String, int>> _messageEmojiCounts = {};
   DateTime? _votingEndsAt;
+  String? _clubName;
+
+  bool get _isNrrClub =>
+      _service.canonicalClubName(_clubName) == 'Norwich Road Runners';
+
+  String get _canonicalClubName => _service.canonicalClubName(_clubName);
+
+  Color get _accentColor =>
+      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+
+  Color get _secondaryAccentColor =>
+      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+
+  Color get _accentForegroundColor => _isNrrClub ? Colors.white : Colors.black;
+
+  String get _awardPageTitle => _isNrrClub
+      ? 'Inspirational Running Award 2026'
+      : 'Malcolm Ball Award 2026';
+
+  String get _awardHeroImage => _isNrrClub
+      ? 'assets/images/nrraward.png'
+      : 'assets/images/malcolmball.png';
+
+  String get _awardHeadline => _isNrrClub
+      ? 'The NRR Inspirational\nRunning Award 2026'
+      : 'The Malcolm Ball Inspirational\nRunner Award 2026';
+
+  String get _awardNotificationName =>
+      _isNrrClub ? 'NRR Inspirational Running Award' : 'Malcolm Ball Award';
+
+  String get _nominationPrompt => _isNrrClub
+      ? '     Nominate An Inspiring NRR Member'
+      : '     Nominate An Inspiring NNBR Member';
 
   bool get _votingHasEnded {
     if (_votingEndsAt == null) return false;
@@ -55,29 +88,40 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final nominees = await _service.fetchNominees();
-      final winners = await _service.fetchWinners();
+      final clubName = await UserService.currentClubName();
+      final canonicalClub = _service.canonicalClubName(clubName);
+      final nominees = await _service.fetchNominees(clubName: canonicalClub);
+      final winners = await _service.fetchWinners(clubName: canonicalClub);
       final admin = await UserService.isAdmin();
       final membersRows = await Supabase.instance.client
           .from('user_profiles')
-          .select('full_name')
+          .select('full_name, club')
           .order('full_name');
       final memberNames = (membersRows as List)
+          .where(
+            (r) =>
+                _service.canonicalClubName(r['club'] as String?) ==
+                canonicalClub,
+          )
           .map((r) => (r['full_name'] as String?)?.trim())
           .whereType<String>()
           .where((s) => s.isNotEmpty)
           .toList(growable: false);
       // Nominee emoji counts removed from UI
-      final chat = await _service.fetchChatMessages();
+      final chat = await _service.fetchChatMessages(clubName: canonicalClub);
       final chatCounts = await _service.fetchMessageEmojiCounts(
         chat.map((m) => m.id).toSet(),
+        clubName: canonicalClub,
       );
-      final votingEndsAt = await _service.fetchVotingEndsAt();
+      final votingEndsAt = await _service.fetchVotingEndsAt(
+        clubName: canonicalClub,
+      );
       // Send a daily reminder notification if voting is within a week
       // of closing and no reminder has been sent today.
-      await _service.sendVotingReminderIfDue();
+      await _service.sendVotingReminderIfDue(clubName: canonicalClub);
       if (!mounted) return;
       setState(() {
+        _clubName = canonicalClub;
         _nominees = nominees;
         _winners = winners;
         _isAdmin = admin;
@@ -115,13 +159,18 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       return;
     }
     try {
-      await _service.submitNomination(name: name, reason: reason);
+      await _service.submitNomination(
+        name: name,
+        reason: reason,
+        clubName: _canonicalClubName,
+      );
       _nameController.clear();
       _reasonController.clear();
       try {
-        await NotificationService.notifyAllUsers(
+        await NotificationService.notifyUsersInClub(
+          clubName: _canonicalClubName,
           title: 'New nomination',
-          body: '$name was nominated for the Malcolm Ball Award',
+          body: '$name was nominated for the $_awardNotificationName',
           route: 'malcolm_ball_award',
         );
       } catch (_) {}
@@ -139,7 +188,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
   Future<void> _vote(String nomineeId) async {
     try {
-      await _service.voteNominee(nomineeId);
+      await _service.voteNominee(nomineeId, clubName: _canonicalClubName);
       // Notify all users about the vote with route tag for deep link
       try {
         final nomineeName = _nominees
@@ -148,7 +197,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               orElse: () => AwardNominee(id: '', name: 'a nominee', votes: 0),
             )
             .name;
-        await NotificationService.notifyAllUsers(
+        await NotificationService.notifyUsersInClub(
+          clubName: _canonicalClubName,
           title: 'New vote',
           body: 'A vote was cast for ' + nomineeName,
           route: 'malcolm_ball_award',
@@ -164,15 +214,22 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
   Future<void> _reactToMessage(String messageId, String emoji) async {
     try {
-      await _service.addMessageEmoji(messageId: messageId, emoji: emoji);
+      await _service.addMessageEmoji(
+        messageId: messageId,
+        emoji: emoji,
+        clubName: _canonicalClubName,
+      );
       try {
-        await NotificationService.notifyAllUsers(
+        await NotificationService.notifyUsersInClub(
+          clubName: _canonicalClubName,
           title: 'New reaction',
-          body: 'Someone reacted $emoji in Malcolm Ball chat',
+          body: 'Someone reacted $emoji in the award chat',
           route: 'malcolm_ball_award',
         );
       } catch (_) {}
-      final counts = await _service.fetchMessageEmojiCounts({messageId});
+      final counts = await _service.fetchMessageEmojiCounts({
+        messageId,
+      }, clubName: _canonicalClubName);
       if (!mounted) return;
       setState(() {
         _messageEmojiCounts[messageId] = counts[messageId] ?? {};
@@ -210,7 +267,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
     setState(() => _loading = true);
     try {
-      await _service.adminResetAwardCycle();
+      await _service.adminResetAwardCycle(clubName: _canonicalClubName);
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -233,10 +290,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   Widget build(BuildContext context) {
     const headerHeight = 260.0;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Malcolm Ball Award 2026'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text(_awardPageTitle), centerTitle: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
@@ -249,7 +303,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     fit: StackFit.expand,
                     children: [
                       Image.asset(
-                        'assets/images/malcolmball.png',
+                        _awardHeroImage,
                         fit: BoxFit.cover,
                         alignment: Alignment.topCenter,
                       ),
@@ -270,15 +324,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'The Malcolm Ball Inspirational\nRunner Award 2026',
+                            Text(
+                              _awardHeadline,
                               style: TextStyle(
-                                color: Color.from(
-                                  alpha: 1,
-                                  red: 0.043,
-                                  green: 0.608,
-                                  blue: 0.937,
-                                ),
+                                color: _secondaryAccentColor,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -349,7 +398,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   }
 
   Widget _hallOfFameSection() {
-    final primary = Theme.of(context).colorScheme.primary;
+    final primary = _accentColor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -448,9 +497,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     IconButton(
                       tooltip: 'Manage winners (edit/delete)',
                       onPressed: _showManageWinnersDialog,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.remove_circle_outline,
-                        color: Color(0xFFFFD700),
+                        color: _accentColor,
                       ),
                       iconSize: 22,
                       padding: EdgeInsets.zero,
@@ -461,7 +510,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     IconButton(
                       tooltip: 'Add previous winner',
                       onPressed: _showAddWinnerDialog,
-                      icon: const Icon(Icons.add, color: Color(0xFFFFD700)),
+                      icon: Icon(Icons.add, color: _accentColor),
                       iconSize: 22,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -570,7 +619,11 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       return;
     }
     try {
-      await _service.addWinner(year: year, name: name);
+      await _service.addWinner(
+        year: year,
+        name: name,
+        clubName: _canonicalClubName,
+      );
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -623,11 +676,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                       ),
                       IconButton(
                         tooltip: 'Edit entry',
-                        icon: const Icon(
-                          Icons.edit,
-                          color: Color(0xFFFFD700),
-                          size: 20,
-                        ),
+                        icon: Icon(Icons.edit, color: _accentColor, size: 20),
                         onPressed: () async {
                           await _editWinnerDialog(w);
                         },
@@ -734,7 +783,12 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       return;
     }
     try {
-      await _service.updateWinner(id: w.id, year: newYear, name: newName);
+      await _service.updateWinner(
+        id: w.id,
+        year: newYear,
+        name: newName,
+        clubName: _canonicalClubName,
+      );
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -776,7 +830,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     );
     if (confirm != true) return;
     try {
-      await _service.deleteWinner(id: w.id);
+      await _service.deleteWinner(id: w.id, clubName: _canonicalClubName);
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -793,19 +847,22 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   // (header moved to top-level Stack in build)
 
   Widget _storyCard() {
-    const body =
-        'He has run across the mountainous Lake District terrain, completed 39 marathons, run for the England cross country team and gone through scores of trainers.\n\n'
-        'An amateur running enthusiast Malcolm Ball, from Ridgeway in Cromer, has no plans to give up.\n'
-        'Mr Ball, who served as a Royal Marines Commando for two years in Malaya as a teenager for his National Service, is a member of the North Norfolk Beach Runners.\n'
-        'He has completed 80 Parkruns, mostly at Sheringham Park, but also at King\'s Lynn and Brighton.\n'
-        'He won the amateur British Masters Athletics Federation 10 mile championships in the over 80s category in 97 minutes and nine seconds - nearly 28 minutes faster than the second place runner.\n'
-        'His running accomplishments include completing the gruelling Lakeland Trails races across the Lake District when he was between 69 and 72-years-old and being called up twice for the England amateur cross country team.\n'
-        'He has also completed eight marathons in under three hours.\n'
-        'His fastest marathon time was two hours, 56 minutes and 49 seconds at London in 1990.\n'
-        'As well as running 35-40 miles a week, Mr Ball goes to the gym every day and attends aqua Zumba and aqua fitness classes three times a week.\n'
-        'He also trains newcomers to the North Norfolk Beach Runners.';
-    const credit =
-        '         — Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
+    final body = _isNrrClub
+        ? 'The Norwich Road Runners Inspirational Running Award recognises a member whose running journey, encouragement, resilience or support for others has had a positive effect on the club. It is a space to celebrate someone who inspires people through racing, volunteering, consistency, kindness or leading by example.\n\n'
+              'NRR has not yet finalised the long-form background for this award, so this page currently uses a placeholder introduction while keeping the same nomination, voting, and comments structure ready for use. Members can still nominate, vote and post supportive comments while the club confirms the final wording and story for the award.'
+        : 'He has run across the mountainous Lake District terrain, completed 39 marathons, run for the England cross country team and gone through scores of trainers.\n\n'
+              'An amateur running enthusiast Malcolm Ball, from Ridgeway in Cromer, has no plans to give up.\n'
+              'Mr Ball, who served as a Royal Marines Commando for two years in Malaya as a teenager for his National Service, is a member of the North Norfolk Beach Runners.\n'
+              'He has completed 80 Parkruns, mostly at Sheringham Park, but also at King\'s Lynn and Brighton.\n'
+              'He won the amateur British Masters Athletics Federation 10 mile championships in the over 80s category in 97 minutes and nine seconds - nearly 28 minutes faster than the second place runner.\n'
+              'His running accomplishments include completing the gruelling Lakeland Trails races across the Lake District when he was between 69 and 72-years-old and being called up twice for the England amateur cross country team.\n'
+              'He has also completed eight marathons in under three hours.\n'
+              'His fastest marathon time was two hours, 56 minutes and 49 seconds at London in 1990.\n'
+              'As well as running 35-40 miles a week, Mr Ball goes to the gym every day and attends aqua Zumba and aqua fitness classes three times a week.\n'
+              'He also trains newcomers to the North Norfolk Beach Runners.';
+    final credit = _isNrrClub
+        ? 'NRR award title and background details can be refined later once the club confirms the final wording.'
+        : '         — Sophie Wyllie, Eastern Daily Press, 27 March 2015.  Picture: Mark Bullimore.  Image: Archant Norfolk 2015)';
 
     final breakIdx = body.indexOf('\n\n');
     final firstPara = breakIdx > 0 ? body.substring(0, breakIdx) : body;
@@ -818,7 +875,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
         decoration: BoxDecoration(
           color: const Color(0xFF0F111A),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF5C542), width: 1),
+          border: Border.all(color: _accentColor, width: 1),
         ),
         child: Stack(
           children: [
@@ -835,6 +892,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () => setState(() => _storyExpanded = true),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _accentColor,
+                      ),
                       child: const Text('Read more ⌄'),
                     ),
                   ),
@@ -849,6 +909,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () => setState(() => _storyExpanded = false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _accentColor,
+                      ),
                       child: const Text('Show less ⌃'),
                     ),
                   ),
@@ -897,7 +960,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                 IconButton(
                   tooltip: 'View vote tally',
                   onPressed: _showVotesTallyDialog,
-                  icon: const Icon(Icons.bar_chart, color: Color(0xFFFFD700)),
+                  icon: Icon(Icons.bar_chart, color: _accentColor),
                 ),
             ],
           ),
@@ -907,10 +970,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 onPressed: _confirmAdminReset,
-                icon: const Icon(Icons.refresh, color: Color(0xFFFFD700)),
-                label: const Text(
+                icon: Icon(Icons.refresh, color: _accentColor),
+                label: Text(
                   'Reset nominees & votes',
-                  style: TextStyle(color: Color(0xFFFFD700)),
+                  style: TextStyle(color: _accentColor),
                 ),
               ),
             ),
@@ -936,7 +999,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
   Widget _nomineeRow(AwardNominee n) {
     final votingEnded = _votingHasEnded;
-    final buttonColor = votingEnded ? Colors.grey : const Color(0xFF0057B7);
+    final buttonColor = votingEnded ? Colors.grey : _secondaryAccentColor;
     final buttonLabel = votingEnded ? 'Closed' : 'Vote';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -944,7 +1007,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
       decoration: BoxDecoration(
         color: const Color(0xFF161B26),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFF5C542)),
+        border: Border.all(color: _accentColor),
       ),
       child: Row(
         children: [
@@ -960,7 +1023,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: buttonColor,
-              foregroundColor: Colors.white,
+              foregroundColor: _isNrrClub ? Colors.black : Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -989,13 +1052,13 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             decoration: BoxDecoration(
               color: const Color(0xFF0F111A),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF5C542), width: 1),
+              border: Border.all(color: _accentColor, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '     Nominate An Inspiring NNBR Member',
+                Text(
+                  _nominationPrompt,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -1062,8 +1125,8 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD700),
-                        foregroundColor: Colors.black,
+                        backgroundColor: _accentColor,
+                        foregroundColor: _accentForegroundColor,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1096,11 +1159,7 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
               child: IconButton(
                 tooltip: 'Set Voting End Date',
                 onPressed: _pickVotingEndDate,
-                icon: const Icon(
-                  Icons.calendar_today,
-                  size: 20,
-                  color: Color(0xFFFFD700),
-                ),
+                icon: Icon(Icons.calendar_today, size: 20, color: _accentColor),
               ),
             ),
         ],
@@ -1133,6 +1192,10 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
               onPressed: _addChatMessage,
+              style: FilledButton.styleFrom(
+                backgroundColor: _accentColor,
+                foregroundColor: _accentForegroundColor,
+              ),
               icon: const Icon(Icons.send),
               label: const Text('Post Comment'),
             ),
@@ -1274,18 +1337,25 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
     try {
-      await _service.addChatMessage(content: text);
+      await _service.addChatMessage(
+        content: text,
+        clubName: _canonicalClubName,
+      );
       try {
-        await NotificationService.notifyAllUsers(
+        await NotificationService.notifyUsersInClub(
+          clubName: _canonicalClubName,
           title: 'New Comment',
           body: text.length > 80 ? text.substring(0, 80) + '…' : text,
           route: 'malcolm_ball_award',
         );
       } catch (_) {}
       _commentController.clear();
-      final chat = await _service.fetchChatMessages();
+      final chat = await _service.fetchChatMessages(
+        clubName: _canonicalClubName,
+      );
       final chatCounts = await _service.fetchMessageEmojiCounts(
         chat.map((m) => m.id).toSet(),
+        clubName: _canonicalClubName,
       );
       if (!mounted) return;
       setState(() {
@@ -1302,7 +1372,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
 
   Future<void> _showVotesTallyDialog() async {
     try {
-      final tally = await _service.fetchVotesTallyDetailed();
+      final tally = await _service.fetchVotesTallyDetailed(
+        clubName: _canonicalClubName,
+      );
       if (!mounted) return;
       await showDialog(
         context: context,
@@ -1341,11 +1413,9 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0x33F5C542),
+                                color: _accentColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFF5C542),
-                                ),
+                                border: Border.all(color: _accentColor),
                               ),
                               child: Text(
                                 '${t['count']} votes',
@@ -1452,15 +1522,16 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
     if (picked == null) return;
     try {
       final dateOnly = DateTime(picked.year, picked.month, picked.day);
-      await _service.setVotingEndsAt(dateOnly);
+      await _service.setVotingEndsAt(dateOnly, clubName: _canonicalClubName);
       if (!mounted) return;
       setState(() => _votingEndsAt = dateOnly);
 
       // Notify all users that nominations/voting now have a set end date.
       try {
         final label = _formatDate(dateOnly);
-        await NotificationService.notifyAllUsers(
-          title: 'Malcolm Ball Award nominations open',
+        await NotificationService.notifyUsersInClub(
+          clubName: _canonicalClubName,
+          title: 'Inspirational running award nominations open',
           body: 'You can now nominate and vote. Voting ends on $label.',
           route: 'malcolm_ball_award',
         );

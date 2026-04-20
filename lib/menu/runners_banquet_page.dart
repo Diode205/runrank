@@ -17,6 +17,7 @@ class RunnersBanquetPage extends StatefulWidget {
 class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   bool _loading = true;
   bool _isAdmin = false;
+  String? _clubName;
 
   final _optionLabels = <TextEditingController>[
     TextEditingController(),
@@ -49,9 +50,11 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   }
 
   Future<void> _init() async {
+    final clubName = await UserService.currentClubName();
     final isAdmin = await UserService.isAdmin();
     final config = await RunnersBanquetService.getConfig(
       eventId: widget.eventId,
+      clubName: clubName ?? '',
     );
     String? effectiveEventId = widget.eventId;
 
@@ -68,19 +71,22 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     List<Map<String, dynamic>> summary = [];
     List<Map<String, dynamic>> my = [];
     if (isAdmin) {
-      // For now, show all banquet bookings regardless of event id so
-      // admins can always see activity even if event ids don't line up.
-      summary = await RunnersBanquetService.getAdminSummary();
+      summary = await RunnersBanquetService.getAdminSummary(
+        clubName: clubName ?? '',
+      );
     }
 
     // Load current user's bookings so we can show a confirmation box.
     // We do not restrict by event id here so that bookings are visible
     // even if the stored event id differs from the one passed in.
-    my = await RunnersBanquetService.getMyReservations();
+    my = await RunnersBanquetService.getMyReservations(
+      clubName: clubName ?? '',
+    );
 
     if (!mounted) return;
     setState(() {
       _isAdmin = isAdmin;
+      _clubName = clubName;
       _configEventId = effectiveEventId;
       if (config != null) {
         final o1 = config['option1_label'] as String?;
@@ -220,11 +226,20 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     if (!paid || !mounted) return;
 
     final effectiveEventId = _configEventId ?? widget.eventId;
+    final clubName = _clubName;
+    if (clubName == null || clubName.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to determine your club.')),
+      );
+      return;
+    }
 
     // Clear any existing reservations for this user for this banquet
     // so that a new purchase replaces their previous choices.
     await RunnersBanquetService.clearMyReservationsForEvent(
       eventId: effectiveEventId,
+      clubName: clubName,
     );
 
     // Record reservation rows per ticket type so admins see
@@ -240,6 +255,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     if (memberIndex != null && _memberQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
+        clubName: clubName,
         optionLabel: _optionLabelForIndex(memberIndex),
         quantity: _memberQuantity,
         specialRequirements: _cleanSpecial(
@@ -250,6 +266,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     if (ok && partnerIndex != null && _partnerQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
+        clubName: clubName,
         optionLabel: _optionLabelForIndex(partnerIndex),
         quantity: _partnerQuantity,
         specialRequirements: _cleanSpecial(
@@ -260,6 +277,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     if (ok && otherIndex != null && _otherQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
+        clubName: clubName,
         optionLabel: _optionLabelForIndex(otherIndex),
         quantity: _otherQuantity,
         specialRequirements: _cleanSpecial(
@@ -280,10 +298,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       return;
     }
 
-    // Refresh admin summary so counts update immediately.
-    // We do not filter by event so admins see all banquet bookings.
     if (_isAdmin) {
-      final summary = await RunnersBanquetService.getAdminSummary();
+      final summary = await RunnersBanquetService.getAdminSummary(
+        clubName: clubName,
+      );
       if (mounted) {
         setState(() {
           _adminSummary = summary;
@@ -292,7 +310,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     }
 
     // Refresh the current user's booking summary (confirmation box).
-    final my = await RunnersBanquetService.getMyReservations();
+    final my = await RunnersBanquetService.getMyReservations(
+      clubName: clubName,
+    );
     if (mounted) {
       setState(() {
         _myReservations = my;
@@ -560,6 +580,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                   onPressed: () async {
                     final ok = await RunnersBanquetService.saveConfig(
                       eventId: _configEventId ?? widget.eventId,
+                      clubName: _clubName ?? '',
                       menuText: '',
                       optionLabels: _optionLabels
                           .map((c) => c.text.trim())
@@ -1281,7 +1302,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await RunnersBanquetService.adminResetAll(eventId: _configEventId);
+      await RunnersBanquetService.adminResetAll(
+        eventId: _configEventId,
+        clubName: _clubName ?? '',
+      );
 
       // Clear local state so UI matches the reset backend.
       setState(() {

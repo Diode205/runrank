@@ -251,7 +251,7 @@ class _CharityPageState extends State<CharityPage> {
       body: _loadingClub
           ? const Center(child: CircularProgressIndicator())
           : StreamBuilder<List<Map<String, dynamic>>>(
-              stream: CharityService.watchCharities(),
+              stream: CharityService.watchCharities(clubName: _clubName),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
@@ -259,10 +259,7 @@ class _CharityPageState extends State<CharityPage> {
                 }
 
                 final rows = snapshot.data ?? const <Map<String, dynamic>>[];
-                final charity = CharityService.pickCharityForClub(
-                  rows,
-                  _clubName,
-                );
+                final charity = rows.isEmpty ? null : rows.first;
 
                 if (_isAdmin) {
                   _seedAdminFields(charity);

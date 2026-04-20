@@ -64,10 +64,28 @@ class MalcolmBallAwardService {
   final SupabaseClient _supabase = Supabase.instance.client;
   RealtimeChannel? _channel;
 
-  Future<List<AwardNominee>> fetchNominees() async {
+  String canonicalClubName(String? clubName) {
+    final normalized = (clubName ?? '').trim();
+    final lower = normalized.toLowerCase();
+    if (lower == 'nrr' ||
+        lower == 'norwich-road-runners' ||
+        lower.contains('norwich road runners')) {
+      return 'Norwich Road Runners';
+    }
+    if (lower == 'nnbr' ||
+        lower == 'north-norfolk-beach-runners' ||
+        lower.contains('north norfolk beach runners')) {
+      return 'NNBR (North Norfolk Beach Runners)';
+    }
+    return normalized;
+  }
+
+  Future<List<AwardNominee>> fetchNominees({String? clubName}) async {
+    final canonicalClub = canonicalClubName(clubName);
     final rows = await _supabase
         .from('award_nominees')
         .select('id,name,created_at')
+        .eq('club_name', canonicalClub)
         .order('created_at', ascending: false);
 
     final List<AwardNominee> list = [];
@@ -77,6 +95,7 @@ class MalcolmBallAwardService {
       final votesRows = await _supabase
           .from('award_votes')
           .select('id')
+          .eq('club_name', canonicalClub)
           .eq('nominee_id', id);
       list.add(
         AwardNominee(id: id, name: name, votes: (votesRows as List).length),
@@ -85,21 +104,27 @@ class MalcolmBallAwardService {
     return list;
   }
 
-  Future<String> _ensureNominee(String name) async {
+  Future<String> _ensureNominee(String name, {String? clubName}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to nominate');
     }
+    final canonicalClub = canonicalClubName(clubName);
     final nameLc = name.trim().toLowerCase();
     final existing = await _supabase
         .from('award_nominees')
         .select('id')
+        .eq('club_name', canonicalClub)
         .eq('name_lc', nameLc)
         .maybeSingle();
     if (existing != null) return existing['id'] as String;
     final inserted = await _supabase
         .from('award_nominees')
-        .insert({'name': name.trim(), 'created_by': user.id})
+        .insert({
+          'name': name.trim(),
+          'created_by': user.id,
+          'club_name': canonicalClub,
+        })
         .select()
         .single();
     return inserted['id'] as String;
@@ -108,28 +133,33 @@ class MalcolmBallAwardService {
   Future<void> submitNomination({
     required String name,
     required String reason,
+    String? clubName,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to nominate');
     }
-    final nomineeId = await _ensureNominee(name);
+    final canonicalClub = canonicalClubName(clubName);
+    final nomineeId = await _ensureNominee(name, clubName: canonicalClub);
     await _supabase.from('award_nominations').insert({
       'nominee_id': nomineeId,
       'user_id': user.id,
       'reason': reason.trim(),
+      'club_name': canonicalClub,
     });
   }
 
-  Future<void> voteNominee(String nomineeId) async {
+  Future<void> voteNominee(String nomineeId, {String? clubName}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to vote');
     }
+    final canonicalClub = canonicalClubName(clubName);
     try {
       await _supabase.from('award_votes').insert({
         'nominee_id': nomineeId,
         'user_id': user.id,
+        'club_name': canonicalClub,
       });
     } on PostgrestException catch (e) {
       // Unique violation means the user already voted
@@ -140,42 +170,59 @@ class MalcolmBallAwardService {
     }
   }
 
-  Future<void> addEmoji(String nomineeId, String emoji) async {
+  Future<void> addEmoji(
+    String nomineeId,
+    String emoji, {
+    String? clubName,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to react');
     }
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_emojis').insert({
       'nominee_id': nomineeId,
       'user_id': user.id,
       'emoji': emoji,
+      'club_name': canonicalClub,
     });
   }
 
   Future<void> addComment({
     required String nomineeId,
     required String content,
+    String? clubName,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to comment');
     }
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_comments').insert({
       'nominee_id': nomineeId,
       'user_id': user.id,
       'content': content.trim(),
+      'club_name': canonicalClub,
     });
   }
 
-  Future<List<AwardCommentItem>> fetchRecentComments({int limit = 20}) async {
+  Future<List<AwardCommentItem>> fetchRecentComments({
+    int limit = 20,
+    String? clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
     final rows = await _supabase
         .from('award_comments')
         .select('id, nominee_id, user_id, content, created_at')
+        .eq('club_name', canonicalClub)
         .order('created_at', ascending: false)
         .limit(limit);
 
     // Map nominee ids to names
-    final nominees = await _supabase.from('award_nominees').select('id,name');
+    final nominees = await _supabase
+        .from('award_nominees')
+        .select('id,name')
+        .eq('club_name', canonicalClub);
     final Map<String, String> nameById = {
       for (final r in nominees as List) r['id'] as String: r['name'] as String,
     };
@@ -194,11 +241,13 @@ class MalcolmBallAwardService {
         .toList();
   }
 
-  Future<List<AwardWinnerItem>> fetchWinners() async {
+  Future<List<AwardWinnerItem>> fetchWinners({String? clubName}) async {
     try {
+      final canonicalClub = canonicalClubName(clubName);
       final rows = await _supabase
           .from('award_winners')
           .select('id, year, name, nominee_id')
+          .eq('club_name', canonicalClub)
           .order('year', ascending: false);
       return (rows as List)
           .map(
@@ -223,10 +272,13 @@ class MalcolmBallAwardService {
     required int year,
     required String name,
     String? nomineeId,
+    String? clubName,
   }) async {
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_winners').insert({
       'year': year,
       'name': name.trim(),
+      'club_name': canonicalClub,
       if (nomineeId != null) 'nominee_id': nomineeId,
     });
   }
@@ -235,15 +287,23 @@ class MalcolmBallAwardService {
     required String id,
     required int year,
     required String name,
+    String? clubName,
   }) async {
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase
         .from('award_winners')
         .update({'year': year, 'name': name.trim()})
+        .eq('club_name', canonicalClub)
         .eq('id', id);
   }
 
-  Future<void> deleteWinner({required String id}) async {
-    await _supabase.from('award_winners').delete().eq('id', id);
+  Future<void> deleteWinner({required String id, String? clubName}) async {
+    final canonicalClub = canonicalClubName(clubName);
+    await _supabase
+        .from('award_winners')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .eq('id', id);
   }
 
   RealtimeChannel subscribeToChanges({required void Function() onAnyChange}) {
@@ -299,10 +359,15 @@ class MalcolmBallAwardService {
   }
 
   // ---------------- General chat (comments) ----------------
-  Future<List<AwardChatMessage>> fetchChatMessages({int limit = 50}) async {
+  Future<List<AwardChatMessage>> fetchChatMessages({
+    int limit = 50,
+    String? clubName,
+  }) async {
+    final canonicalClub = canonicalClubName(clubName);
     final rows = await _supabase
         .from('award_chat_messages')
         .select('id, user_id, content, created_at')
+        .eq('club_name', canonicalClub)
         .order('created_at', ascending: false)
         .limit(limit);
 
@@ -336,39 +401,50 @@ class MalcolmBallAwardService {
     }).toList();
   }
 
-  Future<void> addChatMessage({required String content}) async {
+  Future<void> addChatMessage({
+    required String content,
+    String? clubName,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to comment');
     }
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_chat_messages').insert({
       'user_id': user.id,
       'content': content.trim(),
+      'club_name': canonicalClub,
     });
   }
 
   Future<void> addMessageEmoji({
     required String messageId,
     required String emoji,
+    String? clubName,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in to react');
     }
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_message_emojis').insert({
       'message_id': messageId,
       'user_id': user.id,
       'emoji': emoji,
+      'club_name': canonicalClub,
     });
   }
 
   Future<Map<String, Map<String, int>>> fetchMessageEmojiCounts(
-    Set<String> messageIds,
-  ) async {
+    Set<String> messageIds, {
+    String? clubName,
+  }) async {
     if (messageIds.isEmpty) return {};
+    final canonicalClub = canonicalClubName(clubName);
     final rows = await _supabase
         .from('award_message_emojis')
-        .select('message_id, emoji');
+        .select('message_id, emoji')
+        .eq('club_name', canonicalClub);
     final Map<String, Map<String, int>> counts = {};
     for (final r in rows as List) {
       final mId = r['message_id'] as String;
@@ -381,9 +457,15 @@ class MalcolmBallAwardService {
   }
 
   // ---------------- Admin vote tally ----------------
-  Future<List<Map<String, dynamic>>> fetchVotesTallyDetailed() async {
+  Future<List<Map<String, dynamic>>> fetchVotesTallyDetailed({
+    String? clubName,
+  }) async {
     // returns list of {nominee_id, nominee_name, count, voters: [full_name,...]}
-    final nominees = await _supabase.from('award_nominees').select('id,name');
+    final canonicalClub = canonicalClubName(clubName);
+    final nominees = await _supabase
+        .from('award_nominees')
+        .select('id,name')
+        .eq('club_name', canonicalClub);
     final List<Map<String, dynamic>> results = [];
     for (final n in nominees as List) {
       final id = n['id'] as String;
@@ -391,6 +473,7 @@ class MalcolmBallAwardService {
       final votes = await _supabase
           .from('award_votes')
           .select('user_id')
+          .eq('club_name', canonicalClub)
           .eq('nominee_id', id);
       final userIds = (votes as List)
           .map((v) => v['user_id'] as String)
@@ -418,11 +501,13 @@ class MalcolmBallAwardService {
   }
 
   // ---------------- Voting end date (settings) ----------------
-  Future<DateTime?> fetchVotingEndsAt() async {
+  Future<DateTime?> fetchVotingEndsAt({String? clubName}) async {
     try {
+      final canonicalClub = canonicalClubName(clubName);
       final row = await _supabase
           .from('award_settings')
           .select('voting_ends_at')
+          .eq('club_name', canonicalClub)
           .maybeSingle();
       if (row == null) return null;
       final val = row['voting_ends_at'] as String?;
@@ -433,13 +518,15 @@ class MalcolmBallAwardService {
     }
   }
 
-  Future<void> setVotingEndsAt(DateTime? dt) async {
+  Future<void> setVotingEndsAt(DateTime? dt, {String? clubName}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in');
     }
+    final canonicalClub = canonicalClubName(clubName);
     await _supabase.from('award_settings').upsert({
       'singleton': true,
+      'club_name': canonicalClub,
       'voting_ends_at': dt?.toIso8601String(),
       'updated_by': user.id,
       'updated_at': DateTime.now().toIso8601String(),
@@ -448,13 +535,14 @@ class MalcolmBallAwardService {
 
   /// Admin-triggered reset of nominations, votes, emojis and chat after
   /// voting has ended. This leaves award_winners intact.
-  Future<void> adminResetAwardCycle() async {
+  Future<void> adminResetAwardCycle({String? clubName}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('Please log in');
     }
 
-    final endsAt = await fetchVotingEndsAt();
+    final canonicalClub = canonicalClubName(clubName);
+    final endsAt = await fetchVotingEndsAt(clubName: canonicalClub);
     if (endsAt == null) {
       throw Exception('Please set a voting end date first');
     }
@@ -472,16 +560,44 @@ class MalcolmBallAwardService {
     // satisfy PostgREST's requirement. Use a valid all-zero UUID so
     // the comparison type matches the uuid id column.
     const dummyUuid = '00000000-0000-0000-0000-000000000000';
-    await _supabase.from('award_votes').delete().neq('id', dummyUuid);
-    await _supabase.from('award_emojis').delete().neq('id', dummyUuid);
-    await _supabase.from('award_comments').delete().neq('id', dummyUuid);
-    await _supabase.from('award_nominations').delete().neq('id', dummyUuid);
-    await _supabase.from('award_nominees').delete().neq('id', dummyUuid);
-    await _supabase.from('award_message_emojis').delete().neq('id', dummyUuid);
-    await _supabase.from('award_chat_messages').delete().neq('id', dummyUuid);
+    await _supabase
+        .from('award_votes')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_emojis')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_comments')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_nominations')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_nominees')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_message_emojis')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
+    await _supabase
+        .from('award_chat_messages')
+        .delete()
+        .eq('club_name', canonicalClub)
+        .neq('id', dummyUuid);
 
     // Start next cycle with no end date configured.
-    await setVotingEndsAt(null);
+    await setVotingEndsAt(null, clubName: canonicalClub);
   }
 
   // ---------------- Voting reminders & legacy key/value helpers ----------------
@@ -492,8 +608,9 @@ class MalcolmBallAwardService {
   ///
   /// Uses award_settings row with key 'voting_reminder_last_sent' to
   /// ensure only one reminder is sent per day across the club.
-  Future<void> sendVotingReminderIfDue() async {
-    final endsAt = await fetchVotingEndsAt();
+  Future<void> sendVotingReminderIfDue({String? clubName}) async {
+    final canonicalClub = canonicalClubName(clubName);
+    final endsAt = await fetchVotingEndsAt(clubName: canonicalClub);
     if (endsAt == null) return;
 
     final now = DateTime.now();
@@ -514,9 +631,11 @@ class MalcolmBallAwardService {
         : 'in $daysLeft days';
 
     try {
-      await NotificationService.notifyAllUsers(
-        title: 'Malcolm Ball Award voting closes $suffix',
-        body: 'Voting for the Malcolm Ball Award closes on $dateLabel.',
+      await NotificationService.notifyUsersInClub(
+        clubName: canonicalClub,
+        title: 'Inspirational running award voting closes $suffix',
+        body:
+            'Voting for the inspirational running award closes on $dateLabel.',
         route: 'malcolm_ball_award',
       );
     } catch (_) {
