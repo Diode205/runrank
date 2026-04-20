@@ -28,12 +28,20 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   Future<void> _openAppPrivacy() async {
     final uri = Uri.parse(_appPrivacyUrl);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
   }
 
   Future<void> _openTermsOfUse() async {
     final uri = Uri.parse(_termsOfUseUrl);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
   }
 
   Widget _bullet(String text) {

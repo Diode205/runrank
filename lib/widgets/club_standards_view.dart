@@ -2075,12 +2075,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     return hasConsent && number != null && number.isNotEmpty;
   }
 
-  bool _hasMedicalAlert(Map<String, dynamic> user) {
-    final hasConsent = user['emergency_details_consent'] == true;
-    final notes = (user['medical_notes'] as String?)?.trim();
-    return hasConsent && notes != null && notes.isNotEmpty;
-  }
-
   String _iceMemberName(Map<String, dynamic> user) {
     final fullName = (user['full_name'] as String?)?.trim();
     return (fullName != null && fullName.isNotEmpty) ? fullName : 'Member';
@@ -2123,13 +2117,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final clubName = (_clubName?.trim().isNotEmpty ?? false)
         ? _clubName!.trim()
         : 'Current club';
-    final medicalAlerts = iceMembers.where(_hasMedicalAlert).length;
     final lines = <String>[
       'ICE Full List - $clubName',
       'Generated: ${DateTime.now().toLocal()}',
       'Total members: ${allMembers.length}',
       'Members with consented ICE details: ${iceMembers.length}',
-      'Members with medical notes: $medicalAlerts',
       '',
     ];
 
@@ -2140,10 +2132,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
     for (var index = 0; index < iceMembers.length; index++) {
       final user = iceMembers[index];
-      final medicalNotes = (user['medical_notes'] as String?)?.trim();
-      final medicalSummary = (medicalNotes != null && medicalNotes.isNotEmpty)
-          ? medicalNotes
-          : 'None';
 
       lines
         ..add('${index + 1}. ${_iceMemberName(user)}')
@@ -2153,8 +2141,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         ..add(
           '   Relation: ${_iceFieldValue(user['emergency_contact_relation'])}',
         )
-        ..add('   Phone: ${_iceFieldValue(user['emergency_contact_number'])}')
-        ..add('   Medical notes: $medicalSummary');
+        ..add('   Phone: ${_iceFieldValue(user['emergency_contact_number'])}');
 
       lines.add('');
     }
@@ -2247,14 +2234,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                 ),
                                 itemBuilder: (_, index) {
                                   final user = iceMembers[index];
-                                  final medicalNotes =
-                                      (user['medical_notes'] as String?)
-                                          ?.trim();
-                                  final medicalSummary =
-                                      (medicalNotes != null &&
-                                          medicalNotes.isNotEmpty)
-                                      ? medicalNotes
-                                      : 'None';
                                   return ListTile(
                                     contentPadding: EdgeInsets.zero,
                                     title: Text(
@@ -2269,8 +2248,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                       child: Text(
                                         'ICE contact: ${_iceFieldValue(user['emergency_contact_name'])}\n'
                                         'Relation: ${_iceFieldValue(user['emergency_contact_relation'])}\n'
-                                        'Phone: ${_iceFieldValue(user['emergency_contact_number'])}\n'
-                                        'Medical notes: $medicalSummary',
+                                        'Phone: ${_iceFieldValue(user['emergency_contact_number'])}',
                                         style: const TextStyle(
                                           color: Colors.white70,
                                           height: 1.35,
@@ -2467,37 +2445,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     );
   }
 
-  Future<void> _showMedicalAlertDialog(Map<String, dynamic> user) async {
-    final medicalNotes = (user['medical_notes'] as String?)?.trim();
-    if (medicalNotes == null || medicalNotes.isEmpty || !_isAdmin) {
-      return;
-    }
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF0F111A),
-        title: const Text(
-          'Medical alert',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          medicalNotes,
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showIceActions(Map<String, dynamic> user) async {
-    final hasMedical = _isAdmin && _hasMedicalAlert(user);
-
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0F111A),
@@ -2533,18 +2481,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                     size: 28,
                   ),
                 ),
-                if (hasMedical) ...[
-                  const SizedBox(width: 18),
-                  IconButton(
-                    tooltip: 'Medical alert',
-                    onPressed: () => _showMedicalAlertDialog(user),
-                    icon: const Icon(
-                      Icons.medical_services,
-                      color: Colors.redAccent,
-                      size: 28,
-                    ),
-                  ),
-                ],
               ],
             ),
           ],

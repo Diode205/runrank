@@ -24,7 +24,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   final password = TextEditingController();
   final emergencyContactName = TextEditingController();
   final emergencyContactNumber = TextEditingController();
-  final medicalNotes = TextEditingController();
+  DateTime? _selectedDob;
 
   bool loading = false;
   String? selectedMembershipType;
@@ -33,7 +33,6 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   bool agreeClubPolicy = false;
   bool agreeAppPolicy = false;
   bool agreeEmergencyConsent = false;
-  bool noMedicalIssue = true;
 
   final membershipOptions = [
     "1st Claim",
@@ -50,6 +49,43 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     'Kin',
     'Carer',
   ];
+
+  String _formatDobDisplay(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString().padLeft(4, '0');
+    return '$day-$month-$year';
+  }
+
+  String _formatDobForStorage(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString().padLeft(4, '0');
+    return '$year-$month-$day';
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final initialDate =
+        _selectedDob ?? DateTime(now.year - 30, now.month, now.day);
+    final firstDate = DateTime(now.year - 120, 1, 1);
+    final lastDate = now;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isAfter(lastDate) ? lastDate : initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Select date of birth',
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedDob = picked;
+      dob.text = _formatDobDisplay(picked);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,8 +106,16 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             TextField(
               controller: dob,
-              decoration: const InputDecoration(
-                labelText: "Date of Birth (YYYY-MM-DD)",
+              readOnly: true,
+              onTap: _pickDateOfBirth,
+              decoration: InputDecoration(
+                labelText: "Date of Birth (DD-MM-YYYY)",
+                hintText: 'Tap to select',
+                suffixIcon: IconButton(
+                  onPressed: _pickDateOfBirth,
+                  icon: const Icon(Icons.calendar_today),
+                  tooltip: 'Select date of birth',
+                ),
               ),
             ),
             TextField(
@@ -152,39 +196,12 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             const SizedBox(height: 16),
             CheckboxListTile(
-              value: noMedicalIssue,
-              onChanged: (value) {
-                setState(() {
-                  noMedicalIssue = value ?? true;
-                  if (noMedicalIssue) {
-                    medicalNotes.clear();
-                  }
-                });
-              },
-              title: const Text(
-                'No medical issue to declare',
-                style: TextStyle(fontSize: 13),
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-            if (!noMedicalIssue) ...[
-              TextField(
-                controller: medicalNotes,
-                decoration: const InputDecoration(
-                  labelText: 'Medical issue affecting running or training',
-                ),
-                textCapitalization: TextCapitalization.sentences,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-            ],
-            CheckboxListTile(
               value: agreeEmergencyConsent,
               onChanged: (value) {
                 setState(() => agreeEmergencyConsent = value ?? false);
               },
               title: const Text(
-                'I consent to my emergency and medical details being accessed by club admins and members in a training or racing emergency.',
+                'I consent to my emergency contact details being accessed by club admins and members in a training or racing emergency.',
                 style: TextStyle(fontSize: 13),
               ),
               controlAffinity: ListTileControlAffinity.leading,
@@ -238,17 +255,6 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         return;
                       }
 
-                      if (!noMedicalIssue && medicalNotes.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Please enter the medical issue or choose none',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
                       if (!agreeEmergencyConsent) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -260,13 +266,22 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         return;
                       }
 
+                      if (_selectedDob == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select your date of birth'),
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() => loading = true);
 
                       final success = await AuthService.register(
                         email: email.text.trim(),
                         password: password.text.trim(),
                         fullName: name.text.trim(),
-                        dob: dob.text.trim(),
+                        dob: _formatDobForStorage(_selectedDob!),
                         ukaNumber: uka.text.trim(),
                         club: widget.selectedClub,
                         membershipType: selectedMembershipType!,
@@ -276,9 +291,6 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                             .trim(),
                         emergencyContactRelation: _selectedEmergencyRelation!,
                         emergencyDetailsConsent: agreeEmergencyConsent,
-                        medicalNotes: noMedicalIssue
-                            ? null
-                            : medicalNotes.text.trim(),
                       );
 
                       setState(() => loading = false);
@@ -361,7 +373,9 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PoliciesFormsNoticesPage(),
+                        builder: (_) => PoliciesFormsNoticesPage(
+                          initialClubName: widget.selectedClub,
+                        ),
                       ),
                     );
                   },
@@ -402,7 +416,8 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   Future<void> _openAppPrivacy() async {
     await launchUrl(
       Uri.parse(_appPrivacyUrl),
-      mode: LaunchMode.externalApplication,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
     );
   }
 }

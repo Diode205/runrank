@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -444,10 +445,12 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                   ),
                                   recognizer: TapGestureRecognizer()
                                     ..onTap = () {
-                                      Navigator.of(
-                                        context,
-                                      ).popUntil((route) => route.isFirst);
-                                      Navigator.of(context).pushNamed('/menu');
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const AdministrativeTeamPage(),
+                                        ),
+                                      );
                                     },
                                 ),
                                 const TextSpan(
@@ -496,6 +499,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
                             DropdownMenuItem(
                               value: 'Team Briefing',
                               child: Text('Team Briefing'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Road Hazard Alert',
+                              child: Text('Road Hazard Alert'),
                             ),
                             DropdownMenuItem(
                               value: 'Custom',

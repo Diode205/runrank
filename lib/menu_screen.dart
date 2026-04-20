@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:runrank/admin/admin_charity_page.dart';
 import 'package:runrank/auth/login_screen.dart';
+import 'package:runrank/menu/charity_page.dart';
 import 'package:runrank/menu/club_history_page.dart';
 import 'package:runrank/menu/kit_merchandise_page.dart';
 import 'package:runrank/menu/membership_page.dart';
@@ -51,7 +51,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _emergencyContactName;
   String? _emergencyContactNumber;
   String? _emergencyContactRelation;
-  String? _medicalNotes;
   bool _emergencyDetailsConsent = false;
 
   bool get _isNrrClub {
@@ -95,15 +94,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final emergencyNumberController = TextEditingController(
       text: _emergencyContactNumber ?? '',
     );
-    final medicalNotesController = TextEditingController(
-      text: _medicalNotes ?? '',
-    );
     String? selectedMembershipType = _membershipType;
     DateTime? selectedMemberSince = _memberSince;
     String? selectedEmergencyRelation = _emergencyContactRelation;
     var shareEmergencyDetails = _emergencyDetailsConsent;
-    var noMedicalIssue =
-        (_medicalNotes == null || _medicalNotes!.trim().isEmpty);
 
     await showModalBottomSheet(
       context: context,
@@ -297,37 +291,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       const SizedBox(height: 12),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        value: noMedicalIssue,
-                        onChanged: (value) {
-                          setModalState(() {
-                            noMedicalIssue = value ?? true;
-                            if (noMedicalIssue) {
-                              medicalNotesController.clear();
-                            }
-                          });
-                        },
-                        title: const Text(
-                          'No medical issue to declare',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        activeColor: colorScheme.primary,
-                        checkColor: colorScheme.onPrimary,
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                      if (!noMedicalIssue) ...[
-                        TextField(
-                          controller: medicalNotesController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _inputDecoration(
-                            'Medical issue affecting running or training',
-                          ),
-                          textCapitalization: TextCapitalization.sentences,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
                         value: shareEmergencyDetails,
                         onChanged: (value) {
                           setModalState(() {
@@ -369,8 +332,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                             final newEmergencyNumber = emergencyNumberController
                                 .text
                                 .trim();
-                            final newMedicalNotes = medicalNotesController.text
-                                .trim();
 
                             final hasAnyEmergencyInput =
                                 newEmergencyName.isNotEmpty ||
@@ -386,17 +347,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                 const SnackBar(
                                   content: Text(
                                     'Please complete the emergency contact name, number and relationship',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            if (!noMedicalIssue && newMedicalNotes.isEmpty) {
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please enter the medical issue or choose none',
                                   ),
                                 ),
                               );
@@ -420,11 +370,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                     selectedEmergencyRelation,
                                 'emergency_details_consent':
                                     shareEmergencyDetails,
-                                'medical_notes': noMedicalIssue
-                                    ? null
-                                    : (newMedicalNotes.isEmpty
-                                          ? null
-                                          : newMedicalNotes),
                               };
                               if (selectedMemberSince != null) {
                                 updateData['member_since'] =
@@ -466,11 +411,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                                     selectedEmergencyRelation;
                                 _emergencyDetailsConsent =
                                     shareEmergencyDetails;
-                                _medicalNotes = noMedicalIssue
-                                    ? null
-                                    : (newMedicalNotes.isEmpty
-                                          ? null
-                                          : newMedicalNotes);
                               });
                               if (!mounted) return;
                               Navigator.pop(sheetContext);
@@ -518,7 +458,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     emailController.dispose();
     emergencyNameController.dispose();
     emergencyNumberController.dispose();
-    medicalNotesController.dispose();
   }
 
   InputDecoration _inputDecoration(String label) {
@@ -554,7 +493,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       final profile = await _supabase
           .from('user_profiles')
           .select(
-            'full_name, email, uka_number, club, avatar_url, member_since, membership_type, is_admin, admin_since, created_at, emergency_contact_name, emergency_contact_number, emergency_contact_relation, emergency_details_consent, medical_notes',
+            'full_name, email, uka_number, club, avatar_url, member_since, membership_type, is_admin, admin_since, created_at, emergency_contact_name, emergency_contact_number, emergency_contact_relation, emergency_details_consent',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -595,7 +534,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             profile?['emergency_contact_relation'] as String?;
         _emergencyDetailsConsent =
             profile?['emergency_details_consent'] == true;
-        _medicalNotes = profile?['medical_notes'] as String?;
         _isAdmin = isAdmin;
         _loading = false;
       });
@@ -712,20 +650,17 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     );
                   },
                 ),
-                if (_isAdmin)
-                  _menuTile(
-                    icon: Icons.volunteer_activism,
-                    title: 'Charity of the Year',
-                    subtitle: 'Community Support and Donations',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AdminCharityEditorPage(),
-                        ),
-                      );
-                    },
-                  ),
+                _menuTile(
+                  icon: Icons.volunteer_activism,
+                  title: 'Charity of the Year',
+                  subtitle: 'Community Support and Donations',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CharityPage()),
+                    );
+                  },
+                ),
                 _menuTile(
                   icon: Icons.celebration,
                   title: 'Runners Banquette',
@@ -1129,8 +1064,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           _infoRow('Club', _club ?? 'Not set'),
           const Divider(color: Colors.white12),
           _infoRow('ICE contact', _emergencyContactSummary()),
-          const Divider(color: Colors.white12),
-          _infoRow('Medical', _medicalSummary()),
         ],
       ),
     );
@@ -1150,16 +1083,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         ? ''
         : ' ($relation)';
     return '${_emergencyContactName!}$relationText';
-  }
-
-  String _medicalSummary() {
-    if (!_emergencyDetailsConsent) {
-      return 'Not shared';
-    }
-    if (_medicalNotes == null || _medicalNotes!.trim().isEmpty) {
-      return 'None reported';
-    }
-    return 'Yes';
   }
 
   Widget _infoRow(String label, String value) {

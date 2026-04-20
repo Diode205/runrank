@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/menu/expenses_claim_page.dart';
 
 class PoliciesFormsNoticesPage extends StatefulWidget {
-  const PoliciesFormsNoticesPage({super.key});
+  final String? initialClubName;
+
+  const PoliciesFormsNoticesPage({super.key, this.initialClubName});
 
   @override
   State<PoliciesFormsNoticesPage> createState() =>
@@ -78,7 +80,8 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
   }
 
   Future<void> _loadClub() async {
-    final clubName = await UserService.currentClubName();
+    final clubName =
+        widget.initialClubName ?? await UserService.currentClubName();
     if (!mounted) return;
     setState(() {
       _clubName = clubName;
@@ -118,7 +121,7 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
       : const Color.fromRGBO(235, 246, 26, 1);
 
   Color get _secondaryAccentColor => _isNrrClub
-      ? const Color(0xFFFFE9E9)
+      ? const Color(0xFFD32F2F)
       : const Color.fromRGBO(39, 203, 236, 1);
 
   Color get _iconBackgroundColor => _isNrrClub
@@ -133,7 +136,11 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
 
   Future<void> _openLink(String url, BuildContext context) async {
     final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (!await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    )) {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
