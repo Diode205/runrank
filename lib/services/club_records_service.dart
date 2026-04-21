@@ -145,6 +145,10 @@ class ClubRecordsService {
     return normalized == 'M' || normalized == 'F' ? normalized : null;
   }
 
+  String _recordSyncKey(int timeSeconds, String raceName, String raceDate) {
+    return '$timeSeconds|${raceName.trim()}|$raceDate';
+  }
+
   bool _isMissingScopedClubRecordColumns(Object error) {
     final message = error.toString().toLowerCase();
     return message.contains('club_records') &&
@@ -194,6 +198,38 @@ class ClubRecordsService {
         _cachedClubUserIds = {};
         _clubUserIdsLoaded = true;
       }
+      return {};
+    }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _getClubProfiles(
+    String? genderFilter,
+  ) async {
+    final club = await _getCurrentUserClub();
+    if (club == null || club.isEmpty) return {};
+
+    try {
+      var query = _supabase
+          .from('user_profiles')
+          .select('id, full_name, club, gender')
+          .eq('club', club);
+
+      final normalizedGender = _normalizeGender(genderFilter);
+      if (normalizedGender != null) {
+        query = query.eq('gender', normalizedGender);
+      }
+
+      final rows = await query;
+      final profiles = <String, Map<String, dynamic>>{};
+      for (final raw in rows as List) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final id = row['id'] as String?;
+        if (id == null || id.isEmpty) continue;
+        profiles[id] = row;
+      }
+      return profiles;
+    } catch (e) {
+      print('Error fetching club profiles for club records: $e');
       return {};
     }
   }
@@ -304,8 +340,17 @@ class ClubRecordsService {
     return (response as List).map((json) => ClubRecord.fromJson(json)).toList();
   }
 
-  /// Fetch top N records for a specific distance
-  Future<List<ClubRecord>> getTopRecords(
+  bool _isSupplementalClubRecord(ClubRecord record) {
+    return record.isHistorical ||
+        record.userId == null ||
+        record.userId!.isEmpty;
+  }
+
+  String _displayDistanceForRaceRow(String requestedDistance) {
+    return requestedDistance == '20M' ? '20M' : requestedDistance;
+  }
+
+  Future<List<ClubRecord>> _fetchSupplementalClubRecords(
     String distance, {
     int limit = 5,
     String? genderFilter,
@@ -315,34 +360,154 @@ class ClubRecordsService {
         distance,
         genderFilter: genderFilter,
       );
-
-      if (distance == 'Ultra') {
-        records.sort((a, b) {
-          final da = _parseUltraDistanceScore(a.raceName);
-          final db = _parseUltraDistanceScore(b.raceName);
-          final cmp = db.compareTo(da);
-          if (cmp != 0) return cmp;
-          return a.timeSeconds.compareTo(b.timeSeconds);
-        });
+      return records.where(_isSupplementalClubRecord).toList();
+    } catch (e) {
+      if (_isMissingScopedClubRecordColumns(e)) {
+        final records = await _fetchLegacyRecords(
+          distance,
+          limit: limit,
+          genderFilter: genderFilter,
+        );
+        return records.where(_isSupplementalClubRecord).toList();
       }
+      rethrow;
+    }
+  }
+
+  Future<List<ClubRecord>> _fetchLiveRaceRecords(
+    String distance, {
+    int limit = 5,
+    String? genderFilter,
+  }) async {
+    final profilesById = await _getClubProfiles(genderFilter);
+    if (profilesById.isEmpty) return [];
+
+    dynamic query = _supabase
+        .from('race_results')
+        .select('user_id, race_name, time_seconds, raceDate');
+
+    if (distance == '20M') {
+      query = query.inFilter('distance', ['20M', '20m', '20 mile', '20 Mile']);
+    } else {
+      query = query.eq('distance', distance);
+    }
+
+    query = query.inFilter('user_id', profilesById.keys.toList());
+
+    final rows = await query;
+    final records = <ClubRecord>[];
+
+    for (final raw in rows as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final userId = row['user_id'] as String?;
+      final raceDate = row['raceDate'] as String?;
+      final timeRaw = row['time_seconds'];
+      if (userId == null || raceDate == null || timeRaw is! num) continue;
+
+      final timeSeconds = timeRaw.toInt();
+      if (timeSeconds <= 0) continue;
+
+      final profile = profilesById[userId];
+      if (profile == null) continue;
+
+      records.add(
+        ClubRecord(
+          id: 'live-$userId-${_displayDistanceForRaceRow(distance)}-$timeSeconds-$raceDate',
+          distance: _displayDistanceForRaceRow(distance),
+          timeSeconds: timeSeconds,
+          runnerName: (profile['full_name'] as String?) ?? 'Unknown',
+          userId: userId,
+          club: profile['club'] as String?,
+          gender: _normalizeGender(profile['gender'] as String?),
+          raceName: ((row['race_name'] as String?)?.trim().isNotEmpty == true)
+              ? row['race_name'] as String
+              : 'Untitled race',
+          raceDate: DateTime.parse(raceDate),
+          isHistorical: false,
+        ),
+      );
+    }
+
+    if (distance == 'Ultra') {
+      records.sort((a, b) {
+        final da = _parseUltraDistanceScore(a.raceName);
+        final db = _parseUltraDistanceScore(b.raceName);
+        final cmp = db.compareTo(da);
+        if (cmp != 0) return cmp;
+        return a.timeSeconds.compareTo(b.timeSeconds);
+      });
+    } else {
+      records.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
+    }
+
+    return records.length > limit ? records.take(limit).toList() : records;
+  }
+
+  List<ClubRecord> _mergeRecordSources(
+    String distance,
+    List<ClubRecord> liveRecords,
+    List<ClubRecord> supplementalRecords,
+  ) {
+    final merged = <ClubRecord>[];
+    final seen = <String>{};
+
+    String keyFor(ClubRecord record) {
+      final dateOnly = record.raceDate.toIso8601String().split('T')[0];
+      final runnerToken = (record.userId != null && record.userId!.isNotEmpty)
+          ? record.userId!
+          : record.runnerName.trim().toLowerCase();
+      return '${record.distance}|$runnerToken|${record.timeSeconds}|${record.raceName.trim().toLowerCase()}|$dateOnly';
+    }
+
+    for (final record in [...liveRecords, ...supplementalRecords]) {
+      final key = keyFor(record);
+      if (seen.add(key)) {
+        merged.add(record);
+      }
+    }
+
+    if (distance == 'Ultra') {
+      merged.sort((a, b) {
+        final da = _parseUltraDistanceScore(a.raceName);
+        final db = _parseUltraDistanceScore(b.raceName);
+        final cmp = db.compareTo(da);
+        if (cmp != 0) return cmp;
+        return a.timeSeconds.compareTo(b.timeSeconds);
+      });
+    } else {
+      merged.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
+    }
+
+    return merged;
+  }
+
+  /// Fetch top N records for a specific distance
+  Future<List<ClubRecord>> getTopRecords(
+    String distance, {
+    int limit = 5,
+    String? genderFilter,
+  }) async {
+    try {
+      final liveRecords = await _fetchLiveRaceRecords(
+        distance,
+        limit: limit,
+        genderFilter: genderFilter,
+      );
+
+      final supplementalRecords = await _fetchSupplementalClubRecords(
+        distance,
+        limit: limit,
+        genderFilter: genderFilter,
+      );
+
+      final records = _mergeRecordSources(
+        distance,
+        liveRecords,
+        supplementalRecords,
+      );
 
       return records.length > limit ? records.take(limit).toList() : records;
     } catch (e) {
-      if (_isMissingScopedClubRecordColumns(e)) {
-        try {
-          return await _fetchLegacyRecords(
-            distance,
-            limit: limit,
-            genderFilter: genderFilter,
-          );
-        } catch (legacyError) {
-          print(
-            'Error fetching legacy club records for $distance after scoped fallback: $legacyError',
-          );
-          return [];
-        }
-      }
-
       print('Error fetching club records for $distance: $e');
       return [];
     }
@@ -354,7 +519,6 @@ class ClubRecordsService {
   static double _parseUltraDistanceScore(String raceName) {
     final text = raceName.toLowerCase();
 
-    // Look for a number followed by a unit.
     final unitPattern = RegExp(
       r'(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|mile|miles|mi)\b',
     );
@@ -364,15 +528,12 @@ class ClubRecordsService {
       if (value == null) return 0;
       final unit = unitMatch.group(2) ?? '';
       if (unit.startsWith('k')) {
-        // Kilometres
         return value;
       } else {
-        // Miles -> km
         return value * 1.60934;
       }
     }
 
-    // Fallback: bare number with no unit, treat as km
     final numberPattern = RegExp(r'(\d+(?:\.\d+)?)');
     final numberMatch = numberPattern.firstMatch(text);
     if (numberMatch != null) {
@@ -398,17 +559,20 @@ class ClubRecordsService {
       '20M',
       'Ultra',
     ];
-    final Map<String, List<ClubRecord>> results = {};
+    final recordLists = await Future.wait(
+      distances.map(
+        (distance) => getTopRecords(
+          distance,
+          limit: limitPerDistance,
+          genderFilter: genderFilter,
+        ),
+      ),
+    );
 
-    for (final distance in distances) {
-      results[distance] = await getTopRecords(
-        distance,
-        limit: limitPerDistance,
-        genderFilter: genderFilter,
-      );
-    }
-
-    return results;
+    return {
+      for (var index = 0; index < distances.length; index++)
+        distances[index]: recordLists[index],
+    };
   }
 
   /// Get the fastest record for a distance (club record holder)
@@ -433,6 +597,106 @@ class ClubRecordsService {
   /// for club records based on the current user's profile.
   Future<String?> getDefaultGenderFilter() => _getCurrentUserGender();
 
+  bool _isSameRaceDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _matchesPerformance(
+    ClubRecord record, {
+    required String userId,
+    required int timeSeconds,
+    required String raceName,
+    required DateTime raceDate,
+  }) {
+    final safeRaceName = raceName.trim().isEmpty
+        ? 'Untitled race'
+        : raceName.trim();
+    return record.userId == userId &&
+        record.timeSeconds == timeSeconds &&
+        record.raceName.trim() == safeRaceName &&
+        _isSameRaceDate(record.raceDate, raceDate);
+  }
+
+  Future<void> notifyIfPerformanceSetClubRecord({
+    required String userId,
+    required String distance,
+    required int timeSeconds,
+    required String raceName,
+    required DateTime raceDate,
+    ClubRecord? previousHolder,
+  }) async {
+    try {
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('full_name, club, gender')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final runnerName =
+          ((profile?['full_name'] as String?)?.trim().isNotEmpty == true)
+          ? (profile!['full_name'] as String).trim()
+          : 'Unknown';
+      final clubName = (profile?['club'] as String?)?.trim();
+      final genderFilter = _normalizeGender(profile?['gender'] as String?);
+
+      if (clubName == null || clubName.isEmpty) return;
+
+      final currentHolder = await getClubRecordHolder(
+        distance,
+        genderFilter: genderFilter,
+      );
+      if (currentHolder == null) return;
+
+      if (!_matchesPerformance(
+        currentHolder,
+        userId: userId,
+        timeSeconds: timeSeconds,
+        raceName: raceName,
+        raceDate: raceDate,
+      )) {
+        return;
+      }
+
+      if (previousHolder != null &&
+          _matchesPerformance(
+            previousHolder,
+            userId: userId,
+            timeSeconds: timeSeconds,
+            raceName: raceName,
+            raceDate: raceDate,
+          )) {
+        return;
+      }
+
+      if (previousHolder != null && previousHolder.userId == userId) {
+        if (distance == 'Ultra') {
+          final previousScore = _parseUltraDistanceScore(
+            previousHolder.raceName,
+          );
+          final currentScore = _parseUltraDistanceScore(currentHolder.raceName);
+          if (currentScore < previousScore) return;
+          if (currentScore == previousScore &&
+              currentHolder.timeSeconds >= previousHolder.timeSeconds) {
+            return;
+          }
+        } else if (currentHolder.timeSeconds >= previousHolder.timeSeconds) {
+          return;
+        }
+      }
+
+      final distanceToken = distance.replaceAll(' ', '_');
+      await NotificationService.notifyUsersInClub(
+        clubName: clubName,
+        title: 'New club record set',
+        body:
+            '$runnerName set a new $distance club record in ${currentHolder.formattedTime}.',
+        route: 'club_records/' + distanceToken,
+      );
+    } catch (e) {
+      print('Error notifying for live club record achievement: $e');
+    }
+  }
+
   /// Add a new club record (admin only)
   Future<bool> addRecord(ClubRecord record) async {
     try {
@@ -455,19 +719,11 @@ class ClubRecordsService {
         await _supabase.from('club_records').insert(payload);
       }
 
-      // Notify users in the current admin's club that a new club record has been set
       try {
         final runner = record.runnerName;
         final distance = record.distance;
         final time = record.formattedTime;
-
-        // Encode the distance into the route so Alerts can deep-link
-        // directly to the correct distance tab. Spaces are replaced
-        // with underscores for a route-safe token.
         final distanceToken = distance.replaceAll(' ', '_');
-        // Scope notifications strictly to the club of the admin
-        // who is adding the record. This avoids any possibility of
-        // cross-club leakage due to runner profiles or data issues.
         final clubName = currentClub;
 
         if (clubName != null && clubName.isNotEmpty) {
@@ -475,13 +731,9 @@ class ClubRecordsService {
             clubName: clubName,
             title: 'New club record set',
             body: '$runner set a new $distance club record in $time.',
-            // e.g. [route:club_records/10K] or [route:club_records/Half_M]
             route: 'club_records/' + distanceToken,
           );
         } else {
-          // If we cannot resolve a club at all, skip sending a
-          // notification rather than broadcasting across all clubs.
-          // This avoids cross-club leakage of record activity.
           print(
             'ClubRecordsService.addRecord: Skipping notification because club could not be resolved for distance $distance and runner $runner',
           );
@@ -531,6 +783,155 @@ class ClubRecordsService {
     } catch (e) {
       print('Error deleting club record: $e');
       return false;
+    }
+  }
+
+  Future<void> reconcileCurrentUserRecordForDistance(String distance) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('full_name, club, gender')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final runnerName =
+          (profile != null ? profile['full_name'] as String? : null) ??
+          'Unknown';
+      final club = profile != null ? profile['club'] as String? : null;
+      final gender = profile != null
+          ? _normalizeGender(profile['gender'] as String?)
+          : null;
+
+      dynamic raceResultsQuery = _supabase
+          .from('race_results')
+          .select('id, race_name, time_seconds, raceDate')
+          .eq('user_id', user.id);
+
+      dynamic clubRecordsQuery = _supabase
+          .from('club_records')
+          .select(
+            'id, race_name, time_seconds, race_date, runner_name, club, gender',
+          )
+          .eq('user_id', user.id)
+          .eq('is_historical', false);
+
+      if (distance == '20M') {
+        const aliases = ['20M', '20m', '20 mile', '20 Mile'];
+        raceResultsQuery = raceResultsQuery.inFilter('distance', aliases);
+        clubRecordsQuery = clubRecordsQuery.inFilter('distance', aliases);
+      } else {
+        raceResultsQuery = raceResultsQuery.eq('distance', distance);
+        clubRecordsQuery = clubRecordsQuery.eq('distance', distance);
+      }
+
+      final raceResults = await raceResultsQuery;
+      final existingRecords = await clubRecordsQuery;
+
+      final expectedCounts = <String, int>{};
+      Map<String, dynamic>? fastestResult;
+      int? fastestTime;
+
+      for (final row in raceResults as List) {
+        final timeSeconds = row['time_seconds'] as int?;
+        final raceDate = row['raceDate'] as String?;
+        if (timeSeconds == null || timeSeconds <= 0 || raceDate == null) {
+          continue;
+        }
+
+        final raceName =
+            ((row['race_name'] as String?)?.trim().isNotEmpty == true)
+            ? row['race_name'] as String
+            : 'Untitled race';
+        final dateOnly = DateTime.parse(
+          raceDate,
+        ).toIso8601String().split('T')[0];
+        final key = _recordSyncKey(timeSeconds, raceName, dateOnly);
+        expectedCounts[key] = (expectedCounts[key] ?? 0) + 1;
+
+        if (fastestTime == null || timeSeconds < fastestTime) {
+          fastestTime = timeSeconds;
+          fastestResult = row as Map<String, dynamic>;
+        }
+      }
+
+      var hasFastestRecord = false;
+      for (final row in existingRecords as List) {
+        final id = row['id'] as String?;
+        final timeSeconds = row['time_seconds'] as int?;
+        final raceDate = row['race_date'] as String?;
+        if (id == null || timeSeconds == null || raceDate == null) continue;
+
+        final raceName =
+            ((row['race_name'] as String?)?.trim().isNotEmpty == true)
+            ? row['race_name'] as String
+            : 'Untitled race';
+        final dateOnly = DateTime.parse(
+          raceDate,
+        ).toIso8601String().split('T')[0];
+        final key = _recordSyncKey(timeSeconds, raceName, dateOnly);
+        final remaining = expectedCounts[key] ?? 0;
+
+        if (remaining <= 0) {
+          await _supabase.from('club_records').delete().eq('id', id);
+          continue;
+        }
+
+        expectedCounts[key] = remaining - 1;
+
+        final updates = <String, dynamic>{};
+        if (row['runner_name'] != runnerName) {
+          updates['runner_name'] = runnerName;
+        }
+        if (row['club'] != club) {
+          updates['club'] = club;
+        }
+        if (_normalizeGender(row['gender'] as String?) != gender) {
+          updates['gender'] = gender;
+        }
+        if (updates.isNotEmpty) {
+          await _supabase.from('club_records').update(updates).eq('id', id);
+        }
+
+        if (fastestTime != null && timeSeconds == fastestTime) {
+          hasFastestRecord = true;
+        }
+      }
+
+      if (!hasFastestRecord && fastestResult != null && fastestTime != null) {
+        final raceName =
+            ((fastestResult['race_name'] as String?)?.trim().isNotEmpty == true)
+            ? fastestResult['race_name'] as String
+            : 'Untitled race';
+        await ensureRecordForResult(
+          userId: user.id,
+          distance: distance,
+          timeSeconds: fastestTime,
+          raceName: raceName,
+          raceDate: DateTime.parse(fastestResult['raceDate'] as String),
+        );
+      }
+    } catch (e) {
+      print('Error reconciling current user club record for $distance: $e');
+    }
+  }
+
+  Future<void> reconcileCurrentUserRecords() async {
+    const distances = [
+      '5K',
+      '5M',
+      '10K',
+      '10M',
+      'Half M',
+      'Marathon',
+      '20M',
+      'Ultra',
+    ];
+
+    for (final distance in distances) {
+      await reconcileCurrentUserRecordForDistance(distance);
     }
   }
 
@@ -593,7 +994,7 @@ class ClubRecordsService {
           // Check if this record already exists
           final existing = await _supabase
               .from('club_records')
-              .select('id, runner_name')
+              .select('id, runner_name, race_name, race_date, club, gender')
               .eq('user_id', userId)
               .eq('distance', distance)
               .eq('time_seconds', timeSeconds)
@@ -616,14 +1017,41 @@ class ClubRecordsService {
 
             await addRecord(record);
           } else {
-            // Ensure existing record's name is kept in sync with profile
+            // Ensure existing record stays in sync with the source result and
+            // current profile metadata.
             final existingId = existing['id'] as String?;
-            final existingName = existing['runner_name'] as String?;
-            if (existingId != null && existingName != runnerName) {
-              await _supabase
-                  .from('club_records')
-                  .update({'runner_name': runnerName})
-                  .eq('id', existingId);
+            final resultRaceName =
+                (result['race_name'] as String?)?.trim().isNotEmpty == true
+                ? result['race_name'] as String
+                : 'Unknown Race';
+            final resultRaceDate = DateTime.parse(
+              result['raceDate'] as String,
+            ).toIso8601String().split('T')[0];
+
+            if (existingId != null) {
+              final updates = <String, dynamic>{};
+              if (existing['runner_name'] != runnerName) {
+                updates['runner_name'] = runnerName;
+              }
+              if (existing['race_name'] != resultRaceName) {
+                updates['race_name'] = resultRaceName;
+              }
+              if (existing['race_date'] != resultRaceDate) {
+                updates['race_date'] = resultRaceDate;
+              }
+              if (existing['club'] != club) {
+                updates['club'] = club;
+              }
+              if (_normalizeGender(existing['gender'] as String?) != gender) {
+                updates['gender'] = gender;
+              }
+
+              if (updates.isNotEmpty) {
+                await _supabase
+                    .from('club_records')
+                    .update(updates)
+                    .eq('id', existingId);
+              }
             }
           }
         }
@@ -644,7 +1072,6 @@ class ClubRecordsService {
     required DateTime raceDate,
   }) async {
     try {
-      // Look up the latest profile name for this user
       final profile = await _supabase
           .from('user_profiles')
           .select('full_name, club, gender')
@@ -659,7 +1086,6 @@ class ClubRecordsService {
           ? _normalizeGender(profile['gender'] as String?)
           : null;
 
-      // Check for an existing record with same user, distance and time
       final existing = await _supabase
           .from('club_records')
           .select('id')

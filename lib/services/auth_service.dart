@@ -1,3 +1,4 @@
+import 'package:runrank/services/club_records_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -124,6 +125,16 @@ class AuthService {
     }
 
     try {
+      final normalizedGender = gender.trim().toUpperCase();
+      final genderFilter = normalizedGender == 'M' || normalizedGender == 'F'
+          ? normalizedGender
+          : null;
+      final recordsService = ClubRecordsService();
+      final previousHolder = await recordsService.getClubRecordHolder(
+        distance,
+        genderFilter: genderFilter,
+      );
+
       await client.from('race_results').insert({
         'user_id': user.id,
         'race_name': raceName,
@@ -135,6 +146,15 @@ class AuthService {
         'age_grade': ageGrade,
         'raceDate': raceDate?.toIso8601String(),
       });
+
+      await recordsService.notifyIfPerformanceSetClubRecord(
+        userId: user.id,
+        distance: distance,
+        timeSeconds: finishSeconds,
+        raceName: raceName,
+        raceDate: raceDate ?? DateTime.now(),
+        previousHolder: previousHolder,
+      );
 
       return true;
     } catch (e) {

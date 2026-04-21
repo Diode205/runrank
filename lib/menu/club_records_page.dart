@@ -41,9 +41,6 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   Color get _primaryColor =>
       _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
 
-  Color get _secondaryColor =>
-      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
-
   @override
   void initState() {
     super.initState();
@@ -176,10 +173,6 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   }
 
   Widget _buildAdminButtons() {
-    final syncForegroundColor = _secondaryColor.computeLuminance() > 0.6
-        ? Colors.black
-        : Colors.white;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -218,25 +211,6 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(color: Colors.white12, height: 1),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _syncRecordsFromRaceResults,
-              icon: const Icon(Icons.sync, size: 18),
-              label: const Text('Sync from Race Results'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _secondaryColor,
-                foregroundColor: syncForegroundColor,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -281,57 +255,6 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
         ),
       ],
     );
-  }
-
-  Future<void> _syncRecordsFromRaceResults() async {
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        backgroundColor: Color(0xFF1A1D2E),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF0055FF)),
-            SizedBox(height: 16),
-            Text(
-              'Syncing records from race results...',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      await _recordsService.syncFromRaceResults();
-
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Records synced successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Reload the page
-        _loadData();
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error syncing records: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   Widget _buildPagerControls() {
@@ -438,7 +361,9 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onLongPress: _isAdmin ? () => _showRecordOptions(record) : null,
+          onLongPress: _isAdmin && _canAdminManageRecord(record)
+              ? () => _showRecordOptions(record)
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -1176,6 +1101,10 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
       'Dec',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  bool _canAdminManageRecord(ClubRecord record) {
+    return !record.id.startsWith('live-');
   }
 
   Widget _buildNextSevenSection(List<ClubRecord> records) {

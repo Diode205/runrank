@@ -59,6 +59,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String? _currentUserId;
   String? _currentUserGender;
   String? _currentUserClub;
+  DateTime? _currentUserDob;
+
+  int? _ageOnDate(DateTime date) {
+    final dob = _currentUserDob;
+    if (dob == null) return null;
+
+    var years = date.year - dob.year;
+    final hasHadBirthday =
+        date.month > dob.month ||
+        (date.month == dob.month && date.day >= dob.day);
+    if (!hasHadBirthday) {
+      years--;
+    }
+
+    if (years <= 0 || years > 120) return null;
+    return years;
+  }
 
   @override
   void initState() {
@@ -86,10 +103,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final profile = await client
           .from('user_profiles')
-          .select('club')
+          .select('club, date_of_birth')
           .eq('id', user.id)
           .maybeSingle();
       _currentUserClub = (profile?['club'] as String?)?.trim();
+      final dobRaw = profile?['date_of_birth'] as String?;
+      _currentUserDob = (dobRaw != null && dobRaw.isNotEmpty)
+          ? DateTime.tryParse(dobRaw)
+          : null;
 
       final rows = await client
           .from('race_results')
@@ -125,27 +146,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             : 0;
         final timeText = formatTime(finishSeconds);
 
-        final ageGradeRaw = row['age_grade'];
-        final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
-
-        final gender = ((row['gender'] as String?) ?? '').toUpperCase();
-        final age = row['age'] is int ? row['age'] as int : 0;
-
-        var level = row['level'] as String? ?? 'Unknown';
-        if (clubSupportsStandardDistance(_currentUserClub, distance) &&
-            finishSeconds > 0 &&
-            (gender == 'M' || gender == 'F') &&
-            age > 0) {
-          final eval = RunCalculator.evaluate(
-            gender: gender,
-            age: age,
-            distance: distance,
-            finishSeconds: finishSeconds,
-            clubName: _currentUserClub,
-          );
-          level = eval['level'] as String;
-        }
-
         DateTime raceDate;
         if (row['raceDate'] != null) {
           raceDate = DateTime.parse(row['raceDate']);
@@ -153,6 +153,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
           raceDate = DateTime.parse(row['created_at']);
         } else {
           raceDate = DateTime.now();
+        }
+
+        final gender = ((row['gender'] as String?) ?? '').toUpperCase();
+        final storedAge = row['age'] is int ? row['age'] as int : 0;
+        final effectiveAge = _ageOnDate(raceDate) ?? storedAge;
+        final ageGradeRaw = row['age_grade'];
+        double ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+
+        var level = row['level'] as String? ?? 'Unknown';
+        if (clubSupportsStandardDistance(_currentUserClub, distance) &&
+            finishSeconds > 0 &&
+            (gender == 'M' || gender == 'F') &&
+            effectiveAge > 0) {
+          final eval = RunCalculator.evaluate(
+            gender: gender,
+            age: effectiveAge,
+            distance: distance,
+            finishSeconds: finishSeconds,
+            clubName: _currentUserClub,
+          );
+          level = eval['level'] as String;
+          ageGrade = eval['ageGrade'] as double;
         }
 
         allRecords.add(
@@ -166,7 +188,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             level: level,
             ageGrade: ageGrade,
             gender: gender,
-            age: age,
+            age: effectiveAge,
           ),
         );
       }
@@ -215,50 +237,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _currentUserGender = gender;
       }
 
-      for (final distance in _distances) {
-        var record = await _clubRecordsService.getClubRecordHolder(
-          distance,
-          genderFilter: gender,
-        );
+      final topRecords = await _clubRecordsService.getAllTopRecords(
+        limitPerDistance: 1,
+        genderFilter: gender,
+      );
 
-        // If there is no official club record yet for this distance but the
-        // current user has results recorded, automatically ensure a
-        // club_records entry using their best time. This is especially
-        // important for new clubs (like NRR) so the first race becomes the
-        // initial club record.
-        if (record == null) {
-          final recordsForDistance = _byDistance[distance] ?? const [];
-          if (recordsForDistance.isNotEmpty && _currentUserId != null) {
-            // Find the fastest finish time among the user's results.
-            final best = recordsForDistance
-                .where((r) => (r.finishSeconds ?? 0) > 0)
-                .reduce(
-                  (a, b) =>
-                      (a.finishSeconds ?? 0) <= (b.finishSeconds ?? 0) ? a : b,
-                );
-
-            await _clubRecordsService.ensureRecordForResult(
-              userId: _currentUserId!,
-              distance: distance,
-              timeSeconds: best.finishSeconds ?? 0,
-              raceName: best.raceName,
-              raceDate: best.raceDate,
-            );
-
-            // Re-fetch after ensuring the record so UI reflects it.
-            record = await _clubRecordsService.getClubRecordHolder(
-              distance,
-              genderFilter: gender,
-            );
-          }
-        }
-
-        if (mounted) {
-          setState(() {
-            _clubRecords[distance] = record;
-          });
-        }
-      }
+      if (!mounted) return;
+      setState(() {
+        _clubRecords = {
+          for (final distance in _distances)
+            distance: (topRecords[distance]?.isNotEmpty ?? false)
+                ? topRecords[distance]!.first
+                : null,
+        };
+      });
     } catch (e) {
       print('Error fetching club records: $e');
     }
@@ -844,8 +836,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         print('DEBUG error deleting race_results by id (${r.id}): $e');
       }
 
-      // Also delete any matching entries by composite key for safety,
-      // and keep club_records in sync.
+      // Also delete any matching entries by composite key for safety.
       if (user != null && timeSeconds != null) {
         try {
           final deletedByComposite = await client
@@ -860,35 +851,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           );
         } catch (e) {
           print('DEBUG error deleting race_results by composite key: $e');
-        }
-
-        try {
-          // First, find any club_records rows that match this performance
-          final candidates = await client
-              .from('club_records')
-              .select('id, user_id, distance, time_seconds')
-              .eq('distance', r.distance)
-              .eq('time_seconds', timeSeconds);
-          print('DEBUG club_records candidates for deletion: $candidates');
-
-          // Then delete by id. RLS will ensure that only rows where
-          // user_id = auth.uid() are actually deletable for non-admins.
-          for (final row in candidates) {
-            final id = row['id'] as String?;
-            if (id == null) continue;
-            try {
-              final deletedClub = await client
-                  .from('club_records')
-                  .delete()
-                  .eq('id', id)
-                  .select();
-              print('DEBUG delete club_records by id ($id): $deletedClub');
-            } catch (e) {
-              print('DEBUG error deleting club_records by id ($id): $e');
-            }
-          }
-        } catch (e) {
-          print('DEBUG error selecting club_records candidates: $e');
         }
       }
 
@@ -1017,10 +979,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // Re-evaluate level + age grade for standard distances
       String level = r.level;
       double ageGrade = r.ageGrade;
+      final effectiveAge = _ageOnDate(selectedDate) ?? r.age;
       if (clubSupportsStandardDistance(_currentUserClub, r.distance)) {
         final eval = RunCalculator.evaluate(
           gender: r.gender,
-          age: r.age,
+          age: effectiveAge,
           distance: r.distance,
           finishSeconds: parsedSeconds,
           clubName: _currentUserClub,
@@ -1031,41 +994,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       final rawName = raceNameController.text.trim();
       final safeRaceName = rawName.isEmpty ? 'Untitled race' : rawName;
+      final user = client.auth.currentUser;
+      final genderFilter = r.gender == 'M' || r.gender == 'F'
+          ? r.gender
+          : _currentUserGender;
+      final previousHolder = await _clubRecordsService.getClubRecordHolder(
+        r.distance,
+        genderFilter: genderFilter,
+      );
 
-      // Update the underlying race_results row
-      await client
+      // Update the underlying race_results row. Some legacy rows do not
+      // reliably update by id alone, so fall back to a composite match when
+      // the primary-key update touches nothing.
+      final updatedRows = await client
           .from('race_results')
           .update({
             'race_name': safeRaceName,
             'time_seconds': parsedSeconds,
             'raceDate': selectedDate.toIso8601String(),
+            'age': effectiveAge,
             'level': level,
             'age_grade': ageGrade,
           })
-          .eq('id', r.id);
+          .eq('id', r.id)
+          .select('id');
 
-      // Keep any related club_records entry in sync with the edited result
-      final user = client.auth.currentUser;
-      final oldSeconds = r.finishSeconds;
-      if (user != null && oldSeconds != null) {
-        final existing = await client
-            .from('club_records')
-            .select('id')
+      if (updatedRows.isEmpty && user != null) {
+        final fallbackRows = await client
+            .from('race_results')
+            .update({
+              'race_name': safeRaceName,
+              'time_seconds': parsedSeconds,
+              'raceDate': selectedDate.toIso8601String(),
+              'age': effectiveAge,
+              'level': level,
+              'age_grade': ageGrade,
+            })
             .eq('user_id', user.id)
             .eq('distance', r.distance)
-            .eq('time_seconds', oldSeconds)
-            .maybeSingle();
+            .eq('time_seconds', r.finishSeconds ?? 0)
+            .eq('raceDate', r.raceDate.toIso8601String())
+            .select('id');
 
-        if (existing != null && existing['id'] != null) {
-          await client
-              .from('club_records')
-              .update({
-                'time_seconds': parsedSeconds,
-                'race_name': safeRaceName,
-                'race_date': selectedDate.toIso8601String().split('T')[0],
-              })
-              .eq('id', existing['id'] as String);
+        if (fallbackRows.isEmpty) {
+          await client.from('race_results').insert({
+            'user_id': user.id,
+            'race_name': safeRaceName,
+            'distance': r.distance,
+            'time_seconds': parsedSeconds,
+            'raceDate': selectedDate.toIso8601String(),
+            'age': effectiveAge,
+            'level': level,
+            'age_grade': ageGrade,
+            'gender': r.gender,
+          });
+
+          await client.from('race_results').delete().eq('id', r.id);
         }
+      }
+
+      if (user != null) {
+        await _clubRecordsService.notifyIfPerformanceSetClubRecord(
+          userId: user.id,
+          distance: r.distance,
+          timeSeconds: parsedSeconds,
+          raceName: safeRaceName,
+          raceDate: selectedDate,
+          previousHolder: previousHolder,
+        );
       }
 
       await _fetchRaceHistory();

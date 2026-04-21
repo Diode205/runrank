@@ -6,6 +6,10 @@ class ResultCard extends StatelessWidget {
   final double ageGrade;
   final String ageGradeMessage;
   final String guidance;
+  final Color backgroundColor;
+  final Color accentColor;
+  final Color primaryTextColor;
+  final Color secondaryTextColor;
 
   const ResultCard({
     super.key,
@@ -13,6 +17,10 @@ class ResultCard extends StatelessWidget {
     required this.ageGrade,
     required this.ageGradeMessage,
     required this.guidance,
+    required this.backgroundColor,
+    required this.accentColor,
+    this.primaryTextColor = Colors.white,
+    this.secondaryTextColor = Colors.white70,
   });
 
   @override
@@ -24,7 +32,7 @@ class ResultCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 71, 5, 226),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -51,7 +59,7 @@ class ResultCard extends StatelessWidget {
                 child: Text(
                   style.displayLabel,
                   style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
+                    color: primaryTextColor,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.1,
                   ),
@@ -65,8 +73,8 @@ class ResultCard extends StatelessWidget {
           // Age grade
           Text(
             'Age Grade: ${ageGrade.toStringAsFixed(1)}%',
-            style: const TextStyle(
-              color: Colors.yellowAccent,
+            style: TextStyle(
+              color: accentColor,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -77,7 +85,7 @@ class ResultCard extends StatelessWidget {
           Text(
             ageGradeMessage,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
+            style: TextStyle(color: primaryTextColor, fontSize: 16),
           ),
 
           const SizedBox(height: 16),
@@ -87,8 +95,8 @@ class ResultCard extends StatelessWidget {
           Text(
             guidance,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: secondaryTextColor,
               fontSize: 14,
               height: 1.4,
             ),

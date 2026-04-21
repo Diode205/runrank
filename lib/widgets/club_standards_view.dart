@@ -70,6 +70,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   String _selectedGender = 'M';
   String? _resultMessage;
   String? _clubName;
+  DateTime? _dateOfBirth;
+  DateTime? _memberSince;
 
   // Whether we've finished loading the user's profile/club info
   bool _profileLoaded = false;
@@ -177,7 +179,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       final row = await client
           .from('user_profiles')
-          .select('date_of_birth, gender, club')
+          .select('date_of_birth, gender, club, member_since')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -187,9 +189,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       int? age;
       final dobStr = row['date_of_birth'] as String?;
+      final memberSinceStr = row['member_since'] as String?;
       if (dobStr != null && dobStr.isNotEmpty) {
         final dob = DateTime.tryParse(dobStr);
         if (dob != null) {
+          _dateOfBirth = dob;
           final now = DateTime.now();
           var calculatedAge = now.year - dob.year;
           final hasHadBirthdayThisYear =
@@ -203,6 +207,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             age = calculatedAge;
           }
         }
+      }
+      if (memberSinceStr != null && memberSinceStr.isNotEmpty) {
+        _memberSince = DateTime.tryParse(memberSinceStr);
       }
 
       if (!mounted) return;
@@ -272,12 +279,56 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     }
   }
 
+  int? _ageOnDate(DateTime date) {
+    final dob = _dateOfBirth;
+    if (dob == null) return null;
+
+    var years = date.year - dob.year;
+    final hasHadBirthday =
+        date.month > dob.month ||
+        (date.month == dob.month && date.day >= dob.day);
+    if (!hasHadBirthday) {
+      years--;
+    }
+
+    if (years <= 0 || years > 120) return null;
+    return years;
+  }
+
+  int _resolvedAgeForRaceDate(DateTime? raceDate, {int fallback = 0}) {
+    return _ageOnDate(raceDate ?? DateTime.now()) ?? fallback;
+  }
+
+  void _syncDisplayedAgeWithSelectedRaceDate() {
+    final derivedAge = _ageOnDate(_selectedRaceDate ?? DateTime.now());
+    if (derivedAge != null) {
+      _ageController.text = derivedAge.toString();
+    }
+  }
+
+  bool _isRaceEligibleForAward(DateTime? raceDate) {
+    final membershipDate = _memberSince;
+    final eventDate = raceDate;
+    if (membershipDate == null || eventDate == null) {
+      return true;
+    }
+
+    final memberDay = DateTime(
+      membershipDate.year,
+      membershipDate.month,
+      membershipDate.day,
+    );
+    final raceDay = DateTime(eventDate.year, eventDate.month, eventDate.day);
+    return !raceDay.isBefore(memberDay);
+  }
+
   String _clubStandardsDescription() {
     final club = (_clubName ?? '').toLowerCase();
 
     if (club.contains('norwich road runners')) {
       return 'NRR Club Standards require members to achieve qualifying times '
           'in five of seven races over a calendar year to earn an award.\n\n'
+          'Only races run on or after your club membership date qualify for the award.\n\n'
           'Qualifying races are UKA licensed events. Parkruns and training runs do not count.\n\n'
           'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
           'Awards will be presented at the Annual Awards evening.';
@@ -286,6 +337,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     if (club.contains('north norfolk beach runners')) {
       return 'NNBR Club Standards require members to achieve qualifying times '
           'in four of six distances over a calendar year to earn an award.\n\n'
+          'Only races run on or after your club membership date qualify for the award.\n\n'
           'Qualifying races are UKA licensed and Club Handicap events. Parkruns and training runs do not count.\n\n'
           'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
           'Awards will be presented at the Annual Awards evening.';
@@ -294,6 +346,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     // Generic wording while club is loading / for unknown clubs
     return 'Club Standards require members to achieve qualifying performances '
         'over key distances within a calendar year to earn an award.\n\n'
+        'Only races run on or after your club membership date qualify for the award.\n\n'
         'Qualifying races are typically UKA licensed events and official club handicaps. Training runs do not count.\n\n'
         'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
         'Awards are usually presented at the Annual Awards evening.';
@@ -359,7 +412,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     try {
       final rows = await client
           .from('race_results')
-          .select('distance, level, time_seconds, gender, age')
+          .select('distance, level, time_seconds, gender, age, raceDate')
           .eq('user_id', user.id);
 
       if (rows.isEmpty) {
@@ -379,9 +432,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       for (final row in rows) {
         final distance = (row['distance'] as String?) ?? '';
+        final raceDate = DateTime.tryParse(row['raceDate'] as String? ?? '');
         final level = _effectiveLevelFromRaceRow(row);
 
         if (!_awardDistances.contains(distance)) continue;
+        if (!_isRaceEligibleForAward(raceDate)) continue;
         if (!_awardLevels.contains(level)) continue;
 
         final current = bestByDistance[distance] ?? '';
@@ -449,7 +504,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final timeSecondsRaw = row['time_seconds'];
     final finishSeconds = timeSecondsRaw is num ? timeSecondsRaw.toInt() : 0;
     final gender = ((row['gender'] as String?) ?? '').toUpperCase();
-    final age = row['age'] is int ? row['age'] as int : 0;
+    final storedAge = row['age'] is int ? row['age'] as int : 0;
+    final raceDate = DateTime.tryParse(row['raceDate'] as String? ?? '');
+    final age = _resolvedAgeForRaceDate(raceDate, fallback: storedAge);
 
     if (!clubSupportsStandardDistance(_clubName, distance)) {
       return storedLevel;
@@ -506,7 +563,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(now.year - 5),
+      firstDate: DateTime(1980),
       lastDate: today,
       initialEntryMode: DatePickerEntryMode.calendarOnly,
       selectableDayPredicate: (date) {
@@ -521,6 +578,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         _dateController.text =
             '${picked.day.toString().padLeft(2, '0')} '
             '${_monthShort(picked.month)} ${picked.year}';
+        _syncDisplayedAgeWithSelectedRaceDate();
       });
     }
   }
@@ -580,36 +638,6 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     if (!success) return;
 
     _invalidateTop10SnapCache();
-
-    // After a successful submission, ensure club records stay in sync.
-    // For 20M/Ultra we always create a matching club record entry so
-    // their pages populate immediately. For standard distances, we only
-    // add a club record when this performance beats the current holder.
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    final recordsService = ClubRecordsService();
-    bool shouldEnsureRecord = false;
-
-    if (!_isStandardDistance(distance)) {
-      shouldEnsureRecord = true;
-    } else {
-      final currentHolder = await recordsService.getClubRecordHolder(distance);
-      if (currentHolder == null || seconds < currentHolder.timeSeconds) {
-        shouldEnsureRecord = true;
-      }
-    }
-
-    if (shouldEnsureRecord) {
-      await recordsService.ensureRecordForResult(
-        userId: user.id,
-        distance: distance,
-        timeSeconds: seconds,
-        raceName: race,
-        raceDate: raceDate,
-      );
-    }
   }
 
   Future<void> _toggleTop10Snap() async {
@@ -750,7 +778,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     }
 
     final race = _raceNameController.text.trim();
-    final age = int.tryParse(_ageController.text.trim()) ?? 0;
+    final enteredAge = int.tryParse(_ageController.text.trim()) ?? 0;
+    final age = _resolvedAgeForRaceDate(
+      _selectedRaceDate,
+      fallback: enteredAge,
+    );
     final gender = _selectedGender;
     final distance = _selectedDistance;
     // Special handling for non-standard distances (20M, Ultra)
@@ -861,6 +893,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     }
 
     // Normal club-standard distances: compute level + age grade
+    final raceDate = _selectedRaceDate ?? DateTime.now();
+    final qualifiesForAward = _isRaceEligibleForAward(raceDate);
     final eval = RunCalculator.evaluate(
       gender: gender,
       age: age,
@@ -872,6 +906,19 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     final level = eval['level'] as String;
     final ageGrade = eval['ageGrade'] as double;
     final ageGradeMessage = eval['ageGradeMessage'] as String;
+    final clubLower = (_clubName ?? '').toLowerCase();
+    final isNrrClub = clubLower.contains('norwich road runners');
+    final resultCardBackground = isNrrClub
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF0057B7);
+    final resultCardAccent = isNrrClub
+        ? const Color(0xFFFFD54F)
+        : const Color(0xFFF5C542);
+    final submitButtonBackground = resultCardAccent;
+    final submitButtonForeground =
+        submitButtonBackground.computeLuminance() > 0.6
+        ? Colors.black
+        : Colors.white;
 
     setState(() {
       _resultMessage =
@@ -886,34 +933,46 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         backgroundColor: Colors.grey.shade900,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('WELL DONE!', style: TextStyle(color: Colors.white)),
-        content: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 66, 66, 66),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: const Color.fromARGB(60, 23, 7, 173),
-              width: 1,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black54,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
           ),
-          child: ResultCard(
-            standard: level,
-            ageGrade: ageGrade,
-            ageGradeMessage: ageGradeMessage,
-            guidance:
-                'Age-grade compares your performance to world-class standards.\n\n'
-                '90%+ World Class/Elite\n'
-                '80–89% National Class\n'
-                '70–79% Regional Class\n'
-                '60–69% Local Level\n'
-                '50–59% Good Skill Level',
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 66, 66, 66),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color.fromARGB(60, 23, 7, 173),
+                  width: 1,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ResultCard(
+                standard: level,
+                ageGrade: ageGrade,
+                ageGradeMessage: ageGradeMessage,
+                backgroundColor: resultCardBackground,
+                accentColor: resultCardAccent,
+                guidance:
+                    (!qualifiesForAward && _memberSince != null
+                        ? 'This race was before you joined in. It can be recorded but cannot be claimed towards Club Standards award. Update your membership date in profile if required.\n\n'
+                        : '') +
+                    'Age-grade compares your performance to world-class standards.\n\n'
+                        '90%+ World Class/Elite\n'
+                        '80–89% National Class\n'
+                        '70–79% Regional Class\n'
+                        '60–69% Local Level\n'
+                        '50–59% Good Skill Level',
+              ),
+            ),
           ),
         ),
         actionsPadding: const EdgeInsets.symmetric(
@@ -939,8 +998,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.yellow,
-              foregroundColor: Colors.black,
+              backgroundColor: submitButtonBackground,
+              foregroundColor: submitButtonForeground,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(40),
               ),
@@ -1396,16 +1455,32 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     // Restrict to the current admin's club if known
     Set<String>? allowedUserIds;
     final clubName = _clubName;
+    final Map<String, DateTime?> memberSinceByUserId = {};
+    final Map<String, String> idToName = {};
     if (clubName != null && clubName.isNotEmpty) {
       final profileRows = await client
           .from('user_profiles')
-          .select('id')
+          .select('id, full_name, member_since')
           .eq('club', clubName);
 
       allowedUserIds = {
         for (final p in profileRows)
           if (p['id'] is String) p['id'] as String,
       };
+
+      for (final p in profileRows) {
+        final id = p['id'] as String?;
+        if (id == null || id.isEmpty) continue;
+        final name = (p['full_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          idToName[id] = name;
+        }
+        final memberSinceStr = p['member_since'] as String?;
+        memberSinceByUserId[id] =
+            (memberSinceStr != null && memberSinceStr.isNotEmpty)
+            ? DateTime.tryParse(memberSinceStr)
+            : null;
+      }
 
       if (allowedUserIds.isEmpty) {
         return {};
@@ -1430,10 +1505,21 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     for (final row in rows) {
       final userId = row['user_id'] as String?;
       final distance = (row['distance'] as String?) ?? '';
+      final raceDate = DateTime.tryParse(row['raceDate'] as String? ?? '');
       final level = _effectiveLevelFromRaceRow(row);
 
       if (userId == null) continue;
       if (!_awardDistances.contains(distance)) continue;
+      final memberSince = memberSinceByUserId[userId];
+      if (memberSince != null && raceDate != null) {
+        final memberDay = DateTime(
+          memberSince.year,
+          memberSince.month,
+          memberSince.day,
+        );
+        final raceDay = DateTime(raceDate.year, raceDate.month, raceDate.day);
+        if (raceDay.isBefore(memberDay)) continue;
+      }
       if (!_awardLevels.contains(level)) continue;
 
       perUserBestByDistance.putIfAbsent(userId, () {
@@ -1482,18 +1568,24 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     }
 
     final userIds = userAwardLevel.keys.toList();
-    final profiles = await client
-        .from('user_profiles')
-        .select('id, full_name')
-        .inFilter('id', userIds);
+    if (idToName.length < userIds.length) {
+      final profiles = await client
+          .from('user_profiles')
+          .select('id, full_name, member_since')
+          .inFilter('id', userIds);
 
-    final Map<String, String> idToName = {};
-    for (final p in profiles) {
-      final id = p['id'] as String?;
-      if (id == null) continue;
-      final name = (p['full_name'] as String?)?.trim();
-      if (name != null && name.isNotEmpty) {
-        idToName[id] = name;
+      for (final p in profiles) {
+        final id = p['id'] as String?;
+        if (id == null) continue;
+        final name = (p['full_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          idToName[id] = name;
+        }
+        final memberSinceStr = p['member_since'] as String?;
+        memberSinceByUserId[id] =
+            (memberSinceStr != null && memberSinceStr.isNotEmpty)
+            ? DateTime.tryParse(memberSinceStr)
+            : memberSinceByUserId[id];
       }
     }
 
