@@ -505,7 +505,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                 style: TextStyle(color: Colors.white70),
               ),
               onTap: () => _launchEmail(
-                to: 'diodefernan@gmail.com',
+                to: 'runrankapp@gmail.com',
                 subject: 'RunRank feedback',
               ),
               trailing: const Icon(Icons.open_in_new, color: Colors.white70),
