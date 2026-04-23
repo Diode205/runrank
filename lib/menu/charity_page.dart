@@ -20,7 +20,7 @@ class _CharityPageState extends State<CharityPage> {
   bool _loadingClub = true;
   bool _isAdmin = false;
   bool _saving = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
   String? _seededCharityKey;
 
   @override
@@ -53,16 +53,27 @@ class _CharityPageState extends State<CharityPage> {
 
   List<Color> get _brandGradient => UserService.clubBrandGradient(_clubName);
 
-  Color get _backgroundColor =>
-      _isNrrClub ? const Color(0xFF140708) : const Color(0xFF07121F);
+  Color get _backgroundColor => _clubName == null
+      ? const Color(0xFF101010)
+      : _isNrrClub
+      ? const Color(0xFF140708)
+      : const Color(0xFF07121F);
 
-  Color get _surfaceColor =>
-      _isNrrClub ? const Color(0xFF241112) : const Color(0xFF0F111A);
+  Color get _surfaceColor => _clubName == null
+      ? const Color(0xFF1A1A1A)
+      : _isNrrClub
+      ? const Color(0xFF241112)
+      : const Color(0xFF0F111A);
 
-  Color get _primaryColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFF0057B7);
+  Color get _primaryColor => _clubName == null
+      ? const Color(0xFF3A3A3A)
+      : _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : const Color(0xFF0057B7);
 
-  Color get _accentColor => _isNrrClub ? Colors.white : const Color(0xFFFFD300);
+  Color get _accentColor => _clubName == null
+      ? Colors.white70
+      : (_isNrrClub ? Colors.white : const Color(0xFFFFD300));
 
   Color get _borderColor =>
       _isNrrClub ? const Color(0x66D32F2F) : const Color(0x66FFD300);

@@ -19,7 +19,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
+  final Map<String, int> _commentsCountByPost = {};
+  RealtimeChannel? _postChannel;
+  RealtimeChannel? _postCommentsChannel;
   Color _membershipColor(String? membershipType) {
     switch (membershipType) {
       case '1st Claim':
@@ -39,10 +42,40 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
   void initState() {
     super.initState();
     debugPrint('PostsFeed: initState called');
+    _setupRealtime();
     _checkAdminStatus().then((_) {
       debugPrint('PostsFeed: Admin check complete, loading posts...');
       _loadPosts();
     });
+  }
+
+  void _setupRealtime() {
+    _postChannel = supabase
+        .channel('classic:club_posts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_posts',
+          callback: (_) => _loadPosts(),
+        )
+        .subscribe();
+
+    _postCommentsChannel = supabase
+        .channel('classic:club_post_comments')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_post_comments',
+          callback: (_) => _loadPosts(),
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _postChannel?.unsubscribe();
+    _postCommentsChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _checkAdminStatus() async {
@@ -186,6 +219,32 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
           loading = false;
         });
       }
+
+      final postIds = data
+          .map((row) => row['id'] as String?)
+          .whereType<String>()
+          .toList();
+      if (postIds.isNotEmpty) {
+        final commentRows = await supabase
+            .from('club_post_comments')
+            .select('post_id')
+            .inFilter('post_id', postIds);
+
+        final counts = <String, int>{};
+        for (final row in commentRows as List) {
+          final postId = row['post_id'] as String?;
+          if (postId == null || postId.isEmpty) continue;
+          counts[postId] = (counts[postId] ?? 0) + 1;
+        }
+
+        if (mounted) {
+          setState(() {
+            _commentsCountByPost
+              ..clear()
+              ..addAll(counts);
+          });
+        }
+      }
     } catch (e) {
       debugPrint('Error loading posts: $e');
       if (mounted) {
@@ -291,23 +350,12 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                 itemBuilder: (context, index) {
                   final post = posts[index];
                   final postId = post['id'] as String;
-                  if (index == 0) {
-                    print(
-                      'PostsFeed: Building posts, isAdmin=$isAdmin, count=${posts.length}',
-                    );
-                  }
                   final profileAuthorName =
                       (post['user_profiles']?['full_name'] as String?)?.trim();
                   final fallbackAuthorName = (post['author_name'] as String?)
                       ?.trim();
                   final authorAvatarUrl =
                       post['user_profiles']?['avatar_url'] as String?;
-
-                  if (index == 0) {
-                    print(
-                      'PostsFeed: First post data: id=$postId, profile_full_name=$profileAuthorName, author_name=$fallbackAuthorName, post_keys=${post.keys.toList()}',
-                    );
-                  }
 
                   final displayAuthor =
                       (profileAuthorName != null &&
@@ -317,7 +365,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                             fallbackAuthorName.isNotEmpty)
                       ? fallbackAuthorName
                       : _shortId(post['author_id'] as String?);
-                  final commentsCount = 0;
+                  final commentsCount = _commentsCountByPost[postId] ?? 0;
                   final attachments =
                       (post['club_post_attachments'] as List?)
                           ?.map((e) => e as Map<String, dynamic>)
@@ -681,9 +729,6 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
 
                   // Wrap card in Dismissible for admin swipe-to-delete
                   if (isAdmin) {
-                    print(
-                      'PostsFeed: Wrapping post $postId in Dismissible (admin=$isAdmin)',
-                    );
                     return Dismissible(
                       key: ValueKey('post-$postId'),
                       direction: DismissDirection.endToStart,

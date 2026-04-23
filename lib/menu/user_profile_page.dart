@@ -152,23 +152,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
   String _memberSinceText() {
     final referenceDate = _memberSince ?? _createdAt;
     if (referenceDate == null) return 'Member';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final m = months[referenceDate.month - 1];
-    final y = referenceDate.year;
-    return 'Member since $m $y';
+    final day = referenceDate.day.toString().padLeft(2, '0');
+    final month = referenceDate.month.toString().padLeft(2, '0');
+    final year = referenceDate.year.toString().padLeft(4, '0');
+    return 'Member since $day/$month/$year';
   }
 
   String _formatDob() {
@@ -358,7 +345,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     child: Text(
                       selectedMemberSince != null
-                          ? '${selectedMemberSince!.day}/${selectedMemberSince!.month}/${selectedMemberSince!.year}'
+                          ? '${selectedMemberSince!.day.toString().padLeft(2, '0')}/${selectedMemberSince!.month.toString().padLeft(2, '0')}/${selectedMemberSince!.year.toString().padLeft(4, '0')}'
                           : 'Select date',
                     ),
                   ),

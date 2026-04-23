@@ -22,27 +22,38 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
   final Map<String, List<AwardWinnerRow>> _winnersByAward = {};
   bool _loading = true;
   List<String> _memberNames = [];
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
+
+  bool get _clubResolved => (_clubName ?? '').trim().isNotEmpty;
 
   bool get _isNrrClub {
     final lower = (_clubName ?? '').trim().toLowerCase();
     return lower == 'nrr' || lower.contains('norwich road runners');
   }
 
-  List<Color> get _appBarGradient => _isNrrClub
+  List<Color> get _appBarGradient => !_clubResolved
+      ? const [Color(0xFF1B1B1B), Color(0xFF080808)]
+      : _isNrrClub
       ? const [Color(0xFF000000), Color(0xFF6E1118)]
       : UserService.clubBrandGradient(_clubName);
 
-  List<Color> get _pageBackgroundGradient => _isNrrClub
+  List<Color> get _pageBackgroundGradient => !_clubResolved
+      ? const [Color(0xFF050505), Color(0xFF121212), Color(0xFF000000)]
+      : _isNrrClub
       ? const [Color(0xFF050505), Color(0xFF19090C), Color(0xFF000000)]
       : UserService.clubBrandGradient(
           _clubName,
         ).map((c) => c.withValues(alpha: 0.1)).toList();
 
-  String get _heroImageAsset =>
-      _isNrrClub ? 'assets/images/nrraward.png' : 'assets/images/awards.png';
+  String get _heroImageAsset => !_clubResolved
+      ? 'assets/images/rank_logo.png'
+      : _isNrrClub
+      ? 'assets/images/nrraward.png'
+      : 'assets/images/awards.png';
 
-  List<Color> get _heroRibbonGradient => _isNrrClub
+  List<Color> get _heroRibbonGradient => !_clubResolved
+      ? const [Color(0xFF2C2C2C), Color(0xFF121212)]
+      : _isNrrClub
       ? const [Color(0xFFB71C1C), Color(0xFF111111)]
       : const [blue, yellow];
 
@@ -50,24 +61,41 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
       ? const [Color(0x33000000), Color(0x99000000), Color(0xEE000000)]
       : const [Colors.transparent, Colors.black54];
 
-  Color get _pageSurfaceColor =>
-      _isNrrClub ? const Color(0xFF101010) : const Color(0xFF0F111A);
+  Color get _pageSurfaceColor => !_clubResolved
+      ? const Color(0xFF121212)
+      : _isNrrClub
+      ? const Color(0xFF101010)
+      : const Color(0xFF0F111A);
 
-  Color get _pageBorderColor => _isNrrClub ? const Color(0x66D32F2F) : yellow;
+  Color get _pageBorderColor => !_clubResolved
+      ? const Color(0x663A3A3A)
+      : _isNrrClub
+      ? const Color(0x66D32F2F)
+      : yellow;
 
   Color get _titleAccentColor => Colors.white;
 
-  Color get _headerLabelColor =>
-      _isNrrClub ? Colors.white70 : const Color.fromRGBO(30, 145, 233, 0.702);
+  Color get _headerLabelColor => !_clubResolved
+      ? Colors.white70
+      : _isNrrClub
+      ? Colors.white70
+      : const Color.fromRGBO(30, 145, 233, 0.702);
 
-  Color get _addButtonColor => _isNrrClub ? Colors.white : yellow;
+  Color get _addButtonColor =>
+      !_clubResolved ? Colors.white70 : (_isNrrClub ? Colors.white : yellow);
 
-  Color get _tabStripColor =>
-      _isNrrClub ? const Color(0xFF050505) : const Color(0xFF0F111A);
+  Color get _tabStripColor => !_clubResolved
+      ? const Color(0xFF111111)
+      : _isNrrClub
+      ? const Color(0xFF050505)
+      : const Color(0xFF0F111A);
 
-  Color get _tabSelectedColor => _isNrrClub ? nrrRed : yellow;
+  Color get _tabSelectedColor =>
+      !_clubResolved ? const Color(0xFF4A4A4A) : (_isNrrClub ? nrrRed : yellow);
 
-  Color get _tabUnselectedColor => _isNrrClub ? Colors.white30 : Colors.white24;
+  Color get _tabUnselectedColor => !_clubResolved
+      ? Colors.white24
+      : (_isNrrClub ? Colors.white30 : Colors.white24);
 
   final List<Map<String, String>> _awards = const [
     {'key': 'short_performance', 'title': '🏃‍♀️Short Distance🏃‍➡️'},

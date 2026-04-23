@@ -25,9 +25,15 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   Future<List<KitProduct>>? _thirdProducts;
 
   bool _isAdmin = false;
-  bool _isNrrClub = false;
+  String? _clubName = UserService.cachedClubName;
 
   late List<_KitTabDefinition> _activeTabs;
+
+  static const List<_KitTabDefinition> _loadingTabs = [
+    _KitTabDefinition(title: 'Kit', category: 'loading-1'),
+    _KitTabDefinition(title: 'Merch', category: 'loading-2'),
+    _KitTabDefinition(title: 'Shop', category: 'loading-3'),
+  ];
 
   static const List<String> _defaultSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
@@ -105,10 +111,19 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
 
   final List<_BasketItem> _basket = [];
 
+  bool get _clubResolved => (_clubName ?? '').trim().isNotEmpty;
+
+  bool get _isNrrClub {
+    final lower = (_clubName ?? '').trim().toLowerCase();
+    return lower == 'nrr' || lower.contains('norwich road runners');
+  }
+
   @override
   void initState() {
     super.initState();
-    _activeTabs = _nnbrTabs;
+    _activeTabs = !_clubResolved
+        ? _loadingTabs
+        : (_isNrrClub ? _nrrTabs : _nnbrTabs);
     _tabController = TabController(length: _activeTabs.length, vsync: this);
     _loadData();
   }
@@ -118,8 +133,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
       final isAdmin = await UserService.isAdmin();
       final clubName = await UserService.currentClubName();
 
+      final lower = (clubName ?? '').trim().toLowerCase();
       final isNrrClub =
-          (clubName?.toLowerCase().contains('norwich road runners') ?? false);
+          lower == 'nrr' || lower.contains('norwich road runners');
 
       Future<List<KitProduct>> first;
       Future<List<KitProduct>> second;
@@ -139,7 +155,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
 
       setState(() {
         _isAdmin = isAdmin;
-        _isNrrClub = isNrrClub;
+        _clubName = clubName;
         _activeTabs = isNrrClub ? _nrrTabs : _nnbrTabs;
         _firstProducts = first;
         _secondProducts = second;
@@ -396,10 +412,14 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
 
   @override
   Widget build(BuildContext context) {
-    final accent = _isNrrClub
+    final accent = !_clubResolved
+        ? const Color(0xFF6A6A6A)
+        : _isNrrClub
         ? const Color(0xFFD32F2F)
         : const Color(0xFFFFD700);
-    final bannerIcon = _isNrrClub
+    final bannerIcon = !_clubResolved
+        ? Colors.white70
+        : _isNrrClub
         ? const Color(0xFFD32F2F)
         : const Color(0xFF0055FF);
 
@@ -429,7 +449,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
             child: Row(
               children: [
                 Icon(
-                  _isNrrClub
+                  !_clubResolved
+                      ? Icons.shopping_bag_outlined
+                      : _isNrrClub
                       ? Icons.shopping_bag_outlined
                       : Icons.local_shipping,
                   color: bannerIcon,
@@ -437,7 +459,16 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _isNrrClub
+                  child: !_clubResolved
+                      ? const Text(
+                          'Loading club kit catalogue...',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      : _isNrrClub
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
@@ -518,15 +549,23 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildProductTab(_activeTabs[0], _firstProducts),
-                _buildProductTab(_activeTabs[1], _secondProducts),
-                _buildProductTab(_activeTabs[2], _thirdProducts),
+                !_clubResolved
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildProductTab(_activeTabs[0], _firstProducts),
+                !_clubResolved
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildProductTab(_activeTabs[1], _secondProducts),
+                !_clubResolved
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildProductTab(_activeTabs[2], _thirdProducts),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: _isNrrClub ? _buildBasketFab(accent) : null,
+      floatingActionButton: _clubResolved && _isNrrClub
+          ? _buildBasketFab(accent)
+          : null,
     );
   }
 
@@ -738,13 +777,10 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
         'Please confirm availability, total cost, and payment details (cash or PayPal).',
       );
 
-      final uri = Uri(
-        scheme: 'mailto',
-        path: kitSecretaryEmail,
-        queryParameters: {
-          'subject': 'NRR Kit Order',
-          'body': buffer.toString(),
-        },
+      final subject = Uri.encodeComponent('NRR Kit Order');
+      final body = Uri.encodeComponent(buffer.toString());
+      final uri = Uri.parse(
+        'mailto:$kitSecretaryEmail?subject=$subject&body=$body',
       );
 
       final launched = await launchUrl(

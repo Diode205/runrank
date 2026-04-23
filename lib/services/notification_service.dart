@@ -126,6 +126,7 @@ class NotificationService {
     required String body,
     String? eventId,
     String? route,
+    String? excludeUserId,
   }) async {
     print(
       "DEBUG: notifyClubAdminsInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
@@ -142,6 +143,7 @@ class NotificationService {
         try {
           final userId = u['id'] as String?;
           if (userId == null || userId.isEmpty) continue;
+          if (excludeUserId != null && userId == excludeUserId) continue;
           final userClub = _canonicalClubName(u['club'] as String?);
           if (userClub != canonicalClub) continue;
 

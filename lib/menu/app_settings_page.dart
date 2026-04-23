@@ -170,9 +170,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       final emailText = (email != null && email.isNotEmpty)
           ? email
           : 'no email on file';
-      // Work out committee recipients (Membership Secretary and
-      // Club Secretary) for targeted notifications.
-      Map<String, dynamic>? membershipRow;
+      // Route deletion requests only to the Club Secretary.
       Map<String, dynamic>? secretaryRow;
       try {
         final committeeRows = await client
@@ -184,15 +182,13 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           final roleRaw = (row['role'] as String?) ?? '';
           final roleLower = roleRaw.toLowerCase();
 
-          if (roleLower.contains('membership secretary')) {
-            membershipRow ??= row;
-          } else if (roleLower.contains('secretary') &&
+          if (roleLower.contains('secretary') &&
               !roleLower.contains('membership')) {
             secretaryRow ??= row;
           }
         }
       } catch (e) {
-        // If committee lookup fails we fall back to notifying all admins.
+        debugPrint('Error loading committee roles for deletion request: $e');
       }
 
       final today = DateTime.now();
@@ -204,41 +200,33 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           'Please process this deletion within seven (7) days of the request date in line with club policy. '
           'After this 7-day window there is no additional grace period and the member will no longer be able to log in.';
 
-      final targetUserIds = <String>{};
-      for (final row in [membershipRow, secretaryRow]) {
-        if (row == null) continue;
-        final rawUserId = row['user_id'];
-        final userId = rawUserId?.toString().trim();
-        if (userId != null && userId.isNotEmpty) {
-          targetUserIds.add(userId);
-        }
+      final secretaryUserId = secretaryRow?['user_id']?.toString().trim();
+      if (secretaryUserId == null ||
+          secretaryUserId.isEmpty ||
+          secretaryUserId == user.id) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No Club Secretary user is configured yet to receive deletion requests.',
+            ),
+          ),
+        );
+        return;
       }
 
-      if (targetUserIds.isNotEmpty) {
-        for (final userId in targetUserIds) {
-          await NotificationService.notifyUser(
-            userId: userId,
-            title: 'Account deletion requested',
-            body: notificationBody,
-            route: 'club_committee',
-          );
-        }
-      } else {
-        // If no specific committee holders are configured, fall back
-        // to notifying all admins in the club.
-        await NotificationService.notifyClubAdminsInClub(
-          clubName: clubName,
-          title: 'Account deletion requested',
-          body: notificationBody,
-          route: 'club_committee',
-        );
-      }
+      await NotificationService.notifyUser(
+        userId: secretaryUserId,
+        title: 'Account deletion requested',
+        body: notificationBody,
+        route: 'club_committee',
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Your request has been sent. Contact your club admins to cancel within seven (7) days.',
+            'Your request has been sent to the Club Secretary. Contact them within seven (7) days if you need to cancel it.',
           ),
         ),
       );

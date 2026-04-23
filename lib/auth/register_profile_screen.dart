@@ -20,11 +20,13 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   final email = TextEditingController();
   final name = TextEditingController();
   final dob = TextEditingController();
+  final memberSince = TextEditingController();
   final uka = TextEditingController();
   final password = TextEditingController();
   final emergencyContactName = TextEditingController();
   final emergencyContactNumber = TextEditingController();
   DateTime? _selectedDob;
+  DateTime? _selectedMemberSince;
 
   bool loading = false;
   String? selectedMembershipType;
@@ -54,7 +56,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString().padLeft(4, '0');
-    return '$day-$month-$year';
+    return '$day/$month/$year';
   }
 
   String _formatDobForStorage(DateTime date) {
@@ -87,6 +89,46 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     });
   }
 
+  Future<void> _pickMemberSinceDate() async {
+    final now = DateTime.now();
+    final initialDate = _selectedMemberSince ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isAfter(now) ? now : initialDate,
+      firstDate: DateTime(1980, 1, 1),
+      lastDate: now,
+      helpText: 'Select membership date',
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedMemberSince = picked;
+      memberSince.text = _formatDobDisplay(picked);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _selectedMemberSince = today;
+    memberSince.text = _formatDobDisplay(today);
+  }
+
+  @override
+  void dispose() {
+    email.dispose();
+    name.dispose();
+    dob.dispose();
+    memberSince.dispose();
+    uka.dispose();
+    password.dispose();
+    emergencyContactName.dispose();
+    emergencyContactNumber.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,7 +151,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
               readOnly: true,
               onTap: _pickDateOfBirth,
               decoration: InputDecoration(
-                labelText: "Date of Birth (DD-MM-YYYY)",
+                labelText: "Date of Birth (DD/MM/YYYY)",
                 hintText: 'Tap to select',
                 suffixIcon: IconButton(
                   onPressed: _pickDateOfBirth,
@@ -141,6 +183,21 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
               decoration: const InputDecoration(labelText: "Password"),
             ),
             const SizedBox(height: 16),
+            TextField(
+              controller: memberSince,
+              readOnly: true,
+              onTap: _pickMemberSinceDate,
+              decoration: InputDecoration(
+                labelText: "Member Since (DD/MM/YYYY)",
+                hintText: 'Tap to select',
+                suffixIcon: IconButton(
+                  onPressed: _pickMemberSinceDate,
+                  icon: const Icon(Icons.calendar_today),
+                  tooltip: 'Select membership date',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             const Text(
               "Select Your Membership Type",
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -275,6 +332,15 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         return;
                       }
 
+                      if (_selectedMemberSince == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select your membership date'),
+                          ),
+                        );
+                        return;
+                      }
+
                       setState(() => loading = true);
 
                       final success = await AuthService.register(
@@ -282,6 +348,9 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         password: password.text.trim(),
                         fullName: name.text.trim(),
                         dob: _formatDobForStorage(_selectedDob!),
+                        memberSince: _formatDobForStorage(
+                          _selectedMemberSince!,
+                        ),
                         ukaNumber: uka.text.trim(),
                         club: widget.selectedClub,
                         membershipType: selectedMembershipType!,

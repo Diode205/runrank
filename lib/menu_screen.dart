@@ -44,7 +44,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _fullName;
   String? _email;
   String? _ukaNumber;
-  String? _club;
+  String? _club = UserService.cachedClubName;
   String? _avatarUrl;
   DateTime? _memberSince;
   String? _membershipType;
@@ -58,19 +58,33 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
-  Color get _clubPrimaryColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFFFD300);
+  Color get _clubPrimaryColor => _club == null
+      ? const Color(0xFF3A3A3A)
+      : _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : const Color(0xFFFFD300);
 
-  Color get _clubSecondaryColor =>
-      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+  Color get _clubSecondaryColor => _club == null
+      ? Colors.white70
+      : _isNrrClub
+      ? Colors.white
+      : const Color(0xFF0057B7);
 
-  Color get _quickEditBackgroundColor =>
-      _isNrrClub ? const Color(0xFF140708) : const Color(0xFF0F111A);
+  Color get _quickEditBackgroundColor => _club == null
+      ? const Color(0xFF111111)
+      : _isNrrClub
+      ? const Color(0xFF140708)
+      : const Color(0xFF0F111A);
 
-  Color get _quickEditFieldFillColor =>
-      _isNrrClub ? const Color(0xFF211012) : const Color(0xFF161B26);
+  Color get _quickEditFieldFillColor => _club == null
+      ? const Color(0xFF1A1A1A)
+      : _isNrrClub
+      ? const Color(0xFF211012)
+      : const Color(0xFF161B26);
 
-  List<Color> get _quickEditHeaderGradient => _isNrrClub
+  List<Color> get _quickEditHeaderGradient => _club == null
+      ? const [Color(0xFF2A2A2A), Color(0xFF101010)]
+      : _isNrrClub
       ? const [Color(0xFF7B1620), Color(0xFF200608)]
       : const [Color(0xFF0057B7), Color(0xFFFFD300)];
 
@@ -250,8 +264,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                         icon: const Icon(Icons.calendar_today, size: 18),
                         label: Text(
                           selectedMemberSince != null
-                              ? _formatMonthYear(selectedMemberSince!)
-                              : 'Select month and year',
+                              ? _formatDate(selectedMemberSince!)
+                              : 'Select date',
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
@@ -267,13 +281,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                             lastDate: DateTime(now.year + 1, 12, 31),
                           );
                           if (picked != null) {
-                            setModalState(
-                              () => selectedMemberSince = DateTime(
-                                picked.year,
-                                picked.month,
-                                1,
-                              ),
-                            );
+                            setModalState(() => selectedMemberSince = picked);
                           }
                         },
                       ),
@@ -795,7 +803,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final name = _fullName?.isNotEmpty == true ? _fullName! : 'Set your name';
     final email = _email?.isNotEmpty == true ? _email! : 'Add an email';
     final memberSince = _memberSince != null
-        ? 'Member Since ${_formatMonthYear(_memberSince!)}'
+        ? 'Member Since ${_formatDate(_memberSince!)}'
         : 'Member since not set';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1160,23 +1168,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     );
   }
 
-  String _formatMonthYear(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final m = months[date.month - 1];
-    return '$m ${date.year}';
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString().padLeft(4, '0');
+    return '$day/$month/$year';
   }
 
   Widget _menuTile({

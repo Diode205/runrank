@@ -8,6 +8,7 @@ import 'package:runrank/services/user_service.dart';
 import 'package:runrank/admin/edit_post_page.dart';
 import 'package:runrank/widgets/linkified_text.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
+import 'dart:async';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
   const PostsFeedFacebookScreen({super.key});
@@ -23,9 +24,12 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   bool loading = true;
   bool isAdmin = false;
 
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   RealtimeChannel? _postChannel;
+  RealtimeChannel? _postReactionsChannel;
+  RealtimeChannel? _postCommentsChannel;
+  Timer? _refreshTimer;
 
   // Cache for reactions and comments to avoid redundant fetches
   final Map<String, Map<String, int>> _reactionCounts = {};
@@ -52,6 +56,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   void initState() {
     super.initState();
     _setupRealtime();
+    _setupFallbackRefresh();
     _initPosts();
   }
 
@@ -78,11 +83,55 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           },
         )
         .subscribe();
+
+    _postReactionsChannel = supabase
+        .channel('public:club_post_reactions')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_post_reactions',
+          callback: (payload) {
+            final postId =
+                payload.newRecord['post_id']?.toString() ??
+                payload.oldRecord['post_id']?.toString();
+            if (postId != null && postId.isNotEmpty) {
+              _loadReactions(postId);
+            }
+          },
+        )
+        .subscribe();
+
+    _postCommentsChannel = supabase
+        .channel('public:club_post_comments')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_post_comments',
+          callback: (payload) {
+            final postId =
+                payload.newRecord['post_id']?.toString() ??
+                payload.oldRecord['post_id']?.toString();
+            if (postId != null && postId.isNotEmpty) {
+              _loadComments(postId);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  void _setupFallbackRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted) return;
+      _loadPosts();
+    });
   }
 
   @override
   void dispose() {
     _postChannel?.unsubscribe();
+    _postReactionsChannel?.unsubscribe();
+    _postCommentsChannel?.unsubscribe();
+    _refreshTimer?.cancel();
     for (final controller in _commentControllers.values) {
       controller.dispose();
     }
@@ -225,6 +274,14 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           posts = List<Map<String, dynamic>>.from(data);
           loading = false;
         });
+      }
+
+      final postIds = data
+          .map((row) => row['id'] as String?)
+          .whereType<String>()
+          .toList();
+      if (postIds.isNotEmpty) {
+        await Future.wait(postIds.map(_loadPostDetails));
       }
     } catch (e) {
       debugPrint('Error loading posts: $e');
@@ -762,7 +819,10 @@ class _PostCard extends StatelessWidget {
         (profile?['full_name'] ?? post['author_name'] ?? 'Unknown').toString();
     final avatarUrl = profile?['avatar_url'] as String?;
     final attachments = (post['club_post_attachments'] as List?) ?? [];
-    final likeCount = reactionCounts['❤️'] ?? 0;
+    final reactionCount = reactionCounts.values.fold<int>(
+      0,
+      (sum, count) => sum + count,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -849,13 +909,13 @@ class _PostCard extends StatelessWidget {
                         : Colors.grey,
                     size: 20,
                   ),
-                  label: Text('Like ($likeCount)'),
+                  label: Text('Like ($reactionCount)'),
                   onPressed: () => onToggleReaction('❤️'),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: onOpenDetail,
-                  child: Text('Make Comments (${comments.length})'),
+                  child: Text('Comments (${comments.length})'),
                 ),
               ],
             ),
@@ -999,55 +1059,6 @@ class _PostAttachments extends StatelessWidget {
             ],
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _CommentSection extends StatelessWidget {
-  final List<Map<String, dynamic>> comments;
-  final TextEditingController controller;
-  final Function(String) onSend;
-
-  const _CommentSection({
-    required this.comments,
-    required this.controller,
-    required this.onSend,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ...comments.map(
-          (c) => ListTile(
-            dense: true,
-            title: Text(
-              c['user_profiles']?['full_name'] ?? 'User',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(c['comment'] ?? ''),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  decoration: const InputDecoration(
-                    hintText: 'Add a comment...',
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.send),
-                onPressed: () => onSend(controller.text),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }

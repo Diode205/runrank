@@ -70,7 +70,7 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
     ),
   ];
 
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
   bool _loadingClub = true;
 
   @override
@@ -94,43 +94,79 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
     return lower == 'nrr' || lower.contains('norwich road runners');
   }
 
-  List<_GovernanceDoc> get _docs => _isNrrClub ? _nrrDocs : _defaultDocs;
+  bool get _clubResolved => (_clubName ?? '').trim().isNotEmpty;
+
+  List<_GovernanceDoc> get _docs => !_clubResolved
+      ? const []
+      : _isNrrClub
+      ? _nrrDocs
+      : _defaultDocs;
 
   String get _pageTitle => 'Club Governance';
 
-  String get _heroTitle => _isNrrClub ? 'NRR Governance' : 'Club Governance';
+  String get _heroTitle => !_clubResolved
+      ? 'Club Governance'
+      : _isNrrClub
+      ? 'NRR Governance'
+      : 'Club Governance';
 
-  String get _heroSubtitle => _isNrrClub
+  String get _heroSubtitle => !_clubResolved
+      ? 'Access club policies, notices and essential forms.'
+      : _isNrrClub
       ? 'Access Norwich Road Runners governance documents and core club policies.'
       : 'Access club policies, notices and essential forms.';
 
-  String get _heroImage =>
-      _isNrrClub ? 'assets/images/nrrgov2.png' : 'assets/images/nnbrdocs.png';
+  String get _heroImage => !_clubResolved
+      ? 'assets/images/rank_logo.png'
+      : _isNrrClub
+      ? 'assets/images/nrrgov2.png'
+      : 'assets/images/nnbrdocs.png';
 
-  Color get _backgroundColor =>
-      _isNrrClub ? const Color(0xFF140708) : Colors.black;
+  Color get _backgroundColor => !_clubResolved
+      ? const Color(0xFF101010)
+      : _isNrrClub
+      ? const Color(0xFF140708)
+      : Colors.black;
 
-  Color get _surfaceColor =>
-      _isNrrClub ? const Color(0xFF241112) : Colors.white.withOpacity(0.04);
+  Color get _surfaceColor => !_clubResolved
+      ? Colors.white.withOpacity(0.04)
+      : _isNrrClub
+      ? const Color(0xFF241112)
+      : Colors.white.withOpacity(0.04);
 
-  Color get _borderColor =>
-      _isNrrClub ? const Color(0x66D32F2F) : Colors.white12;
+  Color get _borderColor => !_clubResolved
+      ? Colors.white12
+      : _isNrrClub
+      ? const Color(0x66D32F2F)
+      : Colors.white12;
 
-  Color get _accentColor => _isNrrClub
+  Color get _accentColor => !_clubResolved
+      ? Colors.white70
+      : _isNrrClub
       ? const Color(0xFFD32F2F)
       : const Color.fromRGBO(235, 246, 26, 1);
 
-  Color get _secondaryAccentColor => _isNrrClub
+  Color get _secondaryAccentColor => !_clubResolved
+      ? Colors.white
+      : _isNrrClub
       ? const Color(0xFFD32F2F)
       : const Color.fromRGBO(39, 203, 236, 1);
 
-  Color get _iconBackgroundColor => _isNrrClub
+  Color get _iconBackgroundColor => !_clubResolved
+      ? Colors.white.withOpacity(0.08)
+      : _isNrrClub
       ? const Color(0x29D32F2F)
       : const Color(0xFF0055FF).withOpacity(0.15);
 
-  Color get _iconColor => _isNrrClub ? Colors.white : const Color(0xFF56D3FF);
+  Color get _iconColor => !_clubResolved
+      ? Colors.white70
+      : _isNrrClub
+      ? Colors.white
+      : const Color(0xFF56D3FF);
 
-  List<Color> get _heroGradientColors => _isNrrClub
+  List<Color> get _heroGradientColors => !_clubResolved
+      ? const [Color(0xCC181818), Colors.transparent, Color(0xCC181818)]
+      : _isNrrClub
       ? const [Color(0xE6D32F2F), Color(0xB3140708), Color(0xE6140708)]
       : const [Color(0xCC0A0C14), Colors.transparent, Color(0xCC0A0C14)];
 

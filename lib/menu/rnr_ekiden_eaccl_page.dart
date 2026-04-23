@@ -11,18 +11,31 @@ bool _isNrrClubName(String? clubName) {
   return club == 'nrr' || club.contains('norwich road runners');
 }
 
-Color _clubPrimaryColor(String? clubName) => _isNrrClubName(clubName)
-    ? const Color(0xFFD32F2F)
-    : const Color(0xFFF5C542);
+Color _clubPrimaryColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty) return const Color(0xFF3A3A3A);
+  return _isNrrClubName(clubName)
+      ? const Color(0xFFD32F2F)
+      : const Color(0xFFF5C542);
+}
 
-Color _clubSecondaryColor(String? clubName) =>
-    _isNrrClubName(clubName) ? Colors.white : const Color(0xFF0057B7);
+Color _clubSecondaryColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty) return Colors.white70;
+  return _isNrrClubName(clubName) ? Colors.white : const Color(0xFF0057B7);
+}
 
-Color _clubPrimaryForegroundColor(String? clubName) =>
-    _isNrrClubName(clubName) ? Colors.white : Colors.black;
+Color _clubPrimaryForegroundColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty) return Colors.white;
+  return _isNrrClubName(clubName) ? Colors.white : Colors.black;
+}
 
-Color _clubGradientForegroundColor(String? clubName) =>
-    _isNrrClubName(clubName) ? Colors.black : Colors.white;
+Color _clubGradientForegroundColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty) return Colors.white;
+  return _isNrrClubName(clubName) ? Colors.black : Colors.white;
+}
 
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});

@@ -78,6 +78,45 @@ class ClubRecordsService {
   String? _cachedUserGender;
   bool _userGenderLoaded = false;
 
+  static String canonicalClubName(String? clubName) {
+    final normalized = (clubName ?? '').trim();
+    final lower = normalized.toLowerCase();
+    if (lower == 'nrr' ||
+        lower == 'norwich-road-runners' ||
+        lower.contains('norwich road runners')) {
+      return 'Norwich Road Runners';
+    }
+    if (lower == 'nnbr' ||
+        lower == 'north-norfolk-beach-runners' ||
+        lower.contains('north norfolk beach runners')) {
+      return 'NNBR (North Norfolk Beach Runners)';
+    }
+    return normalized;
+  }
+
+  static List<String> _clubAliases(String? clubName) {
+    final canonical = canonicalClubName(clubName);
+    if (canonical.isEmpty) return const [];
+    if (canonical == 'Norwich Road Runners') {
+      return const [
+        'NRR',
+        'nrr',
+        'Norwich Road Runners',
+        'norwich-road-runners',
+      ];
+    }
+    if (canonical == 'NNBR (North Norfolk Beach Runners)') {
+      return const [
+        'NNBR',
+        'nnbr',
+        'NNBR (North Norfolk Beach Runners)',
+        'North Norfolk Beach Runners',
+        'north-norfolk-beach-runners',
+      ];
+    }
+    return [canonical];
+  }
+
   Future<String?> _getCurrentUserClub() async {
     if (_clubLoaded) return _cachedClubName;
 
@@ -95,8 +134,8 @@ class ClubRecordsService {
           .eq('id', user.id)
           .maybeSingle();
 
-      final club = (row?['club'] as String?)?.trim();
-      _cachedClubName = (club != null && club.isNotEmpty) ? club : null;
+      final club = canonicalClubName(row?['club'] as String?);
+      _cachedClubName = club.isNotEmpty ? club : null;
       _clubLoaded = true;
       return _cachedClubName;
     } catch (e) {
@@ -170,7 +209,10 @@ class ClubRecordsService {
     }
 
     try {
-      var query = _supabase.from('user_profiles').select('id').eq('club', club);
+      var query = _supabase
+          .from('user_profiles')
+          .select('id, club')
+          .inFilter('club', _clubAliases(club));
 
       final normalizedGender = _normalizeGender(genderFilter);
       if (normalizedGender != null) {
@@ -181,6 +223,8 @@ class ClubRecordsService {
       final ids = <String>{};
       for (final row in rows as List) {
         final id = row['id'] as String?;
+        final rowClub = canonicalClubName(row['club'] as String?);
+        if (rowClub != club) continue;
         if (id != null && id.isNotEmpty) {
           ids.add(id);
         }
@@ -212,7 +256,7 @@ class ClubRecordsService {
       var query = _supabase
           .from('user_profiles')
           .select('id, full_name, club, gender')
-          .eq('club', club);
+          .inFilter('club', _clubAliases(club));
 
       final normalizedGender = _normalizeGender(genderFilter);
       if (normalizedGender != null) {
@@ -223,8 +267,11 @@ class ClubRecordsService {
       final profiles = <String, Map<String, dynamic>>{};
       for (final raw in rows as List) {
         final row = Map<String, dynamic>.from(raw as Map);
+        final rowClub = canonicalClubName(row['club'] as String?);
+        if (rowClub != club) continue;
         final id = row['id'] as String?;
         if (id == null || id.isEmpty) continue;
+        row['club'] = rowClub;
         profiles[id] = row;
       }
       return profiles;
@@ -250,7 +297,7 @@ class ClubRecordsService {
     }
 
     if (currentClub != null && currentClub.isNotEmpty) {
-      query = query.eq('club', currentClub);
+      query = query.inFilter('club', _clubAliases(currentClub));
     }
 
     if (normalizedGender != null) {
@@ -262,7 +309,10 @@ class ClubRecordsService {
     }
 
     final response = await query;
-    return (response as List).map((json) => ClubRecord.fromJson(json)).toList();
+    return (response as List)
+        .map((json) => ClubRecord.fromJson(json))
+        .where((record) => canonicalClubName(record.club) == currentClub)
+        .toList();
   }
 
   Future<List<ClubRecord>> _fetchLegacyRecords(
@@ -417,7 +467,7 @@ class ClubRecordsService {
           timeSeconds: timeSeconds,
           runnerName: (profile['full_name'] as String?) ?? 'Unknown',
           userId: userId,
-          club: profile['club'] as String?,
+          club: canonicalClubName(profile['club'] as String?),
           gender: _normalizeGender(profile['gender'] as String?),
           raceName: ((row['race_name'] as String?)?.trim().isNotEmpty == true)
               ? row['race_name'] as String
@@ -702,7 +752,7 @@ class ClubRecordsService {
     try {
       final currentClub = await _getCurrentUserClub();
       final payload = record.toJson();
-      payload['club'] = record.club ?? currentClub;
+      payload['club'] = canonicalClubName(record.club ?? currentClub);
       payload['gender'] =
           _normalizeGender(record.gender) ??
           _normalizeGender(await _getCurrentUserGender());
@@ -752,7 +802,9 @@ class ClubRecordsService {
   Future<bool> updateRecord(String id, ClubRecord record) async {
     try {
       final payload = record.toJson();
-      payload['club'] = record.club ?? await _getCurrentUserClub();
+      payload['club'] = canonicalClubName(
+        record.club ?? await _getCurrentUserClub(),
+      );
       payload['gender'] =
           _normalizeGender(record.gender) ??
           _normalizeGender(await _getCurrentUserGender());
@@ -800,7 +852,9 @@ class ClubRecordsService {
       final runnerName =
           (profile != null ? profile['full_name'] as String? : null) ??
           'Unknown';
-      final club = profile != null ? profile['club'] as String? : null;
+      final club = profile != null
+          ? canonicalClubName(profile['club'] as String?)
+          : null;
       final gender = profile != null
           ? _normalizeGender(profile['gender'] as String?)
           : null;
@@ -987,6 +1041,7 @@ class ClubRecordsService {
 
           final runnerName = profile['full_name'] as String? ?? 'Unknown';
           final club = profile['club'] as String?;
+          final canonicalClub = canonicalClubName(club);
           final gender = _normalizeGender(profile['gender'] as String?);
           final timeSeconds = result['time_seconds'] as int?;
           if (timeSeconds == null || timeSeconds <= 0) continue;
@@ -1008,7 +1063,7 @@ class ClubRecordsService {
               timeSeconds: timeSeconds,
               runnerName: runnerName,
               userId: userId,
-              club: club,
+              club: canonicalClub,
               gender: gender,
               raceName: result['race_name'] as String? ?? 'Unknown Race',
               raceDate: DateTime.parse(result['raceDate'] as String),
@@ -1040,7 +1095,7 @@ class ClubRecordsService {
                 updates['race_date'] = resultRaceDate;
               }
               if (existing['club'] != club) {
-                updates['club'] = club;
+                updates['club'] = canonicalClub;
               }
               if (_normalizeGender(existing['gender'] as String?) != gender) {
                 updates['gender'] = gender;
@@ -1081,7 +1136,9 @@ class ClubRecordsService {
       final runnerName =
           (profile != null ? profile['full_name'] as String? : null) ??
           'Unknown';
-      final club = profile != null ? profile['club'] as String? : null;
+      final club = profile != null
+          ? canonicalClubName(profile['club'] as String?)
+          : null;
       final gender = profile != null
           ? _normalizeGender(profile['gender'] as String?)
           : null;

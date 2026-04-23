@@ -27,37 +27,56 @@ class _MalcolmBallAwardPageState extends State<MalcolmBallAwardPage> {
   List<AwardChatMessage> _chatMessages = [];
   Map<String, Map<String, int>> _messageEmojiCounts = {};
   DateTime? _votingEndsAt;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   bool get _isNrrClub =>
       _service.canonicalClubName(_clubName) == 'Norwich Road Runners';
 
   String get _canonicalClubName => _service.canonicalClubName(_clubName);
 
-  Color get _accentColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+  Color get _accentColor => _clubName == null
+      ? const Color(0xFF3A3A3A)
+      : _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : const Color(0xFFF5C542);
 
-  Color get _secondaryAccentColor =>
-      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+  Color get _secondaryAccentColor => _clubName == null
+      ? Colors.white70
+      : _isNrrClub
+      ? Colors.white
+      : const Color(0xFF0057B7);
 
-  Color get _accentForegroundColor => _isNrrClub ? Colors.white : Colors.black;
+  Color get _accentForegroundColor => _clubName == null
+      ? Colors.white
+      : (_isNrrClub ? Colors.white : Colors.black);
 
-  String get _awardPageTitle => _isNrrClub
+  String get _awardPageTitle => _clubName == null
+      ? 'Inspirational Running Award 2026'
+      : _isNrrClub
       ? 'Inspirational Running Award 2026'
       : 'Malcolm Ball Award 2026';
 
-  String get _awardHeroImage => _isNrrClub
+  String get _awardHeroImage => _clubName == null
+      ? 'assets/images/rank_logo.png'
+      : _isNrrClub
       ? 'assets/images/nrraward.png'
       : 'assets/images/malcolmball.png';
 
-  String get _awardHeadline => _isNrrClub
+  String get _awardHeadline => _clubName == null
+      ? 'Inspirational Running\nAward 2026'
+      : _isNrrClub
       ? 'The NRR Inspirational\nRunning Award 2026'
       : 'The Malcolm Ball Inspirational\nRunner Award 2026';
 
-  String get _awardNotificationName =>
-      _isNrrClub ? 'NRR Inspirational Running Award' : 'Malcolm Ball Award';
+  String get _awardNotificationName => _clubName == null
+      ? 'Inspirational Running Award'
+      : _isNrrClub
+      ? 'NRR Inspirational Running Award'
+      : 'Malcolm Ball Award';
 
-  String get _nominationPrompt => _isNrrClub
+  String get _nominationPrompt => _clubName == null
+      ? '     Nominate An Inspiring Club Member'
+      : _isNrrClub
       ? '     Nominate An Inspiring NRR Member'
       : '     Nominate An Inspiring NNBR Member';
 

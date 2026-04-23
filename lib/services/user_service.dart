@@ -3,6 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserService {
   static final _client = Supabase.instance.client;
+  static String? _cachedClubName;
+
+  static String? get cachedClubName => _cachedClubName;
 
   static Future<bool> isAdmin() async {
     final user = _client.auth.currentUser;
@@ -47,7 +50,10 @@ class UserService {
   /// Returns null if no club is set or user is not logged in.
   static Future<String?> currentClubName() async {
     final user = _client.auth.currentUser;
-    if (user == null) return null;
+    if (user == null) {
+      _cachedClubName = null;
+      return null;
+    }
 
     final row = await _client
         .from('user_profiles')
@@ -56,7 +62,8 @@ class UserService {
         .maybeSingle();
 
     final raw = (row?['club'] as String?)?.trim();
-    return (raw != null && raw.isNotEmpty) ? raw : null;
+    _cachedClubName = (raw != null && raw.isNotEmpty) ? raw : null;
+    return _cachedClubName;
   }
 
   /// Shared brand gradient for club UI chrome.
@@ -64,6 +71,9 @@ class UserService {
   /// - All other clubs (incl. NNBR) -> NNBR yellow + blue
   static List<Color> clubBrandGradient(String? clubName) {
     final lower = clubName?.toLowerCase() ?? '';
+    if (lower.isEmpty) {
+      return const [Color(0x4D2A2A2A), Color(0x4D101010)];
+    }
     if (lower.contains('norwich road runners')) {
       // Match app_clubs migration: primary '#D32F2F' (strong red), accent '#FFFFFF' (white)
       return const [Color(0x4DD32F2F), Color(0x4DFFFFFF)];

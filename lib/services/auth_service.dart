@@ -43,6 +43,7 @@ class AuthService {
     required String password,
     required String fullName,
     required String dob,
+    required String memberSince,
     required String ukaNumber,
     required String club,
     required String membershipType,
@@ -90,8 +91,7 @@ class AuthService {
         "medical_notes": medicalNotes,
         "is_admin": false,
         "admin_since": null,
-        // NEW ▶ store member_since (ISO string from today)
-        "member_since": DateTime.now().toIso8601String(),
+        "member_since": memberSince,
       });
 
       return true;

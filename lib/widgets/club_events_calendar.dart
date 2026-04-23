@@ -33,7 +33,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   final Map<String, WeatherAtTime?> _eventWeather = {};
   final Set<String> _weatherRequested = {};
 
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
   Set<String> _clubUserIds = {};
 
   // Track which event cards have been opened/seen locally

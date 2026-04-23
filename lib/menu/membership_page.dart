@@ -236,15 +236,14 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         : 'I intend to renew my club membership on a $statusText status. '
               'May I therefore request to please raise an order through the UK Athletic to complete my registration and the payment required.';
 
-    final uri = Uri(
-      scheme: 'mailto',
-      path: membershipSecretaryEmail,
-      queryParameters: {
-        'subject': paymentCompleted
-            ? 'Membership Payment Completed'
-            : 'Raise Membership Order',
-        'body': body,
-      },
+    final subject = Uri.encodeComponent(
+      paymentCompleted
+          ? 'Membership Payment Completed'
+          : 'Raise Membership Order',
+    );
+    final encodedBody = Uri.encodeComponent(body);
+    final uri = Uri.parse(
+      'mailto:$membershipSecretaryEmail?subject=$subject&body=$encodedBody',
     );
 
     return launchUrl(uri, mode: LaunchMode.externalApplication);

@@ -19,7 +19,10 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
+  RealtimeChannel? _postChannel;
+  RealtimeChannel? _postReactionsChannel;
+  RealtimeChannel? _postCommentsChannel;
 
   // Track expanded states per post
   final Map<String, bool> _expandedReactions = {};
@@ -42,15 +45,69 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
     '😡',
   ];
 
+  Future<void> _loadPostDetails(String postId) async {
+    await Future.wait([_loadReactions(postId), _loadComments(postId)]);
+  }
+
   @override
   void initState() {
     super.initState();
+    _setupRealtime();
     _checkAdminStatus();
     _loadPosts();
   }
 
+  void _setupRealtime() {
+    _postChannel = supabase
+        .channel('inline:club_posts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_posts',
+          callback: (_) => _loadPosts(),
+        )
+        .subscribe();
+
+    _postReactionsChannel = supabase
+        .channel('inline:club_post_reactions')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_post_reactions',
+          callback: (payload) {
+            final postId =
+                payload.newRecord['post_id']?.toString() ??
+                payload.oldRecord['post_id']?.toString();
+            if (postId != null && postId.isNotEmpty) {
+              _loadReactions(postId);
+            }
+          },
+        )
+        .subscribe();
+
+    _postCommentsChannel = supabase
+        .channel('inline:club_post_comments')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'club_post_comments',
+          callback: (payload) {
+            final postId =
+                payload.newRecord['post_id']?.toString() ??
+                payload.oldRecord['post_id']?.toString();
+            if (postId != null && postId.isNotEmpty) {
+              _loadComments(postId);
+            }
+          },
+        )
+        .subscribe();
+  }
+
   @override
   void dispose() {
+    _postChannel?.unsubscribe();
+    _postReactionsChannel?.unsubscribe();
+    _postCommentsChannel?.unsubscribe();
     for (final controller in _commentControllers.values) {
       controller.dispose();
     }
@@ -80,7 +137,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         });
       }
     } catch (e) {
-      print('Error checking admin status: $e');
+      debugPrint('Error checking admin status: $e');
     }
   }
 
@@ -122,16 +179,17 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         _userReactionsByPost[postId] = userSet;
       });
     } catch (e) {
-      print('Error loading reactions: $e');
+      debugPrint('Error loading reactions: $e');
     }
   }
 
   Future<void> _toggleReaction(String postId, String emoji) async {
     final user = supabase.auth.currentUser;
+    final messenger = ScaffoldMessenger.of(context);
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please log in to react')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please log in to react')),
+      );
       return;
     }
     try {
@@ -168,14 +226,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
             );
           }
         } catch (e) {
-          print('Error sending post reaction notification: $e');
+          debugPrint('Error sending post reaction notification: $e');
         }
       }
       await _loadReactions(postId);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Reaction error: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('Reaction error: $e')));
     }
   }
 
@@ -193,7 +249,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
         _commentsByPost[postId] = List<Map<String, dynamic>>.from(data);
       });
     } catch (e) {
-      print('Error loading comments: $e');
+      debugPrint('Error loading comments: $e');
     }
   }
 
@@ -302,8 +358,16 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           loading = false;
         });
       }
+
+      final postIds = data
+          .map((row) => row['id'] as String?)
+          .whereType<String>()
+          .toList();
+      if (postIds.isNotEmpty) {
+        await Future.wait(postIds.map(_loadPostDetails));
+      }
     } catch (e) {
-      print('Error loading posts: $e');
+      debugPrint('Error loading posts: $e');
       if (mounted) {
         setState(() => loading = false);
       }
@@ -843,6 +907,14 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                           const SizedBox(height: 12),
                           Row(
                             children: [
+                              Text(
+                                '${(_reactionCounts[postId] ?? const <String, int>{}).values.fold<int>(0, (sum, count) => sum + count)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               GestureDetector(
                                 onTap: () async {
                                   setState(() {
@@ -909,6 +981,14 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                       Icons.comment_outlined,
                                       size: 18,
                                       color: Colors.grey[500],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${(_commentsByPost[postId] ?? const <Map<String, dynamic>>[]).length}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[500],
+                                      ),
                                     ),
                                     const SizedBox(width: 4),
                                     Text(

@@ -13,7 +13,6 @@ import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/menu/team_achievements_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
-import 'package:runrank/menu/admin_team_page.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -28,7 +27,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   StreamSubscription<int>? _unreadSubscription;
   RealtimeChannel? _notificationsChannel;
   Timer? _refreshTimer;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
   String? _extractRoute(String text) {
@@ -189,6 +188,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting all notifications: $e')),
+      );
+    }
+  }
+
+  Future<void> _markAllNotificationsRead() async {
+    final unread = notifications
+        .where((n) => !(n['is_read'] ?? false))
+        .toList();
+    if (unread.isEmpty) return;
+
+    try {
+      await NotificationService.markAllRead();
+      await NotificationService.refreshUnreadCount();
+
+      if (!mounted) return;
+      setState(() {
+        notifications = notifications
+            .map((n) => {...n, 'is_read': true})
+            .toList();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications marked as read')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error marking notifications as read: $e')),
       );
     }
   }
@@ -491,6 +518,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Color _alertAccentColor() {
     final lower = (_clubName ?? '').toLowerCase();
+    if (lower.isEmpty) {
+      return const Color(0xFF3A3A3A);
+    }
     if (lower.contains('norwich road runners')) {
       return const Color(0xFFD32F2F); // NRR red
     }
@@ -507,6 +537,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         centerTitle: true,
         elevation: 0,
         actions: [
+          if (!loading && notifications.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.done_all),
+              tooltip: 'Mark all as read',
+              onPressed: _markAllNotificationsRead,
+            ),
           if (!loading && notifications.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
