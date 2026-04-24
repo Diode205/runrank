@@ -55,6 +55,15 @@
                 <data android:host="3ds.stripesdk.io" />
             </intent-filter>
 
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="runrank"
+                    android:host="login-callback" />
+            </intent-filter>
+
         </activity>
 
         <meta-data

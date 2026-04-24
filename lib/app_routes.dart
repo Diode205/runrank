@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 // Core
 import 'package:runrank/auth/login_screen.dart';
+import 'package:runrank/auth/password_reset_code_screen.dart';
+import 'package:runrank/auth/reset_password_screen.dart';
 import 'package:runrank/root_navigation.dart';
 
 // History / records
@@ -41,6 +43,8 @@ class AppRoutes {
   static const notifications = '/notifications';
   static const register = '/register';
   static const migrateAccount = '/migrate-account';
+  static const resetPassword = '/reset-password';
+  static const resetPasswordCode = '/reset-password-code';
 
   // Route table
   static Map<String, WidgetBuilder> routes = {
@@ -57,5 +61,7 @@ class AppRoutes {
     notifications: (_) => const NotificationsScreen(),
     register: (_) => const RegisterClubScreen(),
     migrateAccount: (_) => const RegisterClubScreen(isForMigration: true),
+    resetPassword: (_) => const ResetPasswordScreen(),
+    resetPasswordCode: (_) => const PasswordResetCodeScreen(),
   };
 }

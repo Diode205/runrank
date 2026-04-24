@@ -7,6 +7,10 @@ class UserService {
 
   static String? get cachedClubName => _cachedClubName;
 
+  static void clearCachedClubName() {
+    _cachedClubName = null;
+  }
+
   static Future<bool> isAdmin() async {
     final user = _client.auth.currentUser;
     if (user == null) return false;

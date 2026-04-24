@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/services/auth_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,6 +13,40 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
   bool loading = false;
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset password'),
+          content: const Text(
+            'For now, password resets are handled by your club admin. Please contact your admin for a one-off reset code, then use that code to choose a new password here in the app.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                Navigator.of(context).pushNamed(AppRoutes.resetPasswordCode);
+              },
+              child: const Text('I have a reset code'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,31 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // Forgot password
             TextButton(
-              onPressed: () async {
-                final entered = email.text.trim();
-                if (entered.isEmpty) {
-                  final messenger = ScaffoldMessenger.of(context);
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text("Enter your email first")),
-                  );
-                  return;
-                }
-
-                try {
-                  final messenger = ScaffoldMessenger.of(context);
-                  await Supabase.instance.client.auth.resetPasswordForEmail(
-                    entered,
-                  );
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text("Password reset link sent to $entered"),
-                    ),
-                  );
-                } catch (e) {
-                  final messenger = ScaffoldMessenger.of(context);
-                  messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
-                }
-              },
+              onPressed: _showForgotPasswordDialog,
               child: const Text("Forgot password?"),
             ),
 

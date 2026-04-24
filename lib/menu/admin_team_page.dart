@@ -611,11 +611,15 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
                               ),
                             ),
                             onTap: () {
+                              final existingCommitteeEmail =
+                                  (emailController.text).trim();
                               setState(() {
                                 _committee[index]['name'] =
                                     (user['full_name'] ?? '') as String;
+                                // Staff roles should use the club-managed role
+                                // email, not the member's personal app email.
                                 _committee[index]['email'] =
-                                    (user['email'] ?? '') as String;
+                                    existingCommitteeEmail;
                                 _committee[index]['userId'] =
                                     user['id'] as String;
                                 _committee[index]['avatarUrl'] = avatarUrl;
@@ -657,7 +661,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       var query = _supabase
           .from('user_profiles')
           .select(
-            'id, full_name, email, membership_type, is_admin, admin_since, is_blocked, block_reason, soft_removed_at, club',
+            'id, full_name, email, uka_number, membership_type, is_admin, admin_since, is_blocked, block_reason, soft_removed_at, club',
           );
 
       if (clubName != null && clubName.isNotEmpty) {
@@ -665,7 +669,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       }
 
       final data = await query
-          .or('full_name.ilike.%$term%,email.ilike.%$term%')
+          .or('full_name.ilike.%$term%,email.ilike.%$term%,uka_number.ilike.%$term%')
           .limit(20);
 
       setModalState(() {
@@ -1466,7 +1470,7 @@ For security we recommend using this code within the next few days. After it has
                       controller: _searchController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Search by name or email',
+                        hintText: 'Search by name, email or UKA',
                         hintStyle: const TextStyle(color: Colors.white54),
                         prefixIcon: const Icon(
                           Icons.search,
@@ -1699,6 +1703,22 @@ For security we recommend using this code within the next few days. After it has
                                         minWidth: 36,
                                         minHeight: 36,
                                       ),
+                                      tooltip: 'Generate reset code',
+                                      onPressed: () => _openPasswordResetCodeDialog(
+                                        user,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.password_rounded,
+                                        color: Colors.lightBlueAccent,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
                                       tooltip: 'Remove profile',
                                       onPressed: () => _confirmRemoveProfile(
                                         user,
@@ -1721,6 +1741,200 @@ For security we recommend using this code within the next few days. After it has
               );
             },
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openPasswordResetCodeDialog(Map<String, dynamic> user) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final club = (user['club'] ?? _adminClub ?? '').toString().trim();
+    final memberName = (user['full_name'] ?? 'Member').toString();
+    final ukaNumber = (user['uka_number'] ?? '').toString().trim();
+    String? generatedCode;
+
+    String initials(String name) {
+      final buffer = StringBuffer();
+      for (final raw in name.split(' ')) {
+        final letters = raw.replaceAll(RegExp(r'[^A-Za-z]'), '').trim();
+        if (letters.isNotEmpty) {
+          buffer.write(letters[0].toUpperCase());
+        }
+      }
+      final result = buffer.toString();
+      return result.isEmpty ? 'RR' : result;
+    }
+
+    String randomSuffix(int length) {
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      final rand = Random.secure();
+      return List.generate(
+        length,
+        (_) => chars[rand.nextInt(chars.length)],
+      ).join();
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        final primary = colorScheme.primary;
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F111A),
+              title: Text(
+                'Generate reset code',
+                style: TextStyle(color: primary),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Member: $memberName',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Club: ${club.isEmpty ? '—' : club}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    if (ukaNumber.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'UKA: $ukaNumber',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Create a one-off code that the member can use in the app to set a new password. The code expires after 7 days and can only be used once.',
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                    if (generatedCode != null) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Reset code generated:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF151828),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SelectableText(
+                          generatedCode!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.lightBlueAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final instructions = '''
+RunRank password reset for $memberName
+
+Reset code: $generatedCode
+
+How to use this code:
+1. Open the RunRank app.
+2. On the login screen, tap "Forgot password?".
+3. Tap "I have a reset code".
+4. Enter your UKA number, this reset code, and your new password.
+
+This code can be used once and will expire in 7 days.
+''';
+
+                          await Clipboard.setData(
+                            ClipboardData(text: instructions),
+                          );
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Reset instructions copied'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.copy,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                        label: const Text(
+                          'Copy code and instructions',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    if (club.isEmpty) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Could not determine the member club.'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final code =
+                        'RST-${initials(club)}-${randomSuffix(6)}';
+
+                    try {
+                      await _supabase.from('password_reset_codes').insert({
+                        'user_id': user['id'],
+                        'club': club,
+                        'reset_code': code,
+                        'status': 'issued',
+                        'created_by': _supabase.auth.currentUser?.id,
+                      });
+
+                      setStateDialog(() {
+                        generatedCode = code;
+                      });
+
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Reset code generated: $code'),
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Could not create reset code: $e'),
+                        ),
+                      );
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                  child: const Text('Generate code'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

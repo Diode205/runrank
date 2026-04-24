@@ -1,8 +1,24 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:runrank/services/club_records_service.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
   static final SupabaseClient _supabase = Supabase.instance.client;
+  static const String passwordResetRedirectUrl =
+      'runrank://login-callback/reset-password';
+
+  static List<String> _ukaLookupVariants(String ukaNumber) {
+    final trimmed = ukaNumber.trim();
+    final compact = trimmed.replaceAll(RegExp(r'[\s-]+'), '');
+
+    return {
+      trimmed,
+      trimmed.toUpperCase(),
+      compact,
+      compact.toUpperCase(),
+    }.where((value) => value.isNotEmpty).toList(growable: false);
+  }
 
   // -------------------------------------------------------
   // CHECK LOGIN STATUS
@@ -32,6 +48,7 @@ class AuthService {
   // LOGOUT
   // -------------------------------------------------------
   static Future<void> logout() async {
+    UserService.clearCachedClubName();
     await _supabase.auth.signOut();
   }
 
@@ -221,11 +238,44 @@ class AuthService {
   // -------------------------------------------------------
   static Future<bool> sendPasswordResetEmail(String email) async {
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: kIsWeb ? null : passwordResetRedirectUrl,
+      );
       return true;
     } catch (e) {
       // ignore: avoid_print
       print("Password reset email failed: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> sendPasswordResetEmailForUka(String ukaNumber) async {
+    try {
+      String? registeredEmail;
+
+      for (final candidate in _ukaLookupVariants(ukaNumber)) {
+        final row = await _supabase
+            .from('user_profiles')
+            .select('email')
+            .ilike('uka_number', candidate)
+            .maybeSingle();
+
+        final email = (row?['email'] as String?)?.trim();
+        if (email != null && email.isNotEmpty) {
+          registeredEmail = email;
+          break;
+        }
+      }
+
+      if (registeredEmail == null) {
+        return false;
+      }
+
+      return sendPasswordResetEmail(registeredEmail);
+    } catch (e) {
+      // ignore: avoid_print
+      print("Password reset lookup by UKA failed: $e");
       return false;
     }
   }

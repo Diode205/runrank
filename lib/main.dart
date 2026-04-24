@@ -1,4 +1,5 @@
 // main.dart
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'dart:async';
@@ -6,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:runrank/auth/reset_password_screen.dart';
 import 'splash_screen.dart';
 import 'auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,6 +53,9 @@ void main() {
       await Supabase.initialize(
         url: 'https://yzccwmhgqlgguighfhsk.supabase.co',
         anonKey: 'sb_publishable_PxUqRg99ug7dqYnWG82M9A_pRukqS1k',
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+        ),
       );
 
       // 2b️⃣ Stripe setup (safe if keys not provided)
@@ -164,13 +169,20 @@ class RunRankApp extends StatefulWidget {
 }
 
 class _RunRankAppState extends State<RunRankApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final AppLinks _appLinks = AppLinks();
   ClubConfig? _clubConfig;
   StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<Uri>? _deepLinkSubscription;
+  Uri? _pendingRecoveryUri;
+  bool _passwordRecoveryScreenOpen = false;
+  bool _passwordRecoveryMode = false;
 
   @override
   void initState() {
     super.initState();
     _loadClubConfig();
+    _listenForPasswordRecoveryLinks();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       data,
     ) {
@@ -185,6 +197,10 @@ class _RunRankAppState extends State<RunRankApp> {
         });
       }
 
+      if (event == AuthChangeEvent.passwordRecovery) {
+        _openPasswordRecoveryScreen();
+      }
+
       _loadClubConfig();
     });
   }
@@ -192,6 +208,7 @@ class _RunRankAppState extends State<RunRankApp> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _deepLinkSubscription?.cancel();
     super.dispose();
   }
 
@@ -200,6 +217,65 @@ class _RunRankAppState extends State<RunRankApp> {
     if (!mounted) return;
     setState(() {
       _clubConfig = config;
+    });
+  }
+
+  bool _isPasswordRecoveryLink(Uri uri) {
+    final normalizedPath = uri.path.toLowerCase();
+    return uri.scheme == 'runrank' &&
+        uri.host == 'login-callback' &&
+        normalizedPath == '/reset-password';
+  }
+
+  Future<void> _listenForPasswordRecoveryLinks() async {
+    _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      if (uri != null && _isPasswordRecoveryLink(uri)) {
+        _openPasswordRecoveryScreen(recoveryUri: uri);
+      }
+    });
+
+    try {
+      Uri? initialUri;
+      try {
+        initialUri = await (_appLinks as dynamic).getInitialAppLink();
+      } on NoSuchMethodError {
+        initialUri = await (_appLinks as dynamic).getInitialLink();
+      }
+
+      if (initialUri != null && _isPasswordRecoveryLink(initialUri)) {
+        _openPasswordRecoveryScreen(recoveryUri: initialUri);
+      }
+    } catch (_) {
+      // If reading the initial deep link fails, the auth listener still
+      // handles the common recovery path.
+    }
+  }
+
+  void _openPasswordRecoveryScreen({Uri? recoveryUri}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _navigatorKey.currentState;
+      if (!mounted || _passwordRecoveryScreenOpen) return;
+
+      setState(() {
+        _passwordRecoveryMode = true;
+        _pendingRecoveryUri = recoveryUri ?? _pendingRecoveryUri;
+      });
+
+      if (navigator == null) return;
+
+      _passwordRecoveryScreenOpen = true;
+      navigator
+          .pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ResetPasswordScreen(recoveryUri: recoveryUri ?? _pendingRecoveryUri),
+              settings: const RouteSettings(name: AppRoutes.resetPassword),
+            ),
+            (_) => false,
+          )
+          .whenComplete(() {
+            _passwordRecoveryScreenOpen = false;
+          });
     });
   }
 
@@ -217,6 +293,7 @@ class _RunRankAppState extends State<RunRankApp> {
         : Colors.black;
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'RunRank',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -279,7 +356,9 @@ class _RunRankAppState extends State<RunRankApp> {
       ),
       routes: AppRoutes.routes,
       navigatorObservers: [routeObserver],
-      home: const SplashScreen(nextPage: AuthGate()),
+      home: _passwordRecoveryMode
+          ? ResetPasswordScreen(recoveryUri: _pendingRecoveryUri)
+          : const SplashScreen(nextPage: AuthGate()),
     );
   }
 }
