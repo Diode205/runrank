@@ -6,6 +6,7 @@ import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/inline_video_player.dart';
 import 'package:runrank/widgets/linkified_text.dart';
+import 'package:runrank/widgets/web_link_preview_card.dart';
 
 class PostsFeedInlineScreen extends StatefulWidget {
   const PostsFeedInlineScreen({super.key});
@@ -611,6 +612,13 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                           ?.map((e) => e as Map<String, dynamic>)
                           .toList() ??
                       [];
+                  final contentPreviewUrl =
+                      WebLinkPreviewCard.extractFirstUrl(
+                        post['content'] as String?,
+                      );
+                  final displayContent = WebLinkPreviewCard.removeFirstUrl(
+                    post['content'] as String?,
+                  );
                   final timeAgo = _getTimeAgo(post['created_at']);
                   final isApproved = post['is_approved'] ?? true;
 
@@ -743,17 +751,19 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          LinkifiedText(
-                            text: post['content'] ?? '',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[300],
-                              height: 1.4,
+                          if (displayContent.isNotEmpty)
+                            LinkifiedText(
+                              text: displayContent,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[300],
+                                height: 1.4,
+                              ),
                             ),
-                          ),
 
                           // Attachments
-                          if (attachments.isNotEmpty) ...[
+                          if (attachments.isNotEmpty ||
+                              contentPreviewUrl != null) ...[
                             const SizedBox(height: 12),
                             Builder(
                               builder: (context) {
@@ -763,6 +773,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                 final links = attachments
                                     .where((a) => a['type'] == 'link')
                                     .toList();
+                                final firstPreviewUrl = links.isNotEmpty
+                                    ? links.first['url'] as String?
+                                    : contentPreviewUrl;
+                                final hasInlinePreview =
+                                    firstPreviewUrl != null &&
+                                    firstPreviewUrl.isNotEmpty;
                                 final files = attachments
                                     .where((a) => a['type'] == 'file')
                                     .toList();
@@ -805,8 +821,16 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                         url: videos.first['url'] as String,
                                       ),
                                     ],
+                                    if (hasInlinePreview) ...[
+                                      const SizedBox(height: 8),
+                                      WebLinkPreviewCard(
+                                        url: firstPreviewUrl!,
+                                        buttonLabel: 'View Full Page',
+                                        height: 460,
+                                      ),
+                                    ],
                                     if (images.length > 1 ||
-                                        links.isNotEmpty ||
+                                        links.length > 1 ||
                                         files.isNotEmpty ||
                                         videos.isNotEmpty) ...[
                                       const SizedBox(height: 8),
@@ -832,7 +856,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                   ),
                                                 ),
                                               ),
-                                          ...links.map(
+                                          ...links
+                                              .skip(hasInlinePreview &&
+                                                      links.isNotEmpty
+                                                  ? 1
+                                                  : 0)
+                                              .map(
                                             (a) => ActionChip(
                                               visualDensity:
                                                   VisualDensity.compact,

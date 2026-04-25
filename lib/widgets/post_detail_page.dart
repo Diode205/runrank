@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/inline_video_player.dart';
+import 'package:runrank/widgets/web_link_preview_card.dart';
 
 class PostDetailPage extends StatefulWidget {
   final String postId;
@@ -629,6 +630,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final authorAvatarUrl = post!['user_profiles']?['avatar_url'] as String?;
     final authorMembershipType =
         post!['user_profiles']?['membership_type'] as String?;
+    final contentPreviewUrl = WebLinkPreviewCard.extractFirstUrl(
+      post!['content'] as String?,
+    );
+    final displayContent = WebLinkPreviewCard.removeFirstUrl(
+      post!['content'] as String?,
+    );
     final imageUrl = post!['image_url'] as String?;
     final imageAttachments = attachments
         .where((a) => a['type'] == 'image')
@@ -639,6 +646,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final otherAttachments = attachments
         .where((a) => a['type'] != 'image' && a['type'] != 'video')
         .toList();
+    final linkAttachments = otherAttachments
+        .where((a) => a['type'] == 'link')
+        .toList();
+    final fileAttachments = otherAttachments
+        .where((a) => a['type'] != 'link')
+        .toList();
+    final firstPreviewUrl = linkAttachments.isNotEmpty
+        ? linkAttachments.first['url'] as String?
+        : contentPreviewUrl;
+    final hasInlinePreview =
+        firstPreviewUrl != null && firstPreviewUrl.isNotEmpty;
     final likeCount = likeUsers.length;
 
     return Scaffold(
@@ -762,17 +780,18 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   const SizedBox(height: 12),
 
                   // Content
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      post!['content'] ?? '',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[300],
-                        height: 1.6,
+                  if (displayContent.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        displayContent,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey[300],
+                          height: 1.6,
+                        ),
                       ),
                     ),
-                  ),
 
                   // Image
                   if (imageUrl != null && imageUrl.isNotEmpty) ...[
@@ -796,7 +815,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     ),
                   ],
                   // Attachments
-                  if (attachments.isNotEmpty) ...[
+                  if (attachments.isNotEmpty || hasInlinePreview) ...[
                     const SizedBox(height: 12),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -847,6 +866,14 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                 ),
                                 const SizedBox(height: 8),
                               ],
+                              if (hasInlinePreview) ...[
+                                WebLinkPreviewCard(
+                                  url: firstPreviewUrl!,
+                                  buttonLabel: 'View Full Page',
+                                  height: 560,
+                                ),
+                                const SizedBox(height: 8),
+                              ],
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
@@ -888,7 +915,28 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                       ),
                                     );
                                   }),
-                                  ...otherAttachments.map<Widget>((a) {
+                                  ...linkAttachments
+                                      .skip(hasInlinePreview &&
+                                              linkAttachments.isNotEmpty
+                                          ? 1
+                                          : 0)
+                                      .map<Widget>((a) {
+                                    final fileName =
+                                        a['name'] as String? ?? 'Link';
+
+                                    return ActionChip(
+                                      avatar: const Icon(Icons.link, size: 18),
+                                      label: Text(
+                                        fileName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () => _openAttachmentUrl(
+                                        a['url'] as String?,
+                                      ),
+                                    );
+                                  }),
+                                  ...fileAttachments.map<Widget>((a) {
                                     final attachType =
                                         a['type'] as String? ?? 'file';
                                     final fileName =

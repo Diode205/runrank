@@ -8,6 +8,7 @@ import 'package:runrank/services/user_service.dart';
 import 'package:runrank/admin/edit_post_page.dart';
 import 'package:runrank/widgets/linkified_text.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
+import 'package:runrank/widgets/web_link_preview_card.dart';
 import 'dart:async';
 
 class PostsFeedFacebookScreen extends StatefulWidget {
@@ -819,6 +820,12 @@ class _PostCard extends StatelessWidget {
         (profile?['full_name'] ?? post['author_name'] ?? 'Unknown').toString();
     final avatarUrl = profile?['avatar_url'] as String?;
     final attachments = (post['club_post_attachments'] as List?) ?? [];
+    final contentPreviewUrl = WebLinkPreviewCard.extractFirstUrl(
+      post['content'] as String?,
+    );
+    final displayContent = WebLinkPreviewCard.removeFirstUrl(
+      post['content'] as String?,
+    );
     final reactionCount = reactionCounts.values.fold<int>(
       0,
       (sum, count) => sum + count,
@@ -885,14 +892,19 @@ class _PostCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                const SizedBox(height: 8),
-                LinkifiedText(text: post['content'] ?? ''),
+                if (displayContent.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  LinkifiedText(text: displayContent),
+                ],
               ],
             ),
           ),
-          if (attachments.isNotEmpty) ...[
+          if (attachments.isNotEmpty || contentPreviewUrl != null) ...[
             const SizedBox(height: 12),
-            _PostAttachments(attachments: attachments),
+            _PostAttachments(
+              attachments: attachments,
+              content: post['content'] as String?,
+            ),
           ],
           const Divider(),
           Padding(
@@ -928,7 +940,8 @@ class _PostCard extends StatelessWidget {
 
 class _PostAttachments extends StatelessWidget {
   final List attachments;
-  const _PostAttachments({required this.attachments});
+  final String? content;
+  const _PostAttachments({required this.attachments, this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -936,8 +949,18 @@ class _PostAttachments extends StatelessWidget {
     final links = attachments.where((a) => a['type'] == 'link').toList();
     final files = attachments.where((a) => a['type'] == 'file').toList();
     final videos = attachments.where((a) => a['type'] == 'video').toList();
+    final contentPreviewUrl = WebLinkPreviewCard.extractFirstUrl(content);
+    final firstPreviewUrl = links.isNotEmpty
+        ? links.first['url'] as String?
+        : contentPreviewUrl;
+    final hasInlinePreview =
+        firstPreviewUrl != null && firstPreviewUrl.isNotEmpty;
 
-    if (images.isEmpty && links.isEmpty && files.isEmpty && videos.isEmpty) {
+    if (images.isEmpty &&
+        links.isEmpty &&
+        files.isEmpty &&
+        videos.isEmpty &&
+        !hasInlinePreview) {
       return const SizedBox.shrink();
     }
 
@@ -967,8 +990,16 @@ class _PostAttachments extends StatelessWidget {
           const SizedBox(height: 8),
           InlineVideoPlayer(url: videos.first['url'] as String),
         ],
+        if (hasInlinePreview) ...[
+          const SizedBox(height: 8),
+          WebLinkPreviewCard(
+            url: firstPreviewUrl!,
+            buttonLabel: 'View Full Page',
+            height: 460,
+          ),
+        ],
         if (images.length > 1 ||
-            links.isNotEmpty ||
+            links.length > 1 ||
             files.isNotEmpty ||
             videos.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -988,7 +1019,9 @@ class _PostAttachments extends StatelessWidget {
                       ),
                     ),
                   ),
-              ...links.map(
+              ...links
+                  .skip(hasInlinePreview && links.isNotEmpty ? 1 : 0)
+                  .map(
                 (a) => ActionChip(
                   visualDensity: VisualDensity.compact,
                   avatar: const Icon(Icons.link, size: 16),

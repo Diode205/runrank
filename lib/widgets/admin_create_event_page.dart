@@ -307,6 +307,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   // Controllers
   final hostCtrl = TextEditingController();
   final venueCtrl = TextEditingController();
+  final venueFocusNode = FocusNode();
   final venueAddressCtrl = TextEditingController();
   final descriptionCtrl = TextEditingController();
   final latitudeCtrl = TextEditingController();
@@ -444,12 +445,37 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   Future<void> _loadSavedVenuePresets() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getStringList(_savedVenuesPrefsKey()) ?? const [];
-      final presets = raw
-          .map((entry) => jsonDecode(entry) as Map<String, dynamic>)
-          .map(_SavedVenuePreset.fromJson)
-          .where((preset) => preset.venue.isNotEmpty)
-          .toList();
+      final keys = {
+        _savedVenuesPrefsKey(),
+        'admin_saved_venues_default_club',
+        ...prefs
+            .getKeys()
+            .where((key) => key.startsWith('admin_saved_venues_')),
+      };
+
+      final presetsById = <String, _SavedVenuePreset>{};
+      for (final key in keys) {
+        final raw = prefs.getStringList(key) ?? const [];
+        for (final entry in raw) {
+          try {
+            final preset = _SavedVenuePreset.fromJson(
+              jsonDecode(entry) as Map<String, dynamic>,
+            );
+            if (preset.venue.isNotEmpty) {
+              presetsById[preset.id] = preset;
+            }
+          } catch (e) {
+            debugPrint('Error decoding saved venue preset from "$key": $e');
+          }
+        }
+      }
+
+      final presets = presetsById.values.toList()
+        ..sort(
+          (a, b) => a.venue.trim().toLowerCase().compareTo(
+            b.venue.trim().toLowerCase(),
+          ),
+        );
 
       if (!mounted) return;
       setState(() {
@@ -623,12 +649,27 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   List<_SavedVenuePreset> _matchingVenuePresets(String query) {
     final trimmed = query.trim().toLowerCase();
-    if (trimmed.length < 2) return const [];
+    if (trimmed.isEmpty) return const [];
 
-    return _savedVenuePresets.where((preset) {
+    final matches = _savedVenuePresets.where((preset) {
       final venue = preset.venue.trim().toLowerCase();
-      return venue.startsWith(trimmed) && venue != trimmed;
+      return venue != trimmed && venue.contains(trimmed);
     }).toList();
+
+    matches.sort((a, b) {
+      final aVenue = a.venue.trim().toLowerCase();
+      final bVenue = b.venue.trim().toLowerCase();
+      final aStartsWith = aVenue.startsWith(trimmed);
+      final bStartsWith = bVenue.startsWith(trimmed);
+
+      if (aStartsWith != bStartsWith) {
+        return aStartsWith ? -1 : 1;
+      }
+
+      return aVenue.compareTo(bVenue);
+    });
+
+    return matches;
   }
 
   _SavedVenuePreset? _selectedVenuePresetForCurrentInput() {
@@ -647,6 +688,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   void dispose() {
     hostCtrl.dispose();
     venueCtrl.dispose();
+    venueFocusNode.dispose();
     venueAddressCtrl.dispose();
     descriptionCtrl.dispose();
     latitudeCtrl.dispose();
@@ -1128,11 +1170,17 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     final matchingVenuePresets = supportsSavedVenues
                         ? _matchingVenuePresets(venueCtrl.text)
                         : const <_SavedVenuePreset>[];
+                    final visibleVenuePresets = supportsSavedVenues
+                        ? (venueCtrl.text.trim().isEmpty
+                              ? const <_SavedVenuePreset>[]
+                              : matchingVenuePresets)
+                        : const <_SavedVenuePreset>[];
                     final selectedPreset =
                         _selectedVenuePresetForCurrentInput();
                     final showVenueSuggestions =
                         supportsSavedVenues &&
-                        matchingVenuePresets.isNotEmpty &&
+                        venueFocusNode.hasFocus &&
+                        visibleVenuePresets.isNotEmpty &&
                         selectedPreset == null;
 
                     return Column(
@@ -1189,32 +1237,76 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           ),
                         TextFormField(
                           controller: venueCtrl,
+                          focusNode: venueFocusNode,
                           onChanged: supportsSavedVenues
                               ? (_) => setState(() {
                                   _selectedSavedVenueId =
                                       _selectedVenuePresetForCurrentInput()?.id;
                                 })
                               : null,
+                          onTap: supportsSavedVenues ? () => setState(() {}) : null,
                           decoration: const InputDecoration(labelText: "Venue"),
                           validator: (v) =>
                               v!.trim().isEmpty ? "Required" : null,
                         ),
+                        if (supportsSavedVenues)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6.0),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _savedVenuePresets.isEmpty
+                                    ? 'No saved venues found yet.'
+                                    : '${_savedVenuePresets.length} saved venue${_savedVenuePresets.length == 1 ? '' : 's'} available',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                          ),
                         if (showVenueSuggestions) ...[
                           const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: matchingVenuePresets.map((preset) {
-                                return ActionChip(
-                                  label: Text(preset.label),
-                                  avatar: const Icon(
-                                    Icons.place_outlined,
-                                    size: 18,
-                                  ),
-                                  onPressed: () =>
-                                      _applySavedVenuePreset(preset),
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF151922),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: visibleVenuePresets.map((preset) {
+                                final isLast =
+                                    identical(
+                                      preset,
+                                      visibleVenuePresets.last,
+                                    );
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(
+                                      dense: true,
+                                      leading: const Icon(
+                                        Icons.place_outlined,
+                                        size: 20,
+                                      ),
+                                      title: Text(preset.venue),
+                                      subtitle: preset.address.isEmpty
+                                          ? null
+                                          : Text(
+                                              preset.address,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                      onTap: () {
+                                        _applySavedVenuePreset(preset);
+                                        venueFocusNode.unfocus();
+                                      },
+                                    ),
+                                    if (!isLast)
+                                      const Divider(height: 1, thickness: 0.5),
+                                  ],
                                 );
                               }).toList(),
                             ),
