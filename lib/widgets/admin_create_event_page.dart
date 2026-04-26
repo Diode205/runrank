@@ -216,6 +216,28 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       _clubName != null &&
       _clubName!.toLowerCase().contains('norwich road runners');
 
+  static const List<String> _nrrTrainingEventTypes = <String>[
+    'Recovery Monday',
+    'Mousehold Monday',
+    'Coached Tuesday',
+    'Road Route Thursday',
+    'Paul Evans Session',
+  ];
+
+  bool get _usesTrainingDetails =>
+      _resolvedEventType == 'Training' ||
+      selectedEventType == 'Training 1' ||
+      selectedEventType == 'Training 2' ||
+      _nrrTrainingEventTypes.contains(_resolvedEventType);
+
+  bool get _usesHandicapDetails =>
+      _resolvedEventType == 'Handicap Series' ||
+      _resolvedEventType == 'One Mile Handicap';
+
+  String get _resolvedEventType => _isNRRClub && selectedEventType == 'Training'
+      ? _selectedNrrTrainingEventType
+      : selectedEventType;
+
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
   String? _selectedHostId;
@@ -249,7 +271,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     if (widget.initialEventType != null) {
       selectedCategory = "admin"; // only admin creates events here
       final initType = widget.initialEventType!;
-      if (initType == "Training 1" || initType == "Training 2") {
+      if (_nrrTrainingEventTypes.contains(initType)) {
+        selectedEventType = "Training";
+        _selectedNrrTrainingEventType = initType;
+      } else if (initType == "Training 1" || initType == "Training 2") {
         // Legacy callers may still pass the old labels; normalise
         // them into the new unified Training type.
         selectedEventType = "Training";
@@ -294,6 +319,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   String selectedEventType = "";
   String selectedCategory = "";
+  String _selectedNrrTrainingEventType = _nrrTrainingEventTypes.first;
   String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
 
   // Special Event subtype (e.g. AGM, Club Nights, Awards Night)
@@ -378,6 +404,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           // For NRR: keep all admin event types except Handicap Series.
           adminTypes = [
             "Training",
+            "One Mile Handicap",
             "Race",
             "Cross Country",
             "Relay",
@@ -398,6 +425,14 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           ];
 
           raceNames = ["Holt 10K", "Worstead 5M", "Chase The Train"];
+        }
+
+        if (selectedCategory == 'admin' &&
+            !adminTypes.contains(selectedEventType)) {
+          if (_nrrTrainingEventTypes.contains(selectedEventType)) {
+            _selectedNrrTrainingEventType = selectedEventType;
+          }
+          selectedEventType = adminTypes.first;
         }
 
         _hosts = rows
@@ -448,9 +483,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       final keys = {
         _savedVenuesPrefsKey(),
         'admin_saved_venues_default_club',
-        ...prefs
-            .getKeys()
-            .where((key) => key.startsWith('admin_saved_venues_')),
+        ...prefs.getKeys().where(
+          (key) => key.startsWith('admin_saved_venues_'),
+        ),
       };
 
       final presetsById = <String, _SavedVenuePreset>{};
@@ -722,13 +757,20 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   }
 
   String buildTitle() {
-    switch (selectedEventType) {
+    final eventType = _resolvedEventType;
+    switch (eventType) {
       case "Training":
       case "Training 1":
       case "Training 2":
-        // New unified Training type (and legacy labels) all
-        // use a simple "Training" title for the calendar.
         return "Training";
+      case "Recovery Monday":
+      case "Mousehold Monday":
+      case "Coached Tuesday":
+      case "Road Route Thursday":
+      case "Paul Evans Session":
+        return eventType;
+      case "One Mile Handicap":
+        return "One Mile Handicap";
       case "Race":
         return "Race: $selectedRace";
       case "Cross Country":
@@ -747,7 +789,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       case "Parkrun Tourism":
         return "Parkrun Tourism";
       default:
-        return selectedEventType;
+        return eventType;
     }
   }
 
@@ -808,11 +850,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       }
     }
 
+    final eventTypeForSave = _resolvedEventType;
+
     final map = {
-      "event_type": selectedEventType.toLowerCase().replaceAll(" ", "_"),
-      "training_number": selectedEventType == "Training 1"
+      "event_type": eventTypeForSave.toLowerCase().replaceAll(" ", "_"),
+      "training_number": eventTypeForSave == "Training 1"
           ? 1
-          : selectedEventType == "Training 2"
+          : eventTypeForSave == "Training 2"
           ? 2
           : null,
       "race_name": selectedEventType == "Race"
@@ -837,13 +881,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "marshal_call_date":
           (selectedEventType == "Race" ||
               selectedEventType == "Cross Country" ||
-              selectedEventType == "Handicap Series")
+              _usesHandicapDetails)
           ? marshalCallDate?.toIso8601String().split("T").first
           : null,
       "expected_time_required":
-          selectedEventType == "Handicap Series" || selectedEventType == "Relay"
-          ? true
-          : false,
+          _usesHandicapDetails || selectedEventType == "Relay" ? true : false,
       "created_by": supabase.auth.currentUser?.id,
     };
 
@@ -982,13 +1024,46 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             .toList(),
                   onChanged: (v) {
                     if (v == null) return;
-                    setState(() => selectedEventType = v);
+                    setState(() {
+                      selectedEventType = v;
+                      if (_isNRRClub && v == 'Training') {
+                        _selectedNrrTrainingEventType =
+                            _nrrTrainingEventTypes.first;
+                      }
+                    });
                     _applyFixedVenuePresetForCurrentSelection();
                   },
                 ),
               ),
 
               const SizedBox(height: 12),
+
+              // NRR TRAINING UI
+              if (_isNRRClub && selectedEventType == "Training")
+                _section(
+                  "Training Event",
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedNrrTrainingEventType,
+                    items: _nrrTrainingEventTypes
+                        .map(
+                          (e) => DropdownMenuItem<String>(
+                            value: e,
+                            child: Text(e),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _selectedNrrTrainingEventType = v);
+                    },
+                    decoration: const InputDecoration(
+                      labelText: "Select training event",
+                    ),
+                  ),
+                ),
+
+              if (_isNRRClub && selectedEventType == "Training")
+                const SizedBox(height: 12),
 
               // RACE UI
               if (selectedEventType == "Race")
@@ -1165,7 +1240,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 Builder(
                   builder: (context) {
                     final supportsSavedVenues =
-                        selectedEventType == 'Training' ||
+                        _usesTrainingDetails ||
                         selectedEventType == 'Parkrun Tourism';
                     final matchingVenuePresets = supportsSavedVenues
                         ? _matchingVenuePresets(venueCtrl.text)
@@ -1244,7 +1319,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                                       _selectedVenuePresetForCurrentInput()?.id;
                                 })
                               : null,
-                          onTap: supportsSavedVenues ? () => setState(() {}) : null,
+                          onTap: supportsSavedVenues
+                              ? () => setState(() {})
+                              : null,
                           decoration: const InputDecoration(labelText: "Venue"),
                           validator: (v) =>
                               v!.trim().isEmpty ? "Required" : null,
@@ -1277,11 +1354,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: visibleVenuePresets.map((preset) {
-                                final isLast =
-                                    identical(
-                                      preset,
-                                      visibleVenuePresets.last,
-                                    );
+                                final isLast = identical(
+                                  preset,
+                                  visibleVenuePresets.last,
+                                );
                                 return Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -1469,7 +1545,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
               // MARSHAL CALL DATE
               if (selectedEventType == "Race" ||
                   selectedEventType == "Cross Country" ||
-                  selectedEventType == "Handicap Series")
+                  _usesHandicapDetails)
                 _section(
                   "Marshal Call Date",
                   SizedBox(

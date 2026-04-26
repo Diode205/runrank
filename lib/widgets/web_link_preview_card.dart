@@ -21,7 +21,7 @@ class WebLinkPreviewCard extends StatefulWidget {
     if (text == null || text.trim().isEmpty) return null;
 
     final match = RegExp(
-      r'(https?:\/\/[^\s]+|www\.[^\s]+)',
+      r"""(https?:\/\/[^\s"'<>]+|www\.[^\s"'<>]+)""",
       caseSensitive: false,
     ).firstMatch(text);
     return match?.group(0);
@@ -30,15 +30,47 @@ class WebLinkPreviewCard extends StatefulWidget {
   static String removeFirstUrl(String? text) {
     if (text == null || text.trim().isEmpty) return '';
 
-    final withoutUrl = text.replaceFirst(
-      RegExp(r'(https?:\/\/[^\s]+|www\.[^\s]+)', caseSensitive: false),
+    final withoutEmbedHtml = _removeEmbedHtml(text);
+    final withoutUrl = withoutEmbedHtml.replaceFirst(
+      RegExp(
+        r"""(https?:\/\/[^\s"'<>]+|www\.[^\s"'<>]+)""",
+        caseSensitive: false,
+      ),
       '',
     );
 
     return withoutUrl
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
         .replaceAll(RegExp(r'[ \t]+\n'), '\n')
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
+  }
+
+  static String _removeEmbedHtml(String text) {
+    final iframeMatch = RegExp(
+      r'<\s*iframe\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (iframeMatch == null) return text;
+
+    final firstTag = text.indexOf('<');
+    final prefix = firstTag >= 0 ? text.substring(0, firstTag) : '';
+    final lineBreak = text.lastIndexOf('\n', iframeMatch.start);
+    final start = prefix.trim().isEmpty
+        ? firstTag
+        : lineBreak >= 0
+        ? lineBreak + 1
+        : firstTag;
+    final end = text.lastIndexOf('>');
+    if (start < 0 || end < start) return text;
+
+    return '${text.substring(0, start)} ${text.substring(end + 1)}';
   }
 }
 
@@ -226,8 +258,7 @@ class _WebLinkBrowserPageState extends State<_WebLinkBrowserPage> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const LinearProgressIndicator(minHeight: 2),
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
         ],
       ),
     );

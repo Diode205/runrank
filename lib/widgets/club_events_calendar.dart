@@ -433,6 +433,33 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                       final normalizedType = e.eventType
                           .toLowerCase()
                           .replaceAll(" ", "_");
+                      final omitCreatorSubtitle =
+                          normalizedType == 'paul_evans_session';
+                      String subtitleWithCreator(
+                        String venue,
+                        String creatorName,
+                      ) {
+                        final parts = <String>[];
+                        if (!omitCreatorSubtitle &&
+                            creatorName.trim().isNotEmpty) {
+                          parts.add('with ${creatorName.trim()}');
+                        }
+                        if (venue.trim().isNotEmpty) {
+                          parts.add(venue.trim());
+                        }
+                        return parts.join('\n');
+                      }
+
+                      final trainingTitleByType = <String, String>{
+                        'training': 'Training',
+                        'training_1': 'Training',
+                        'training_2': 'Training',
+                        'recovery_monday': 'Recovery Monday',
+                        'mousehold_monday': 'Mousehold Monday',
+                        'coached_tuesday': 'Coached Tuesday',
+                        'road_route_thursday': 'Road Route Thursday',
+                        'paul_evans_session': 'Paul Evans Session',
+                      };
                       if (normalizedType == 'relay') {
                         final rawTeam = e.relayTeam?.trim() ?? '';
                         final teamLower = rawTeam.toLowerCase();
@@ -471,33 +498,41 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                                 : '${e.venue} • Team: $teamLabel';
                           }
                         }
-                      } else if (normalizedType == 'training' ||
-                          normalizedType == 'training_1' ||
-                          normalizedType == 'training_2') {
-                        // For Training events, show "Training with {Host}" so
+                      } else if (trainingTitleByType.containsKey(
+                        normalizedType,
+                      )) {
+                        // For Training events, show "{Session} with {Host}" so
                         // members can immediately see who is leading the
                         // session on the calendar card.
                         final host = e.hostOrDirector.trim();
-                        if (host.isNotEmpty) {
-                          displayTitle = 'Training with $host';
-                        } else {
-                          displayTitle = 'Training';
-                        }
-                        subtitleText = e.venue;
+                        final baseTitle =
+                            trainingTitleByType[normalizedType] ?? 'Training';
+                        displayTitle = baseTitle;
+                        subtitleText = subtitleWithCreator(e.venue, host);
+                      } else if (normalizedType == 'one_mile_handicap') {
+                        final host = e.hostOrDirector.trim();
+                        displayTitle = 'One Mile Handicap';
+                        subtitleText = subtitleWithCreator(e.venue, host);
                       } else if (normalizedType == 'social_run' ||
                           normalizedType == 'parkrun_tourism') {
                         final host = e.hostOrDirector.trim();
                         final baseTitle = normalizedType == 'parkrun_tourism'
                             ? 'Parkrun Tourism'
                             : 'Social Run';
-                        if (host.isNotEmpty) {
-                          displayTitle = '$baseTitle with $host';
-                        } else {
-                          displayTitle = baseTitle;
-                        }
-                        subtitleText = e.venue;
+                        displayTitle = baseTitle;
+                        subtitleText = subtitleWithCreator(e.venue, host);
                       } else {
                         subtitleText = e.venue;
+                      }
+
+                      final eventCreatorName = e.hostOrDirector.trim();
+                      if (!omitCreatorSubtitle &&
+                          eventCreatorName.isNotEmpty &&
+                          !displayTitle.contains(eventCreatorName) &&
+                          !subtitleText.contains(eventCreatorName)) {
+                        subtitleText = subtitleText.trim().isEmpty
+                            ? 'with $eventCreatorName'
+                            : 'with $eventCreatorName\n$subtitleText';
                       }
 
                       final isNew = !_seenEventIds.contains(e.id);
@@ -735,11 +770,17 @@ class _EventCard extends StatelessWidget {
       case 'training':
       case 'training_1':
       case 'training_2':
+      case 'recovery_monday':
+      case 'mousehold_monday':
+      case 'coached_tuesday':
+      case 'road_route_thursday':
+      case 'paul_evans_session':
         return const Color(0x33FFF59D);
       case 'race':
       case 'cross_country':
         return const Color(0x3390CAF9);
       case 'handicap_series':
+      case 'one_mile_handicap':
         return const Color(0x33A5D6A7);
       case 'relay':
         return const Color(0x33FFCC80);
@@ -762,11 +803,17 @@ class _EventCard extends StatelessWidget {
       case 'training':
       case 'training_1':
       case 'training_2':
+      case 'recovery_monday':
+      case 'mousehold_monday':
+      case 'coached_tuesday':
+      case 'road_route_thursday':
+      case 'paul_evans_session':
         return '🏃';
       case 'race':
       case 'cross_country':
         return '🏁';
       case 'handicap_series':
+      case 'one_mile_handicap':
         return '🎯';
       case 'relay':
         return '🔗';

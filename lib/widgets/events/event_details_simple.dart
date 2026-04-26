@@ -440,7 +440,13 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     final clubName = viewerClubName ?? '';
     final isNRR = clubName.toLowerCase().contains('norwich road runners');
     final eventType = widget.event.eventType.toLowerCase();
-    final isTraining = eventType.startsWith('training');
+    final isTraining =
+        eventType.startsWith('training') ||
+        eventType == 'recovery_monday' ||
+        eventType == 'mousehold_monday' ||
+        eventType == 'coached_tuesday' ||
+        eventType == 'road_route_thursday' ||
+        eventType == 'paul_evans_session';
     final isSpecial = eventType == 'special_event';
     final isSocial =
         eventType == 'social_run' ||
@@ -469,7 +475,12 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
 
                 final eventType = widget.event.eventType.toLowerCase();
                 if ((eventType == "special_event" ||
-                        eventType.startsWith("training")) &&
+                        eventType.startsWith("training") ||
+                        eventType == 'recovery_monday' ||
+                        eventType == 'mousehold_monday' ||
+                        eventType == 'coached_tuesday' ||
+                        eventType == 'road_route_thursday' ||
+                        eventType == 'paul_evans_session') &&
                     rawType == "running") {
                   displayType = "Attending";
                 }

@@ -10,7 +10,7 @@ import 'package:runrank/widgets/events/event_venue_preview.dart';
 // import removed: admin_edit_event_page.dart (controls moved to calendar)
 
 /// Event details page for race events (Race, Handicap_Series)
-/// Group 2: Race and Handicap_Series with marshal call dates and predicted finish times
+/// Group 2: Race and Handicap-style events with marshal call dates and predicted times
 class RaceEventDetailsPage extends StatefulWidget {
   final ClubEvent event;
   final bool openHostChat;
@@ -462,8 +462,10 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     final marshalDate = widget.event.marshalCallDate;
     final canMarshal =
         marshalDate == null || DateTime.now().isAfter(marshalDate);
+    final normalizedEventType = widget.event.eventType.toLowerCase();
+    final isOneMileHandicap = normalizedEventType == "one_mile_handicap";
     final isHandicap =
-        widget.event.eventType.toLowerCase() == "handicap_series";
+        normalizedEventType == "handicap_series" || isOneMileHandicap;
 
     // For NRR races (including Broadland XC treated as race-style),
     // use white buttons for running and unavailable.
@@ -508,7 +510,9 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
             FilledButton(
               style: whiteButtonStyle,
               onPressed: isHandicap
-                  ? () => _showHandicapFinishTimeDialog()
+                  ? (isOneMileHandicap
+                        ? () => _showOneMileExpectedPaceDialog()
+                        : () => _showHandicapFinishTimeDialog())
                   : () => submitResponse(type: "run"),
               child: Text(
                 isHandicap ? "🏃🏽" : "🏃‍♀️",
@@ -529,11 +533,12 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
               child: const Text("🦺", style: TextStyle(fontSize: 24)),
             ),
             // Unavailable button
-            FilledButton(
-              style: whiteButtonStyle,
-              onPressed: () => submitResponse(type: "unavailable"),
-              child: const Text("❌", style: TextStyle(fontSize: 24)),
-            ),
+            if (!isOneMileHandicap)
+              FilledButton(
+                style: whiteButtonStyle,
+                onPressed: () => submitResponse(type: "unavailable"),
+                child: const Text("❌", style: TextStyle(fontSize: 24)),
+              ),
           ],
         ),
       ],
@@ -585,8 +590,10 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
   }
 
   List<Widget> _getParticipantLines() {
+    final normalizedEventType = widget.event.eventType.toLowerCase();
+    final isOneMileHandicap = normalizedEventType == "one_mile_handicap";
     final isHandicap =
-        widget.event.eventType.toLowerCase() == "handicap_series";
+        normalizedEventType == "handicap_series" || isOneMileHandicap;
     final isCrossCountry =
         widget.event.eventType.toLowerCase() == 'cross_country';
     final isCromerCrossCountry =
@@ -619,12 +626,13 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         volunteers,
         responseType: 'marshalling',
       ),
-      _buildParticipantLine(
-        "❌ Unavailable",
-        unavailable.length,
-        unavailable,
-        responseType: 'unavailable',
-      ),
+      if (!isOneMileHandicap)
+        _buildParticipantLine(
+          "❌ Unavailable",
+          unavailable.length,
+          unavailable,
+          responseType: 'unavailable',
+        ),
     ];
   }
 
@@ -656,6 +664,48 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         submitResponse(type: "run", predictedTimeSeconds: secs);
       }
     }
+  }
+
+  Future<void> _showOneMileExpectedPaceDialog() async {
+    final paceController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Expected mile pace"),
+        content: TextField(
+          controller: paceController,
+          keyboardType: TextInputType.datetime,
+          decoration: const InputDecoration(
+            labelText: "MM:SS",
+            hintText: "e.g. 07:30",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final paceSeconds = mmssToSeconds(paceController.text);
+    if (paceSeconds == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter pace between 02:00 and 20:00, e.g. 07:30.'),
+        ),
+      );
+      return;
+    }
+
+    submitResponse(type: "run", predictedTimeSeconds: paceSeconds);
   }
 
   Future<void> _contactHost() async {
@@ -711,6 +761,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
       }
     }
 
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -744,6 +795,15 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
       responseType: responseType,
     );
 
+    final isOneMileHandicap =
+        widget.event.eventType.toLowerCase() == 'one_mile_handicap';
+    final expectedTimeLabel = isOneMileHandicap
+        ? 'Expected pace'
+        : 'Predicted time';
+    String formatExpectedTime(int seconds) => isOneMileHandicap
+        ? '${secondsToMMSS(seconds)}/mile'
+        : secondsToHHMMSS(seconds);
+
     String buildExportText() {
       final buffer = StringBuffer();
       final e = widget.event;
@@ -759,7 +819,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         final expected = a['expectedTimeSeconds'] as int?;
         String detail = '';
         if (showExpectedTime && expected != null) {
-          detail = ' — Predicted time: ${secondsToHHMMSS(expected)}';
+          detail = ' — $expectedTimeLabel: ${formatExpectedTime(expected)}';
         }
         buffer.writeln("${i + 1}. $name$detail");
       }
@@ -793,7 +853,9 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                     return ListTile(
                       title: Text(name),
                       subtitle: showExpectedTime && expected != null
-                          ? Text('Predicted time: ${secondsToHHMMSS(expected)}')
+                          ? Text(
+                              '$expectedTimeLabel: ${formatExpectedTime(expected)}',
+                            )
                           : null,
                     );
                   },
