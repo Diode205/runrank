@@ -980,7 +980,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
 
       await supabase.from('club_posts').insert({
         'title': title,
-        'content': content,
+        'content': _removePostTitleHeader(title, content),
         'author_id': user.id,
         'author_name': authorName,
         'expiry_date': expiry.toIso8601String(),
@@ -1006,5 +1006,27 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
         ).showSnackBar(SnackBar(content: Text('Error publishing post: $e')));
       }
     }
+  }
+
+  String _removePostTitleHeader(String title, String content) {
+    final lines = content.split('\n');
+    final firstContentIndex = lines.indexWhere(
+      (line) => line.trim().isNotEmpty,
+    );
+    if (firstContentIndex < 0) return content;
+
+    String normalize(String value) =>
+        value.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    final titleText = normalize(title);
+    final firstLine = normalize(lines[firstContentIndex]);
+    if (!firstLine.startsWith(titleText)) return content;
+
+    lines.removeAt(firstContentIndex);
+    if (firstContentIndex < lines.length &&
+        lines[firstContentIndex].trim().isEmpty) {
+      lines.removeAt(firstContentIndex);
+    }
+    return lines.join('\n').trimLeft();
   }
 }
