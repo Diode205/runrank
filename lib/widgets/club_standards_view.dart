@@ -1777,20 +1777,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         ? await client
               .from('race_results')
               .select(
-                'user_id, race_name, distance, age_grade, level, raceDate',
+                'user_id, race_name, distance, age_grade, level, raceDate, gender',
               )
               .order('raceDate', ascending: false)
         : await client
               .from('race_results')
               .select(
-                'user_id, race_name, distance, age_grade, level, raceDate',
+                'user_id, race_name, distance, age_grade, level, raceDate, gender',
               )
               .inFilter('user_id', allowedUserIds.toList())
               .order('raceDate', ascending: false);
 
     if (rows.isEmpty) return null;
 
-    final Map<String, List<Map<String, dynamic>>> byDistance = {};
+    final Map<String, Map<String, List<Map<String, dynamic>>>> byDistance = {};
     final Set<String> userIds = {};
 
     for (final row in rows) {
@@ -1801,22 +1801,26 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
       if (ageGrade <= 0) continue;
 
-      byDistance.putIfAbsent(distance, () => <Map<String, dynamic>>[]);
-      byDistance[distance]!.add(row);
-
       final userId = row['user_id'] as String?;
       if (userId != null) {
         userIds.add(userId);
       }
+
+      final gender = _normalizeReportGender(row['gender'] as String?);
+      if (gender != null) {
+        byDistance
+            .putIfAbsent(distance, () => <String, List<Map<String, dynamic>>>{})
+            .putIfAbsent(gender, () => <Map<String, dynamic>>[])
+            .add(row);
+      }
     }
 
-    if (byDistance.isEmpty) return null;
-
     final Map<String, String> idToName = {};
+    final Map<String, String> idToGender = {};
     if (userIds.isNotEmpty) {
       final profiles = await client
           .from('user_profiles')
-          .select('id, full_name')
+          .select('id, full_name, gender')
           .inFilter('id', userIds.toList());
 
       for (final p in profiles) {
@@ -1826,63 +1830,99 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         if (name != null && name.isNotEmpty) {
           idToName[id] = name;
         }
+        final gender = _normalizeReportGender(p['gender'] as String?);
+        if (gender != null) {
+          idToGender[id] = gender;
+        }
       }
     }
+
+    for (final row in rows) {
+      final distance = (row['distance'] as String?) ?? '';
+      if (!_awardDistances.contains(distance)) continue;
+
+      final ageGradeRaw = row['age_grade'];
+      final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+      if (ageGrade <= 0) continue;
+
+      final rowGender = _normalizeReportGender(row['gender'] as String?);
+      if (rowGender != null) continue;
+
+      final userId = row['user_id'] as String?;
+      final profileGender = userId == null ? null : idToGender[userId];
+      if (profileGender == null) continue;
+
+      byDistance
+          .putIfAbsent(distance, () => <String, List<Map<String, dynamic>>>{})
+          .putIfAbsent(profileGender, () => <Map<String, dynamic>>[])
+          .add(row);
+    }
+
+    if (byDistance.isEmpty) return null;
 
     final buffer = StringBuffer();
     buffer.writeln('Latest Age-Grade Tops');
     buffer.writeln('');
 
     for (final distance in _awardDistances) {
-      final list = byDistance[distance];
-      if (list == null || list.isEmpty) continue;
+      final byGender = byDistance[distance];
+      if (byGender == null || byGender.isEmpty) continue;
 
-      list.sort((a, b) {
-        final agA = (a['age_grade'] is num)
-            ? (a['age_grade'] as num).toDouble()
-            : 0.0;
-        final agB = (b['age_grade'] is num)
-            ? (b['age_grade'] as num).toDouble()
-            : 0.0;
-        final dateA =
-            DateTime.tryParse(a['raceDate'] as String? ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB =
-            DateTime.tryParse(b['raceDate'] as String? ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+      buffer.writeln(distance);
 
-        final cmp = agB.compareTo(agA);
-        if (cmp != 0) return cmp;
-        return dateB.compareTo(dateA);
-      });
+      for (final gender in const ['M', 'F']) {
+        final list = byGender[gender];
+        if (list == null || list.isEmpty) continue;
 
-      final top = list.take(3).toList();
-      buffer.writeln('$distance — Top ${top.length}');
+        list.sort((a, b) {
+          final agA = (a['age_grade'] is num)
+              ? (a['age_grade'] as num).toDouble()
+              : 0.0;
+          final agB = (b['age_grade'] is num)
+              ? (b['age_grade'] as num).toDouble()
+              : 0.0;
+          final dateA =
+              DateTime.tryParse(a['raceDate'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final dateB =
+              DateTime.tryParse(b['raceDate'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
 
-      for (var i = 0; i < top.length; i++) {
-        final row = top[i];
-        final userId = row['user_id'] as String?;
-        final name = idToName[userId] ?? 'Unknown member';
-        final raceName = (row['race_name'] as String?)?.trim();
-        final level = (row['level'] as String?) ?? '';
-        final ageGradeRaw = row['age_grade'];
-        final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
-        final raceDateStr = row['raceDate'] as String?;
-        String dateLabel = '';
-        if (raceDateStr != null) {
-          final dt = DateTime.tryParse(raceDateStr);
-          if (dt != null) {
-            dateLabel =
-                '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year % 100}';
-          }
-        }
+          final cmp = agB.compareTo(agA);
+          if (cmp != 0) return cmp;
+          return dateB.compareTo(dateA);
+        });
 
+        final top = list.take(3).toList();
         buffer.writeln(
-          '${i + 1}) $name — ${raceName ?? 'Unknown race'} — '
-          '${ageGrade.toStringAsFixed(1)}%'
-          '${level.isNotEmpty ? ' ($level)' : ''}'
-          '${dateLabel.isNotEmpty ? ' — $dateLabel' : ''}',
+          '${_ageGradeTopsGenderLabel(gender)} — Top ${top.length}',
         );
+
+        for (var i = 0; i < top.length; i++) {
+          final row = top[i];
+          final userId = row['user_id'] as String?;
+          final name = idToName[userId] ?? 'Unknown member';
+          final raceName = (row['race_name'] as String?)?.trim();
+          final level = (row['level'] as String?) ?? '';
+          final ageGradeRaw = row['age_grade'];
+          final ageGrade = ageGradeRaw is num ? ageGradeRaw.toDouble() : 0.0;
+          final raceDateStr = row['raceDate'] as String?;
+          String dateLabel = '';
+          if (raceDateStr != null) {
+            final dt = DateTime.tryParse(raceDateStr);
+            if (dt != null) {
+              dateLabel =
+                  '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year % 100}';
+            }
+          }
+
+          buffer.writeln(
+            '${i + 1}) $name — ${raceName ?? 'Unknown race'} — '
+            '${ageGrade.toStringAsFixed(1)}%'
+            '${level.isNotEmpty ? ' ($level)' : ''}'
+            '${dateLabel.isNotEmpty ? ' — $dateLabel' : ''}',
+          );
+        }
       }
 
       buffer.writeln('');
@@ -1890,6 +1930,17 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
     final text = buffer.toString().trimRight();
     return text.isEmpty ? null : text;
+  }
+
+  String? _normalizeReportGender(String? rawGender) {
+    final gender = rawGender?.trim().toUpperCase();
+    if (gender == 'M' || gender == 'MALE' || gender == 'MEN') return 'M';
+    if (gender == 'F' || gender == 'FEMALE' || gender == 'WOMEN') return 'F';
+    return null;
+  }
+
+  String _ageGradeTopsGenderLabel(String gender) {
+    return gender == 'F' ? 'Women' : 'Men';
   }
 
   Future<String?> _buildWeeklyRunningReport() async {
