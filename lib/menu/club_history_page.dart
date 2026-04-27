@@ -130,7 +130,7 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
             automaticallyImplyLeading: false,
             floating: false,
             pinned: true,
-            expandedHeight: 490,
+            expandedHeight: 520,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.all(20),
@@ -166,7 +166,7 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _GlassyButton(
                             icon: Icons.groups_outlined,
@@ -181,7 +181,7 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _GlassyButton(
                             icon: Icons.timeline_outlined,
@@ -206,7 +206,7 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
           SliverToBoxAdapter(
             child: Container(
               color: Colors.black,
-              padding: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
               child: Text(
                 _headline,
                 textAlign: TextAlign.center,
@@ -219,7 +219,7 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 48),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 for (var i = 0; i < _sections.length; i++) ...[
@@ -227,9 +227,9 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                     title: _sections[i].title,
                     content: _sections[i].content,
                   ),
-                  if (i < _sections.length - 1) const SizedBox(height: 20),
+                  if (i < _sections.length - 1) const SizedBox(height: 24),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -244,12 +244,15 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(_footerIcon, color: _primaryColor, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        _footerText,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontStyle: FontStyle.italic,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _footerText,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontStyle: FontStyle.italic,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -408,7 +411,7 @@ class _GlassyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 88,
+      height: 100,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor, width: 1.5),
@@ -427,15 +430,15 @@ class _GlassyButton extends StatelessWidget {
                   onTap: onTap,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                      horizontal: 4,
+                      vertical: 8,
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(icon, color: iconColor, size: 22),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           label,
                           maxLines: 2,
@@ -444,7 +447,7 @@ class _GlassyButton extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                            fontSize: 11,
                             height: 1.1,
                           ),
                         ),

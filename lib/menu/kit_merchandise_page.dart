@@ -1067,89 +1067,77 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
               LayoutBuilder(
                 builder: (context, constraints) {
                   const double spacing = 6;
-                  const double minBadgeWidth = 46;
-                  const double maxBadgeWidth = 78;
-
-                  final maxWidth = constraints.maxWidth;
-                  final itemCount = visibleSizes.length;
-                  int targetColumns = itemCount.clamp(1, 8);
-
-                  while (targetColumns > 1) {
-                    final requiredWidth =
-                        targetColumns * minBadgeWidth +
-                        (targetColumns - 1) * spacing;
-                    if (requiredWidth <= maxWidth) {
-                      break;
-                    }
-                    targetColumns--;
-                  }
-
-                  final rawWidth =
-                      (maxWidth - (targetColumns - 1) * spacing) /
-                      targetColumns;
-                  final badgeWidth = rawWidth
-                      .clamp(minBadgeWidth, maxBadgeWidth)
-                      .toDouble();
-
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: visibleSizes.map((size) {
+                  return Row(
+                    children: visibleSizes.asMap().entries.expand((entry) {
+                      final index = entry.key;
+                      final size = entry.value;
                       final qty = product.stock[size] ?? 0;
                       final inStock = qty > 0;
-                      return Container(
-                        width: badgeWidth,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: inStock
-                              ? (_isNrrClub
-                                    ? const Color(
-                                        0xFFD32F2F,
-                                      ).withValues(alpha: 0.18)
-                                    : const Color(
-                                        0xFF0055FF,
-                                      ).withValues(alpha: 0.2))
-                              : Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: inStock
-                                ? (_isNrrClub
-                                      ? const Color(
-                                          0xFFD32F2F,
-                                        ).withValues(alpha: 0.45)
-                                      : const Color(
-                                          0xFF0055FF,
-                                        ).withValues(alpha: 0.5))
-                                : Colors.red.withValues(alpha: 0.3),
+                      return [
+                        if (index > 0) const SizedBox(width: spacing),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: inStock
+                                  ? (_isNrrClub
+                                        ? const Color(
+                                            0xFFD32F2F,
+                                          ).withValues(alpha: 0.18)
+                                        : const Color(
+                                            0xFF0055FF,
+                                          ).withValues(alpha: 0.2))
+                                  : Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: inStock
+                                    ? (_isNrrClub
+                                          ? const Color(
+                                              0xFFD32F2F,
+                                            ).withValues(alpha: 0.45)
+                                          : const Color(
+                                              0xFF0055FF,
+                                            ).withValues(alpha: 0.5))
+                                    : Colors.red.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    size,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: inStock
+                                          ? Colors.white
+                                          : Colors.white38,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$qty',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: inStock
+                                        ? Colors.white
+                                        : Colors.redAccent,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            Text(
-                              size,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: inStock ? Colors.white : Colors.white38,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$qty',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: inStock
-                                    ? Colors.white
-                                    : Colors.redAccent,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
+                      ];
                     }).toList(),
                   );
                 },

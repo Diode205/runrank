@@ -501,7 +501,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                 style: TextStyle(color: Colors.white),
               ),
               subtitle: const Text(
-                'Contact diodefernan@gmail.com for help or feedback',
+                'Contact Developer Dios Fernandez',
                 style: TextStyle(color: Colors.white70),
               ),
               onTap: () => _launchEmail(
