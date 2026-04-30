@@ -113,6 +113,7 @@ class PaymentService {
 
     if (clubConfig.publishableKey.isEmpty) {
       debugPrint('Stripe publishable key missing. Skipping Stripe init.');
+      return;
     } else {
       Stripe.publishableKey = clubConfig.publishableKey;
       _activePublishableKey = clubConfig.publishableKey;

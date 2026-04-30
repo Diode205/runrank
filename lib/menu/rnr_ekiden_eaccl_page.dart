@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/widgets/admin_create_event_page.dart';
+import 'package:runrank/widgets/web_link_preview_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,22 +20,10 @@ Color _clubPrimaryColor(String? clubName) {
       : const Color(0xFFF5C542);
 }
 
-Color _clubSecondaryColor(String? clubName) {
-  final lower = (clubName ?? '').trim().toLowerCase();
-  if (lower.isEmpty) return Colors.white70;
-  return _isNrrClubName(clubName) ? Colors.white : const Color(0xFF0057B7);
-}
-
 Color _clubPrimaryForegroundColor(String? clubName) {
   final lower = (clubName ?? '').trim().toLowerCase();
   if (lower.isEmpty) return Colors.white;
   return _isNrrClubName(clubName) ? Colors.white : Colors.black;
-}
-
-Color _clubGradientForegroundColor(String? clubName) {
-  final lower = (clubName ?? '').trim().toLowerCase();
-  if (lower.isEmpty) return Colors.white;
-  return _isNrrClubName(clubName) ? Colors.black : Colors.white;
 }
 
 class RnrEkidenEacclPage extends StatelessWidget {
@@ -58,6 +47,32 @@ class RnrEkidenEacclPage extends StatelessWidget {
   }
 }
 
+double _siteCardHeightForActions(
+  BuildContext context, {
+  double extraReservedHeight = 0,
+  double minHeight = 320,
+}) {
+  final media = MediaQuery.of(context);
+  final availableHeight =
+      media.size.height -
+      kToolbarHeight -
+      media.padding.top -
+      media.padding.bottom -
+      16 -
+      12 -
+      48 -
+      24 -
+      extraReservedHeight;
+
+  return availableHeight.clamp(minHeight, double.infinity).toDouble();
+}
+
+double _eacclRaceListHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  final height = media.size.height * 0.16;
+  return height.clamp(96, 140).toDouble();
+}
+
 // Header removed per request
 
 // (Replaced by the new _EkidenPage layout)
@@ -72,17 +87,11 @@ class _RnrPage extends StatefulWidget {
 }
 
 class _RnrPageState extends State<_RnrPage> {
-  bool _expanded = false;
   bool _isAdmin = false;
   String? _clubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
-  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
-  List<Color> get _heroButtonGradient => [
-    _accentColor.withOpacity(0.35),
-    _clubSecondaryColor(_clubName).withOpacity(0.35),
-  ];
   final List<_StageInfo> _stages = const [
     _StageInfo(
       label: "S1: King's Lynn — PE30 2NB",
@@ -129,12 +138,6 @@ class _RnrPageState extends State<_RnrPage> {
       query: 'Stowbridge PE34 3PW',
     ),
   ];
-
-  static const String _visiblePara =
-      'The course of the Round Norfolk Relay mirrors the county boundary over a distance of 198 miles, divided into 17 unequal stages. Norfolk\'s enormous skies, vast sandy beaches, open spaces and picturesque towns and villages, with their attractive cottages and medieval churches, all contribute to making the race a unique running experience. But it is likely to be the spectacular skies at sunset and sunrise which will provide the most vivid memories.';
-
-  static const String _morePara =
-      'The race starts at Lynnsport in Kings Lynn and then, from Hunstanton, follows the stunning coastline through 5 multi terrain stages taking the Norfolk Coastal path as far as Cromer. The 40 miles (4 stages) from Cromer through to Horsey Mill and on to Belton are on the road. By the time the teams reach Belton it is dark.\n\nFrom Belton, the course turns south-west following main roads for 62 miles (4 stages), all run in darkness. It is during these mostly flat stages through Breckland that the time stagger unwinds and the race is invariably won or lost. From Feltwell (Stage 14) the four remaining stages covering the last 33 miles are run across the flat Fens through the early morning mist. Finally, following the Great Ouse River into historic King\'s Lynn runners pass by the old Custom house, through the famous Tuesday Market Place and then on to the Finish at Lynnsport.\n\nUnique in character and concept, the race presents not only a tough physical challenge, but also a test of the organisational prowess of a club. Run over 24 hours, without a break (and carrying a baton), the event is much more than just a normal relay for it requires special preparation, planning and support. It is not an event for a club without a spirit of adventure. But the sense of satisfaction and achievement after completing the race is simply \"Second to None\".\n\nA staggered start, based on anticipated finishing times, ensures that teams of similar ability start together, with faster teams chasing. If the stagger works, all teams should finish the race by 9:15am to 10:00am on the Sunday. With the first teams starting at 5:30 am on Saturday this allows for teams running an average of 8mins 40secs per mile throughout the course.';
 
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
@@ -284,207 +287,178 @@ class _RnrPageState extends State<_RnrPage> {
 
   @override
   Widget build(BuildContext context) {
-    const double heroHeight = 240;
-    return Stack(
-      children: [
-        // Background: opaque main photo
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(0),
-            child: Image.asset(
-              'assets/images/rnr.png',
-              height: heroHeight,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+    final siteCardHeight = _siteCardHeightForActions(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _OfficialSiteCard(
+            title: 'Round Norfolk Relay',
+            url: 'https://theroundnorfolkrelay.com/',
+            accentColor: _accentColor,
+            height: siteCardHeight,
+            showAddButton: _isAdmin,
+            onAddEvent: _createEvent,
           ),
-        ),
-        // Foreground: scrollable content overlaying the hero
-        Positioned.fill(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, heroHeight - 60, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Main content card with border and padding
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      _openLink('https://rnr.totalracetiming.co.uk/result'),
+                  icon: const Icon(Icons.list_alt, size: 18),
+                  label: const Text('Results'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    foregroundColor: _accentForegroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    border: Border.all(color: _accentColor, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Centered second image, overlapping the hero
-                      Center(
-                        child: Image.asset(
-                          'assets/images/RNR26.png',
-                          height: 90,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _visiblePara,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      // Row: Create Event (left) and Read more (right)
-                      Row(
-                        children: [
-                          if (_isAdmin)
-                            IconButton(
-                              tooltip: 'Create event',
-                              onPressed: _createEvent,
-                              icon: Icon(
-                                Icons.add_circle_outline,
-                                color: _accentColor,
-                              ),
-                            )
-                          else
-                            const SizedBox(width: 48),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => _expanded = !_expanded),
-                            child: Text(
-                              _expanded ? 'Show less' : 'Read more…',
-                              style: TextStyle(color: _accentColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_expanded) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _morePara,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      // Visit site button with NRR red/white blended gradient
-                      SizedBox(
-                        width: double.infinity,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _heroButtonGradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ElevatedButton.icon(
-                            onPressed: () =>
-                                _openLink('https://theroundnorfolkrelay.com/'),
-                            icon: const Icon(Icons.open_in_new, size: 18),
-                            label: const Text(
-                              'Visit The RNR Site',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: _heroButtonTextColor,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Bottom action buttons: Results and Drive (+ stages dropdown)
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openLink(
-                          'https://rnr.totalracetiming.co.uk/result',
-                        ),
-                        icon: const Icon(Icons.list_alt, size: 18),
-                        label: const Text('Results'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accentColor,
-                          foregroundColor: _accentForegroundColor,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PopupMenuButton<int>(
+                  tooltip: 'Drive to stage',
+                  itemBuilder: (context) => [
+                    for (int i = 0; i < _stages.length; i++)
+                      PopupMenuItem<int>(
+                        value: i,
+                        child: Text(_stages[i].label),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: PopupMenuButton<int>(
-                        tooltip: 'Drive to stage',
-                        itemBuilder: (context) => [
-                          for (int i = 0; i < _stages.length; i++)
-                            PopupMenuItem<int>(
-                              value: i,
-                              child: Text(_stages[i].label),
-                            ),
-                        ],
-                        onSelected: (index) {
-                          final s = _stages[index];
-                          _openMaps(s.query);
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.directions,
-                                size: 18,
-                                color: Colors.black,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Drive To',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(Icons.arrow_drop_down, color: Colors.black),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
+                  onSelected: (index) {
+                    final s = _stages[index];
+                    _openMaps(s.query);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.directions, size: 18, color: Colors.black),
+                        SizedBox(width: 8),
+                        Text(
+                          'Drive To',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_drop_down, color: Colors.black),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfficialSiteCard extends StatelessWidget {
+  const _OfficialSiteCard({
+    required this.title,
+    required this.url,
+    required this.accentColor,
+    required this.height,
+    this.showAddButton = false,
+    this.onAddEvent,
+  });
+
+  final String title;
+  final String url;
+  final Color accentColor;
+  final double height;
+  final bool showAddButton;
+  final VoidCallback? onAddEvent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accentColor, width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: Stack(
+          children: [
+            WebLinkPreviewCard(
+              url: url,
+              buttonLabel: 'Visit Site',
+              height: height,
+            ),
+            Positioned(
+              left: 12,
+              top: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.68),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            if (showAddButton && onAddEvent != null)
+              Positioned(
+                left: 12,
+                bottom: 12,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: onAddEvent,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black54,
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.add,
+                        color: accentColor.computeLuminance() > 0.5
+                            ? Colors.black
+                            : Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -513,17 +487,11 @@ class _EkidenPage extends StatefulWidget {
 }
 
 class _EkidenPageState extends State<_EkidenPage> {
-  bool _expanded = false;
   bool _isAdmin = false;
   String? _clubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
-  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
-  List<Color> get _heroButtonGradient => [
-    _accentColor.withOpacity(0.35),
-    _clubSecondaryColor(_clubName).withOpacity(0.35),
-  ];
 
   @override
   void initState() {
@@ -666,222 +634,79 @@ class _EkidenPageState extends State<_EkidenPage> {
     );
   }
 
-  static const String _visiblePara =
-      'Ipswich JAFFA have been staging the only Ekiden held in the UK since 1992, and it is now a well established fixture in the local racing calendar. It attracts runners from all over East Anglia, with the 2017 event having a record entry of 200 teams. There is a Junior Ekiden for those aged under 16.\n\nThe 26.2 mile race will be run by teams of six as a relay. Legs: 1 x 7.2km, 3 x 5km and 2 x 10km\n\nClub teams and social and business teams are all welcome.';
-
-  static const String _morePara =
-      'The Junior race will start at 09:30. Teams will be expected to complete the race within 45 minutes. Junior race limit – 70 teams – no limit on entries per club\n\nThe Senior race will take place after the Junior race has finished at 10.20 with an expected race limit of 250 teams. This should mean that we can accept all entries.';
-
   @override
   Widget build(BuildContext context) {
-    const double heroHeight = 220;
-    return Stack(
-      children: [
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: Stack(
+    final siteCardHeight = _siteCardHeightForActions(
+      context,
+      extraReservedHeight: 52,
+    );
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _OfficialSiteCard(
+            title: 'Ipswich Ekiden',
+            url: 'https://www.ipswichekiden.co.uk/',
+            accentColor: _accentColor,
+            height: siteCardHeight,
+            showAddButton: _isAdmin,
+            onAddEvent: _createEvent,
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextButton.icon(
+              onPressed: () => _openLink('https://portal.ipswichekiden.co.uk/'),
+              icon: Icon(Icons.group_add, color: _accentColor),
+              label: Text(
+                'Register your team',
+                style: TextStyle(color: _accentColor),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(0),
-                child: Image.asset(
-                  'assets/images/ekidenpic.png',
-                  height: heroHeight,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  color: Colors.black.withOpacity(0.25),
-                  colorBlendMode: BlendMode.darken,
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _openLink(
+                    'https://onedrive.live.com/:x:/g/personal/56EC7C0093D7DC62/ETMLmCH7WGxNopw0rw_OZeQBnNhrEjr7s9hko8_u5tzu6A?resid=56EC7C0093D7DC62!s21980b3358fb4d6ca29c34af0fce65e4&ithint=file%2Cxlsx&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy81NmVjN2MwMDkzZDdkYzYyL0VUTUxtQ0g3V0d4Tm9wdzByd19PWmVRQm5OaHJFanI3czloa284X3U1dHp1NkE',
+                  ),
+                  icon: const Icon(Icons.list_alt, size: 18),
+                  label: const Text('Results'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    foregroundColor: _accentForegroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
-              Positioned(
-                left: 16,
-                bottom: 56,
-                child: Text(
-                  'Ipswich JAFFA Ekiden Relay',
-                  style: TextStyle(
-                    color: _accentColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(0, 1.5),
-                        blurRadius: 3,
-                        color: Colors.black87,
-                      ),
-                    ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _openMaps(
+                    'Ipswich High School, Woolverstone, Ipswich IP9 1AZ',
+                  ),
+                  icon: const Icon(Icons.directions, size: 18),
+                  label: const Text('Drive To'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-        Positioned.fill(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, heroHeight - 40, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(color: _accentColor, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _visiblePara,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          if (_isAdmin)
-                            IconButton(
-                              tooltip: 'Create event',
-                              onPressed: _createEvent,
-                              icon: Icon(
-                                Icons.add_circle_outline,
-                                color: _accentColor,
-                              ),
-                            )
-                          else
-                            const SizedBox(width: 48),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => _expanded = !_expanded),
-                            child: Text(
-                              _expanded ? 'Show less' : 'Read more…',
-                              style: TextStyle(color: _accentColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_expanded) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _morePara,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _heroButtonGradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ElevatedButton.icon(
-                            onPressed: () =>
-                                _openLink('https://www.ipswichekiden.co.uk/'),
-                            icon: const Icon(Icons.open_in_new, size: 18),
-                            label: const Text(
-                              'Visit Ipswich JAFFA Ekiden Relay',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: _heroButtonTextColor,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    children: [
-                      const Text(
-                        "If you'd like to participate in the relay once Calendar Event is created, follow the link to register your team.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70, height: 1.4),
-                      ),
-                      const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: () =>
-                            _openLink('https://portal.ipswichekiden.co.uk/'),
-                        icon: Icon(Icons.group_add, color: _accentColor),
-                        label: Text(
-                          'Register your team',
-                          style: TextStyle(color: _accentColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openLink(
-                          'https://onedrive.live.com/:x:/g/personal/56EC7C0093D7DC62/ETMLmCH7WGxNopw0rw_OZeQBnNhrEjr7s9hko8_u5tzu6A?resid=56EC7C0093D7DC62!s21980b3358fb4d6ca29c34af0fce65e4&ithint=file%2Cxlsx&migratedtospo=true&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy81NmVjN2MwMDkzZDdkYzYyL0VUTUxtQ0g3V0d4Tm9wdzByd19PWmVRQm5OaHJFanI3czloa284X3U1dHp1NkE',
-                        ),
-                        icon: const Icon(Icons.list_alt, size: 18),
-                        label: const Text('Results'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accentColor,
-                          foregroundColor: _accentForegroundColor,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openMaps(
-                          'Ipswich High School, Woolverstone, Ipswich IP9 1AZ',
-                        ),
-                        icon: const Icon(Icons.directions, size: 18),
-                        label: const Text('Drive To'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -893,17 +718,11 @@ class _EacclPage extends StatefulWidget {
 }
 
 class _EacclPageState extends State<_EacclPage> {
-  bool _expanded = false;
   bool _isAdmin = false;
   String? _clubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
-  Color get _heroButtonTextColor => _clubGradientForegroundColor(_clubName);
-  List<Color> get _heroButtonGradient => [
-    _accentColor.withOpacity(0.35),
-    _clubSecondaryColor(_clubName).withOpacity(0.35),
-  ];
 
   @override
   void initState() {
@@ -1193,7 +1012,7 @@ class _EacclPageState extends State<_EacclPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'eaccl_${race.id}_meta',
-        '${dateLabel}|${venue}|${race.postcode}',
+        '$dateLabel|$venue|${race.postcode}',
       );
     }
   }
@@ -1288,12 +1107,6 @@ class _EacclPageState extends State<_EacclPage> {
     }
   }
 
-  static const String _visiblePara =
-      'The East Anglian Cross Country League (EACCL) is a cross country league run through the winter months at various locations through Norfolk and Suffolk. Originating as a forces league with events at various Army and RAF bases. This has now expanded to include local domestic running clubs and groups. It has been running since the early 1960’s. It was initially set up on a Wednesday as this was when the forces were encouraged to do sporting activities, a lot of colleges also adopted this practice.\nThe series is open as team or as individual.';
-
-  static const String _morePara =
-      'The series consists of around ten races per season. This can vary per season depending on availability of clubs, venues and weather. Two races per season can be dropped individually to be eligible to participate in the awards for the season or as a team they have to have participation in all races.\n\nCosts are per season, as a team or individual. See the forms page for more details. All payments are required prior to participation in any event\n\nMen’s races are generally 10k and the ladies are approx 5k, these distances do vary according to location and access. We endeavour to do our best to adhere to this but some sites are working areas and we have to work within authorisations and local restrictions. All races start at 2:30pm unless stated.  The league also raises money for several local charities and projects through the hosting clubs charging for car parking and providing refreshments where possible, as all the venues are kindly used with no charge.';
-
   final List<_EacclRace> _races = [
     _EacclRace(
       id: 'eaccl_r1',
@@ -1369,271 +1182,156 @@ class _EacclPageState extends State<_EacclPage> {
 
   @override
   Widget build(BuildContext context) {
-    const double heroHeight = 220;
-    return Stack(
-      children: [
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(0),
-                child: Image.asset(
-                  'assets/images/eaccl.jpg',
-                  height: heroHeight,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  color: Colors.black.withOpacity(0.25),
-                  colorBlendMode: BlendMode.darken,
+    final siteCardHeight = _siteCardHeightForActions(
+      context,
+      extraReservedHeight: 120,
+      minHeight: 260,
+    );
+    final raceListHeight = _eacclRaceListHeight(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _OfficialSiteCard(
+            title: 'East Anglian Cross Country League',
+            url: 'https://eaccl.org.uk/',
+            accentColor: _accentColor,
+            height: siteCardHeight,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: const Color(0x0FFFFFFF),
+              border: Border.all(color: _accentColor, width: 1),
+            ),
+            child: SizedBox(
+              height: raceListHeight,
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: _races.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(color: Colors.white12),
+                  itemBuilder: (context, index) {
+                    final r = _races[index];
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (_isAdmin)
+                          IconButton(
+                            tooltip: 'Add event',
+                            onPressed: () => _createEventFor(
+                              r.venue,
+                              r.postcode,
+                              r.date,
+                              r.no,
+                            ),
+                            icon: Icon(
+                              Icons.add_circle_outline,
+                              color: _accentColor,
+                            ),
+                          ),
+                        if (_isAdmin) const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Race ${r.no}: ${r.venue}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${r.postcode}  —  ${r.date}',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_isAdmin)
+                          IconButton(
+                            tooltip: 'Edit race details',
+                            onPressed: () => _editRace(r),
+                            icon: Icon(Icons.edit, color: _accentColor),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              Positioned(
-                left: 16,
-                bottom: 56,
-                child: Text(
-                  'East Anglian Cross Country League',
-                  style: TextStyle(
-                    color: _accentColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(0, 1.5),
-                        blurRadius: 3,
-                        color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      _openLink('https://eaccl.org.uk/winter-results/'),
+                  icon: const Icon(Icons.list_alt, size: 18),
+                  label: const Text('Results'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    foregroundColor: _accentForegroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PopupMenuButton<int>(
+                  tooltip: 'Drive to venue',
+                  itemBuilder: (context) => [
+                    for (final r in _races)
+                      PopupMenuItem<int>(
+                        value: r.no,
+                        child: Text('R${r.no}: ${r.venue} — ${r.postcode}'),
                       ),
-                    ],
+                  ],
+                  onSelected: (no) {
+                    final r = _races.firstWhere((e) => e.no == no);
+                    _openMaps('${r.venue} ${r.postcode}');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.directions, size: 18, color: Colors.black),
+                        SizedBox(width: 8),
+                        Text(
+                          'Drive To',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_drop_down, color: Colors.black),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-        Positioned.fill(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, heroHeight - 40, 16, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF141A24), Color(0xFF0D0F18)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(color: _accentColor, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _visiblePara,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => _expanded = !_expanded),
-                            child: Text(
-                              _expanded ? 'Show less' : 'Read more…',
-                              style: TextStyle(color: _accentColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_expanded) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _morePara,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _heroButtonGradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openLink('https://eaccl.org.uk/'),
-                            icon: const Icon(Icons.open_in_new, size: 18),
-                            label: const Text(
-                              'Visit EACCL Website',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: _heroButtonTextColor,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Race list
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: const Color(0x0FFFFFFF),
-                    border: Border.all(color: _accentColor, width: 1),
-                  ),
-                  child: Column(
-                    children: [
-                      for (final r in _races) ...[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            if (_isAdmin)
-                              IconButton(
-                                tooltip: 'Add event',
-                                onPressed: () => _createEventFor(
-                                  r.venue,
-                                  r.postcode,
-                                  r.date,
-                                  r.no,
-                                ),
-                                icon: Icon(
-                                  Icons.add_circle_outline,
-                                  color: _accentColor,
-                                ),
-                              ),
-                            if (_isAdmin) const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Race ${r.no}: ${r.venue}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${r.postcode}  —  ${r.date}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_isAdmin)
-                              IconButton(
-                                tooltip: 'Edit race details',
-                                onPressed: () => _editRace(r),
-                                icon: Icon(Icons.edit, color: _accentColor),
-                              ),
-                          ],
-                        ),
-                        const Divider(color: Colors.white12),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Bottom actions: Results + Drive To
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () =>
-                            _openLink('https://eaccl.org.uk/winter-results/'),
-                        icon: const Icon(Icons.list_alt, size: 18),
-                        label: const Text('Results'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accentColor,
-                          foregroundColor: _accentForegroundColor,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: PopupMenuButton<int>(
-                        tooltip: 'Drive to venue',
-                        itemBuilder: (context) => [
-                          for (final r in _races)
-                            PopupMenuItem<int>(
-                              value: r.no,
-                              child: Text(
-                                'R${r.no}: ${r.venue} — ${r.postcode}',
-                              ),
-                            ),
-                        ],
-                        onSelected: (no) {
-                          final r = _races.firstWhere((e) => e.no == no);
-                          _openMaps('${r.venue} ${r.postcode}');
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.directions,
-                                size: 18,
-                                color: Colors.black,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Drive To',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(Icons.arrow_drop_down, color: Colors.black),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

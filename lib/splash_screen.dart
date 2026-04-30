@@ -33,8 +33,13 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
-    setState(() => _version = "v${info.version}");
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _version = "v${info.version}");
+    } catch (e) {
+      debugPrint('Unable to load package version: $e');
+    }
   }
 
   void _startAnimations() {

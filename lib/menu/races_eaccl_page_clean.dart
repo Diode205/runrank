@@ -1561,7 +1561,11 @@ class _RaceCard extends StatelessWidget {
               if (hasSeriesDates)
                 Column(
                   children: [
-                    for (var index = 0; index < info.seriesDates.length; index++)
+                    for (
+                      var index = 0;
+                      index < info.seriesDates.length;
+                      index++
+                    )
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -1653,33 +1657,38 @@ class _RaceCard extends StatelessWidget {
                   ],
                 ),
               const SizedBox(height: 6),
-              // Photo placed below date, slightly zoomed and smaller
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 150,
-                  width: double.infinity,
-                  child: Stack(
-                    children: [
-                      Transform.scale(
-                        scale: 1.1,
-                        child: Image.asset(
-                          _imageForRace(info.keyId),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.transparent, Colors.black54],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final photoHeight = _photoHeightForWidth(
+                    constraints.maxWidth,
+                  );
+
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      height: photoHeight,
+                      width: double.infinity,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.asset(
+                            _imageForRace(info.keyId),
+                            fit: BoxFit.cover,
                           ),
-                        ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.transparent, Colors.black54],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               // Race Info box (Venue, Registration, Start)
@@ -1695,7 +1704,10 @@ class _RaceCard extends StatelessWidget {
                   children: [
                     _InfoRow(icon: Icons.place, text: info.location),
                     const SizedBox(height: 6),
-                    _InfoRow(icon: Icons.assignment_ind, text: info.registration),
+                    _InfoRow(
+                      icon: Icons.assignment_ind,
+                      text: info.registration,
+                    ),
                     const SizedBox(height: 6),
                     _InfoRow(icon: Icons.flag_circle, text: info.raceStart),
                   ],
@@ -1719,7 +1731,11 @@ class _RaceCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.emoji_events, color: specialNoteColor, size: 18),
+                      Icon(
+                        Icons.emoji_events,
+                        color: specialNoteColor,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1818,6 +1834,10 @@ class _RaceCard extends StatelessWidget {
       default:
         return 'assets/images/eaccl.jpg';
     }
+  }
+
+  double _photoHeightForWidth(double width) {
+    return (width * 0.38).clamp(190.0, 420.0).toDouble();
   }
 }
 

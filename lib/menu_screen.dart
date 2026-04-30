@@ -128,6 +128,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     DateTime? selectedMemberSince = _memberSince;
     String? selectedEmergencyRelation = _emergencyContactRelation;
     var shareEmergencyDetails = _emergencyDetailsConsent;
+    var saving = false;
 
     await showModalBottomSheet(
       context: context,
@@ -228,7 +229,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: selectedMembershipType,
+                        initialValue: selectedMembershipType,
                         items: const [
                           DropdownMenuItem(
                             value: '1st Claim',
@@ -305,7 +306,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedEmergencyRelation,
+                        initialValue: selectedEmergencyRelation,
                         items: _emergencyRelations
                             .map(
                               (relation) => DropdownMenuItem<String>(
@@ -358,132 +359,158 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          onPressed: () async {
-                            final user = _supabase.auth.currentUser;
-                            if (user == null) return;
-                            final newName = nameController.text.trim();
-                            final newEmail = emailController.text.trim();
-                            final newEmergencyName = emergencyNameController
-                                .text
-                                .trim();
-                            final newEmergencyNumber = emergencyNumberController
-                                .text
-                                .trim();
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  final user = _supabase.auth.currentUser;
+                                  if (user == null) return;
+                                  final newName = nameController.text.trim();
+                                  final newEmail = emailController.text.trim();
+                                  final newEmergencyName =
+                                      emergencyNameController.text.trim();
+                                  final newEmergencyNumber =
+                                      emergencyNumberController.text.trim();
 
-                            final hasAnyEmergencyInput =
-                                newEmergencyName.isNotEmpty ||
-                                newEmergencyNumber.isNotEmpty ||
-                                selectedEmergencyRelation != null ||
-                                shareEmergencyDetails;
+                                  final hasAnyEmergencyInput =
+                                      newEmergencyName.isNotEmpty ||
+                                      newEmergencyNumber.isNotEmpty ||
+                                      selectedEmergencyRelation != null ||
+                                      shareEmergencyDetails;
 
-                            if (hasAnyEmergencyInput &&
-                                (newEmergencyName.isEmpty ||
-                                    newEmergencyNumber.isEmpty ||
-                                    selectedEmergencyRelation == null)) {
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please complete the emergency contact name, number and relationship',
+                                  if (hasAnyEmergencyInput &&
+                                      (newEmergencyName.isEmpty ||
+                                          newEmergencyNumber.isEmpty ||
+                                          selectedEmergencyRelation == null)) {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please complete the emergency contact name, number and relationship',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  try {
+                                    setModalState(() => saving = true);
+
+                                    final updateData = <String, dynamic>{
+                                      'full_name': newName.isEmpty
+                                          ? null
+                                          : newName,
+                                      'email': newEmail.isEmpty
+                                          ? null
+                                          : newEmail,
+                                      'membership_type': selectedMembershipType,
+                                      'emergency_contact_name':
+                                          newEmergencyName.isEmpty
+                                          ? null
+                                          : newEmergencyName,
+                                      'emergency_contact_number':
+                                          newEmergencyNumber.isEmpty
+                                          ? null
+                                          : newEmergencyNumber,
+                                      'emergency_contact_relation':
+                                          selectedEmergencyRelation,
+                                      'emergency_details_consent':
+                                          shareEmergencyDetails,
+                                    };
+                                    if (selectedMemberSince != null) {
+                                      updateData['member_since'] =
+                                          selectedMemberSince!
+                                              .toIso8601String();
+                                    }
+
+                                    await _supabase
+                                        .from('user_profiles')
+                                        .update(updateData)
+                                        .eq('id', user.id);
+
+                                    if (newName.isNotEmpty) {
+                                      await _syncProfileNameReferences(
+                                        userId: user.id,
+                                        newName: newName,
+                                      );
+                                    }
+
+                                    if (!mounted || !sheetContext.mounted) {
+                                      return;
+                                    }
+                                    if (Navigator.canPop(sheetContext)) {
+                                      Navigator.pop(sheetContext);
+                                    }
+
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _fullName = newName.isEmpty
+                                          ? null
+                                          : newName;
+                                      _email = newEmail.isEmpty
+                                          ? null
+                                          : newEmail;
+                                      _membershipType = selectedMembershipType;
+                                      _memberSince = selectedMemberSince;
+                                      _emergencyContactName =
+                                          newEmergencyName.isEmpty
+                                          ? null
+                                          : newEmergencyName;
+                                      _emergencyContactNumber =
+                                          newEmergencyNumber.isEmpty
+                                          ? null
+                                          : newEmergencyNumber;
+                                      _emergencyContactRelation =
+                                          selectedEmergencyRelation;
+                                      _emergencyDetailsConsent =
+                                          shareEmergencyDetails;
+                                    });
+
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: _clubPrimaryColor,
+                                        content: Text(
+                                          'Profile updated',
+                                          style: TextStyle(
+                                            color: _isNrrClub
+                                                ? Colors.white
+                                                : Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    setModalState(() => saving = false);
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: Colors.redAccent,
+                                        content: Text(
+                                          'Update failed\n$e',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: saving
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: _isNrrClub
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                )
+                              : const Text(
+                                  'Save',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
                                   ),
                                 ),
-                              );
-                              return;
-                            }
-
-                            try {
-                              final updateData = <String, dynamic>{
-                                'full_name': newName.isEmpty ? null : newName,
-                                'email': newEmail.isEmpty ? null : newEmail,
-                                'membership_type': selectedMembershipType,
-                                'emergency_contact_name':
-                                    newEmergencyName.isEmpty
-                                    ? null
-                                    : newEmergencyName,
-                                'emergency_contact_number':
-                                    newEmergencyNumber.isEmpty
-                                    ? null
-                                    : newEmergencyNumber,
-                                'emergency_contact_relation':
-                                    selectedEmergencyRelation,
-                                'emergency_details_consent':
-                                    shareEmergencyDetails,
-                              };
-                              if (selectedMemberSince != null) {
-                                updateData['member_since'] =
-                                    selectedMemberSince!.toIso8601String();
-                              }
-
-                              await _supabase
-                                  .from('user_profiles')
-                                  .update(updateData)
-                                  .eq('id', user.id);
-
-                              // Also propagate updated name to existing club posts
-                              if (newName.isNotEmpty) {
-                                await _supabase
-                                    .from('club_posts')
-                                    .update({'author_name': newName})
-                                    .eq('author_id', user.id);
-
-                                // And update existing club records for this runner
-                                await _supabase
-                                    .from('club_records')
-                                    .update({'runner_name': newName})
-                                    .eq('user_id', user.id);
-                              }
-
-                              setState(() {
-                                _fullName = newName.isEmpty ? null : newName;
-                                _email = newEmail.isEmpty ? null : newEmail;
-                                _membershipType = selectedMembershipType;
-                                _memberSince = selectedMemberSince;
-                                _emergencyContactName = newEmergencyName.isEmpty
-                                    ? null
-                                    : newEmergencyName;
-                                _emergencyContactNumber =
-                                    newEmergencyNumber.isEmpty
-                                    ? null
-                                    : newEmergencyNumber;
-                                _emergencyContactRelation =
-                                    selectedEmergencyRelation;
-                                _emergencyDetailsConsent =
-                                    shareEmergencyDetails;
-                              });
-                              if (!mounted) return;
-                              Navigator.pop(sheetContext);
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  backgroundColor: _clubPrimaryColor,
-                                  content: Text(
-                                    'Profile updated',
-                                    style: TextStyle(
-                                      color: _isNrrClub
-                                          ? Colors.white
-                                          : Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              if (!mounted) return;
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.redAccent,
-                                  content: Text(
-                                    'Update failed\n$e',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: const Text(
-                            'Save',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
                         ),
                       ),
                     ],
@@ -517,6 +544,29 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         borderSide: BorderSide(color: _clubPrimaryColor),
       ),
     );
+  }
+
+  Future<void> _syncProfileNameReferences({
+    required String userId,
+    required String newName,
+  }) async {
+    try {
+      await _supabase
+          .from('club_posts')
+          .update({'author_name': newName})
+          .eq('author_id', userId);
+    } catch (e) {
+      debugPrint('Unable to sync club post author name: $e');
+    }
+
+    try {
+      await _supabase
+          .from('club_records')
+          .update({'runner_name': newName})
+          .eq('user_id', userId);
+    } catch (e) {
+      debugPrint('Unable to sync club record runner name: $e');
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -836,8 +886,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      membershipColor.withOpacity(0.18),
-                      membershipColor.withOpacity(0.08),
+                      membershipColor.withValues(alpha: 0.18),
+                      membershipColor.withValues(alpha: 0.08),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1283,7 +1333,7 @@ class _FixedHeaderDelegate extends SliverPersistentHeaderDelegate {
 double _headerExtent(BuildContext context) {
   // Base required height to fit avatar + details comfortably
   const base = 168.0; // accounts for image, labels, and padding
-  final scale = MediaQuery.of(context).textScaleFactor;
+  final scale = MediaQuery.textScalerOf(context).scale(1);
   // Allow a little extra for larger accessibility text sizes
   final extra = (scale > 1.0) ? (base * ((scale - 1.0).clamp(0.0, 0.2))) : 0.0;
   return base + extra;

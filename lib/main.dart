@@ -58,8 +58,14 @@ void main() {
         ),
       );
 
-      // 2b️⃣ Stripe setup (safe if keys not provided)
-      await PaymentService.init();
+      // 2b️⃣ Stripe setup is optional. Never let payment configuration stop
+      // the login screen from loading during a fresh App Review install.
+      try {
+        await PaymentService.init();
+      } catch (e, stack) {
+        debugPrint('Stripe init failed, continuing without payments: $e');
+        FirebaseCrashlytics.instance.recordError(e, stack, fatal: false);
+      }
 
       // 3️⃣ Crashlytics: capture Dart & platform errors
       final bool crashlyticsEnabled =
@@ -190,11 +196,11 @@ class _RunRankAppState extends State<RunRankApp> {
 
       if (!mounted) return;
 
-      if (event == AuthChangeEvent.signedOut ||
-          event == AuthChangeEvent.userDeleted) {
+      if (event == AuthChangeEvent.signedOut) {
         setState(() {
           _clubConfig = null;
         });
+        return;
       }
 
       if (event == AuthChangeEvent.passwordRecovery) {
@@ -213,6 +219,14 @@ class _RunRankAppState extends State<RunRankApp> {
   }
 
   Future<void> _loadClubConfig() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!mounted) return;
+      setState(() {
+        _clubConfig = null;
+      });
+      return;
+    }
+
     final config = await ClubConfigService.loadForCurrentUser();
     if (!mounted) return;
     setState(() {
@@ -229,7 +243,7 @@ class _RunRankAppState extends State<RunRankApp> {
 
   Future<void> _listenForPasswordRecoveryLinks() async {
     _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      if (uri != null && _isPasswordRecoveryLink(uri)) {
+      if (_isPasswordRecoveryLink(uri)) {
         _openPasswordRecoveryScreen(recoveryUri: uri);
       }
     });
@@ -267,8 +281,9 @@ class _RunRankAppState extends State<RunRankApp> {
       navigator
           .pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (_) =>
-                  ResetPasswordScreen(recoveryUri: recoveryUri ?? _pendingRecoveryUri),
+              builder: (_) => ResetPasswordScreen(
+                recoveryUri: recoveryUri ?? _pendingRecoveryUri,
+              ),
               settings: const RouteSettings(name: AppRoutes.resetPassword),
             ),
             (_) => false,
@@ -304,7 +319,6 @@ class _RunRankAppState extends State<RunRankApp> {
           primary: primaryColor,
           secondary: accentColor,
           surface: Colors.grey.shade900,
-          background: backgroundColor,
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: backgroundColor,
@@ -319,13 +333,9 @@ class _RunRankAppState extends State<RunRankApp> {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: backgroundColor,
-          indicatorColor: primaryColor.withOpacity(0.3),
-          labelTextStyle: MaterialStatePropertyAll(
-            TextStyle(color: accentColor),
-          ),
-          iconTheme: MaterialStatePropertyAll(
-            IconThemeData(color: accentColor),
-          ),
+          indicatorColor: primaryColor.withValues(alpha: 0.3),
+          labelTextStyle: WidgetStatePropertyAll(TextStyle(color: accentColor)),
+          iconTheme: WidgetStatePropertyAll(IconThemeData(color: accentColor)),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,

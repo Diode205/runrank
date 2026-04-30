@@ -381,6 +381,16 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     return 'View full club standards on club website';
   }
 
+  double _topClubPhotoHeight(BuildContext context, {required bool isNrr}) {
+    final width = MediaQuery.sizeOf(context).width;
+    final ratio = isNrr ? 0.49 : 0.36;
+    return (width * ratio).clamp(isNrr ? 230.0 : 170.0, isNrr ? 620.0 : 420.0);
+  }
+
+  double _carouselHeightForWidth(double width) {
+    return (width * 0.68).clamp(300.0, 820.0);
+  }
+
   Future<void> _initAdminAndStatus() async {
     _isAdmin = await UserService.isAdmin();
     if (mounted) {
@@ -1171,32 +1181,41 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                     ? const Color(0xFF0055FF)
                     : colorScheme.primary;
 
-                return Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor, width: 2),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
-                      _carouselImages[_currentImageIndex],
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey.shade800,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported,
-                              color: Colors.white38,
-                              size: 48,
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final carouselHeight = _carouselHeightForWidth(
+                      constraints.maxWidth,
+                    );
+
+                    return Container(
+                      height: carouselHeight,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor, width: 2),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        _carouselImages[_currentImageIndex],
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade800,
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.white38,
+                                size: 48,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -3026,7 +3045,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                           // Common container with rounded corners & clipping so
                           // both clubs get visibly rounded images.
                           return Container(
-                            height: isNRR ? 180 : 150,
+                            height: _topClubPhotoHeight(context, isNrr: isNRR),
+                            width: double.infinity,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
                               color: Colors.black,
@@ -3037,7 +3057,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                   ? 'assets/images/NRRmain.png'
                                   : 'assets/images/nnbr_cover.png',
                               width: double.infinity,
-                              fit: isNRR ? BoxFit.cover : BoxFit.contain,
+                              height: double.infinity,
+                              fit: BoxFit.contain,
                               alignment: Alignment.center,
                             ),
                           );
