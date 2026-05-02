@@ -2,17 +2,132 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+const _mobileUserAgent =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 '
+    'Mobile/15E148 Safari/604.1';
+
+Future<void> _loadUri(
+  WebViewController controller,
+  Uri uri, {
+  required bool forceMobileViewport,
+}) async {
+  if (!forceMobileViewport) {
+    await controller.loadRequest(uri);
+    return;
+  }
+
+  await _configureFittedViewport(controller);
+  await controller.setUserAgent(_mobileUserAgent);
+  await controller.loadRequest(uri);
+}
+
+Future<void> _configureFittedViewport(WebViewController controller) async {
+  final platformController = controller.platform;
+
+  try {
+    await (platformController as dynamic).setUseWideViewPort(true);
+  } catch (_) {
+    // Only Android exposes this. Other platforms keep their normal behavior.
+  }
+
+  try {
+    await (platformController as dynamic).setTextZoom(90);
+  } catch (_) {
+    // Only Android exposes this. Other platforms keep their normal behavior.
+  }
+}
+
+Future<void> _fitPageToWebViewWidth(WebViewController controller) async {
+  try {
+    await controller.runJavaScript(r'''
+      (function() {
+        function fitRunRankPage() {
+          var doc = document.documentElement;
+          var body = document.body;
+          if (!doc || !body) return;
+
+          var wrapper = document.getElementById('__runrank_fit_wrapper');
+          if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.id = '__runrank_fit_wrapper';
+            while (body.firstChild) {
+              wrapper.appendChild(body.firstChild);
+            }
+            body.appendChild(wrapper);
+          }
+
+          wrapper.style.transform = '';
+          wrapper.style.width = '';
+          wrapper.style.marginLeft = '';
+          wrapper.style.transformOrigin = '0 0';
+          wrapper.style.display = 'block';
+          body.style.margin = '0';
+          body.style.overflowX = 'hidden';
+          body.style.backgroundColor = '#f4f4f4';
+          doc.style.overflowX = 'hidden';
+
+          var viewportWidth = doc.clientWidth || window.innerWidth || 1;
+          var candidates = Array.prototype.slice.call(
+            document.querySelectorAll(
+              '#container, #wrapper, #page, .container, .wrapper, .page, table, main'
+            )
+          );
+          var measurements = candidates.map(function(el) {
+            var rect = el.getBoundingClientRect();
+            return {
+              width: Math.max(el.scrollWidth || 0, el.offsetWidth || 0, rect.width || 0),
+              left: Math.max(0, rect.left || 0)
+            };
+          }).filter(function(item) {
+            return item.width >= 600;
+          });
+          var best = measurements.sort(function(a, b) {
+            return a.width - b.width;
+          })[0];
+          var contentWidth = Math.max(
+            best ? best.width : 0,
+            wrapper.offsetWidth,
+            980
+          );
+          var scale = Math.min(
+            1.08,
+            (viewportWidth / contentWidth) * 1.10
+          );
+          var scaledWidth = contentWidth * scale;
+          var offset = Math.max(0, (viewportWidth - scaledWidth) / 2);
+          var visualTrimLeft = 26;
+
+          wrapper.style.width = contentWidth + 'px';
+          wrapper.style.marginLeft = (offset - visualTrimLeft) + 'px';
+          wrapper.style.transform = 'scale(' + scale + ')';
+          body.style.minHeight = (wrapper.scrollHeight * scale) + 'px';
+          body.dataset.runrankFitReady = 'true';
+        }
+
+        fitRunRankPage();
+        window.setTimeout(fitRunRankPage, 300);
+        window.setTimeout(fitRunRankPage, 900);
+      })();
+    ''');
+  } catch (_) {
+    // The page still renders normally if script injection is unavailable.
+  }
+}
+
 class WebLinkPreviewCard extends StatefulWidget {
   const WebLinkPreviewCard({
     super.key,
     required this.url,
     this.buttonLabel = 'View Full Page',
     this.height = 420,
+    this.forceMobileViewport = false,
   });
 
   final String url;
   final String buttonLabel;
   final double height;
+  final bool forceMobileViewport;
 
   @override
   State<WebLinkPreviewCard> createState() => _WebLinkPreviewCardState();
@@ -77,15 +192,15 @@ class WebLinkPreviewCard extends StatefulWidget {
 class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
   WebViewController? _controller;
   Uri? _uri;
+  var _isFitting = false;
 
   @override
   void initState() {
     super.initState();
     _uri = _parseUri(widget.url);
     if (_uri != null) {
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..loadRequest(_uri!);
+      _controller = WebViewController();
+      _configurePreviewController();
     }
   }
 
@@ -102,16 +217,36 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
     return uri;
   }
 
-  Future<void> _launchExternal() async {
+  Future<void> _configurePreviewController() async {
+    final controller = _controller;
     final uri = _uri;
-    if (uri == null) return;
+    if (controller == null || uri == null) return;
 
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Could not open the link')));
-    }
+    await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await controller.setNavigationDelegate(
+      NavigationDelegate(
+        onPageStarted: (_) {
+          if (widget.forceMobileViewport && mounted) {
+            setState(() => _isFitting = true);
+          }
+        },
+        onPageFinished: (_) {
+          if (widget.forceMobileViewport) {
+            _fitPageToWebViewWidth(controller);
+            Future<void>.delayed(const Duration(milliseconds: 450), () {
+              if (mounted) {
+                setState(() => _isFitting = false);
+              }
+            });
+          }
+        },
+      ),
+    );
+    await _loadUri(
+      controller,
+      uri,
+      forceMobileViewport: widget.forceMobileViewport,
+    );
   }
 
   Future<void> _openInApp() async {
@@ -123,6 +258,7 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
         builder: (_) => _WebLinkBrowserPage(
           uri: uri,
           title: uri.host.replaceFirst('www.', ''),
+          forceMobileViewport: widget.forceMobileViewport,
         ),
       ),
     );
@@ -159,6 +295,17 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
           fit: StackFit.expand,
           children: [
             WebViewWidget(controller: _controller!),
+            if (_isFitting)
+              const ColoredBox(
+                color: Color(0xFFF4F4F4),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
             Positioned(
               right: 12,
               bottom: 12,
@@ -195,10 +342,15 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
 }
 
 class _WebLinkBrowserPage extends StatefulWidget {
-  const _WebLinkBrowserPage({required this.uri, required this.title});
+  const _WebLinkBrowserPage({
+    required this.uri,
+    required this.title,
+    required this.forceMobileViewport,
+  });
 
   final Uri uri;
   final String title;
+  final bool forceMobileViewport;
 
   @override
   State<_WebLinkBrowserPage> createState() => _WebLinkBrowserPageState();
@@ -211,23 +363,50 @@ class _WebLinkBrowserPageState extends State<_WebLinkBrowserPage> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            if (mounted) {
-              setState(() => _isLoading = true);
-            }
-          },
-          onPageFinished: (_) {
-            if (mounted) {
-              setState(() => _isLoading = false);
-            }
-          },
-        ),
-      )
-      ..loadRequest(widget.uri);
+    _controller = WebViewController();
+    _configureBrowserController();
+  }
+
+  Future<void> _configureBrowserController() async {
+    await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await _controller.setNavigationDelegate(
+      NavigationDelegate(
+        onPageStarted: (_) {
+          if (mounted) {
+            setState(() => _isLoading = true);
+          }
+        },
+        onPageFinished: (_) {
+          if (widget.forceMobileViewport) {
+            _fitPageToWebViewWidth(_controller);
+            Future<void>.delayed(const Duration(milliseconds: 450), () {
+              if (mounted) {
+                setState(() => _isLoading = false);
+              }
+            });
+            return;
+          }
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        },
+      ),
+    );
+    await _loadBrowserUri(widget.uri);
+  }
+
+  Future<void> _loadBrowserUri(Uri uri) async {
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+    await _loadUri(
+      _controller,
+      uri,
+      forceMobileViewport: widget.forceMobileViewport,
+    );
+    if (mounted && widget.forceMobileViewport) {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _openExternal() async {
