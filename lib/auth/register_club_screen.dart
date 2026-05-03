@@ -74,12 +74,34 @@ class _RegisterClubScreenState extends State<RegisterClubScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _selectedClub,
+                    initialValue: _selectedClub,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: widget.isForMigration ? 'New Club' : 'Club',
                     ),
                     items: _clubs
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                              c,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    selectedItemBuilder: (context) => _clubs
+                        .map(
+                          (c) => Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              c,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setState(() => _selectedClub = v),
                   ),

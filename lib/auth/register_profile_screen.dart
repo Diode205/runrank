@@ -52,6 +52,17 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     'Carer',
   ];
 
+  String? get _membershipTypeNote {
+    switch (selectedMembershipType) {
+      case '1st Claim':
+        return 'Claim for Club Standard awards on races you have run and submitted from the date of your First Claim membership.';
+      case '2nd Claim':
+        return 'Depending on club rules, you can submit race records but may or may not be able to claim for Club Standard awards as a Second Claim member.';
+      default:
+        return null;
+    }
+  }
+
   String _formatDobDisplay(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -166,7 +177,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedGender,
+              initialValue: _selectedGender,
               decoration: const InputDecoration(labelText: 'Gender'),
               items: const [
                 DropdownMenuItem(value: 'M', child: Text('Male')),
@@ -216,6 +227,18 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                 });
               },
             ),
+            if (_membershipTypeNote != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _membershipTypeNote!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
             const Text(
@@ -237,7 +260,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedEmergencyRelation,
+              initialValue: _selectedEmergencyRelation,
               decoration: const InputDecoration(labelText: 'Relationship'),
               items: emergencyRelations
                   .map(
@@ -361,6 +384,8 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         emergencyContactRelation: _selectedEmergencyRelation!,
                         emergencyDetailsConsent: agreeEmergencyConsent,
                       );
+
+                      if (!context.mounted) return;
 
                       setState(() => loading = false);
 

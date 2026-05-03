@@ -11,6 +11,7 @@ import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/menu/admin_team_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/app_settings_page.dart';
+import 'package:runrank/menu/athletics_portal_power10_page.dart';
 import 'package:runrank/menu/runners_banquet_page.dart';
 import 'package:runrank/menu/malcolm_ball_award_page.dart';
 import 'package:runrank/menu/runners_of_the_year_page.dart';
@@ -809,6 +810,19 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const PoliciesFormsNoticesPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.public,
+                  title: 'Athletics Portal & Power of 10',
+                  subtitle: 'England Athletics login and athlete search',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AthleticsPortalPower10Page(),
                       ),
                     );
                   },

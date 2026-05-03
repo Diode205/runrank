@@ -384,11 +384,21 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   double _topClubPhotoHeight(BuildContext context, {required bool isNrr}) {
     final width = MediaQuery.sizeOf(context).width;
     final ratio = isNrr ? 0.49 : 0.36;
-    return (width * ratio).clamp(isNrr ? 230.0 : 170.0, isNrr ? 620.0 : 420.0);
+    final isPhone = width < 700;
+    final minHeight = isPhone
+        ? (isNrr ? 165.0 : 130.0)
+        : (isNrr ? 230.0 : 170.0);
+    final maxHeight = isPhone
+        ? (isNrr ? 240.0 : 190.0)
+        : (isNrr ? 620.0 : 420.0);
+    return (width * ratio).clamp(minHeight, maxHeight);
   }
 
   double _carouselHeightForWidth(double width) {
-    return (width * 0.68).clamp(300.0, 820.0);
+    final ratio = width < 700 ? 0.48 : 0.68;
+    final minHeight = width < 700 ? 190.0 : 300.0;
+    final maxHeight = width < 700 ? 360.0 : 820.0;
+    return (width * ratio).clamp(minHeight, maxHeight);
   }
 
   Future<void> _initAdminAndStatus() async {
@@ -1189,30 +1199,33 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
                     return Container(
                       height: carouselHeight,
+                      padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: borderColor, width: 2),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset(
-                        _carouselImages[_currentImageIndex],
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey.shade800,
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.white38,
-                                size: 48,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          _carouselImages[_currentImageIndex],
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey.shade800,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white38,
+                                  size: 48,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     );
                   },

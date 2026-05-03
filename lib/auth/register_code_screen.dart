@@ -100,6 +100,14 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
               },
               child: const Text("Continue"),
             ),
+            if (!widget.isForMigration) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'If you are registering a Second Claim account, please ensure you use a different email address from your First Claim registration with any other club subscribed in RunRank.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, height: 1.4),
+              ),
+            ],
           ],
         ),
       ),
