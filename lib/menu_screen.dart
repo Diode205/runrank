@@ -764,8 +764,8 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.emoji_events,
-                  title: 'Inspirational Running Award 2026',
-                  subtitle: 'Nominations, Votes, Reactions & Comments',
+                  title: 'Inspirational Running Awards',
+                  subtitle: 'Nominate, Vote, and Comments',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -791,7 +791,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 _menuTile(
                   icon: Icons.groups,
                   title: 'Relay & Cross Country Teams',
-                  subtitle: 'RNR, Ekiden and EACCL Participations',
+                  subtitle: 'RNR, Ekiden, and EACCL Teams',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -804,7 +804,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 _menuTile(
                   icon: Icons.description,
                   title: 'Club Governance',
-                  subtitle: 'Club policies, waivers, and key updates',
+                  subtitle: 'Club policies and key mandates',
                   onTap: () {
                     Navigator.push(
                       context,
@@ -817,7 +817,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 _menuTile(
                   icon: Icons.public,
                   title: 'Athletics Portal & Power of 10',
-                  subtitle: 'England Athletics login and athlete search',
+                  subtitle: 'England Athletics login and search',
                   onTap: () {
                     Navigator.push(
                       context,
