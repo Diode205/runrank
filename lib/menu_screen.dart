@@ -29,6 +29,28 @@ const List<String> _emergencyRelations = [
   'Carer',
 ];
 
+class _QuickEditResult {
+  const _QuickEditResult({
+    required this.fullName,
+    required this.email,
+    required this.membershipType,
+    required this.memberSince,
+    required this.emergencyContactName,
+    required this.emergencyContactNumber,
+    required this.emergencyContactRelation,
+    required this.emergencyDetailsConsent,
+  });
+
+  final String? fullName;
+  final String? email;
+  final String? membershipType;
+  final DateTime? memberSince;
+  final String? emergencyContactName;
+  final String? emergencyContactNumber;
+  final String? emergencyContactRelation;
+  final bool emergencyDetailsConsent;
+}
+
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
 
@@ -53,6 +75,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _emergencyContactNumber;
   String? _emergencyContactRelation;
   bool _emergencyDetailsConsent = false;
+  ModalRoute<void>? _subscribedRoute;
 
   bool get _isNrrClub {
     final club = (_club ?? '').trim().toLowerCase();
@@ -99,7 +122,9 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final route = ModalRoute.of(context);
-    if (route != null) {
+    if (route != null && route != _subscribedRoute) {
+      routeObserver.unsubscribe(this);
+      _subscribedRoute = route;
       routeObserver.subscribe(this, route);
     }
   }
@@ -107,6 +132,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
+    _subscribedRoute = null;
     super.dispose();
   }
 
@@ -117,21 +143,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
 
   // Quick edit bottom sheet
   Future<void> _showQuickEditSheet() async {
-    final nameController = TextEditingController(text: _fullName ?? '');
-    final emailController = TextEditingController(text: _email ?? '');
-    final emergencyNameController = TextEditingController(
-      text: _emergencyContactName ?? '',
-    );
-    final emergencyNumberController = TextEditingController(
-      text: _emergencyContactNumber ?? '',
-    );
-    String? selectedMembershipType = _membershipType;
-    DateTime? selectedMemberSince = _memberSince;
-    String? selectedEmergencyRelation = _emergencyContactRelation;
-    var shareEmergencyDetails = _emergencyDetailsConsent;
-    var saving = false;
-
-    await showModalBottomSheet(
+    final result = await showModalBottomSheet<_QuickEditResult>(
       context: context,
       isScrollControlled: true,
       isDismissible: true,
@@ -141,410 +153,83 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final messenger = ScaffoldMessenger.of(this.context);
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.9,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: _quickEditHeaderGradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Quick edit',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Close',
-                              onPressed: () => Navigator.pop(sheetContext),
-                              icon: const Icon(
-                                Icons.close,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: _clubSecondaryColor.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      const Text(
-                        'Swipe down or tap close to dismiss.',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: nameController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: _inputDecoration('Name / nickname'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: emailController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: _inputDecoration('Email'),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Membership type',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedMembershipType,
-                        items: const [
-                          DropdownMenuItem(
-                            value: '1st Claim',
-                            child: Text('1st Claim'),
-                          ),
-                          DropdownMenuItem(
-                            value: '2nd Claim',
-                            child: Text('2nd Claim'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Social',
-                            child: Text('Social'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Full-Time Education',
-                            child: Text('Full-Time Education'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          setModalState(() => selectedMembershipType = val);
-                        },
-                        decoration: _inputDecoration('Select membership'),
-                        dropdownColor: _quickEditBackgroundColor,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Member since',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.calendar_today, size: 18),
-                        label: Text(
-                          selectedMemberSince != null
-                              ? _formatDate(selectedMemberSince!)
-                              : 'Select date',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(color: _clubSecondaryColor),
-                        ),
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final initial = selectedMemberSince ?? now;
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: initial,
-                            firstDate: DateTime(1990, 1, 1),
-                            lastDate: DateTime(now.year + 1, 12, 31),
-                          );
-                          if (picked != null) {
-                            setModalState(() => selectedMemberSince = picked);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 18),
-                      const Text(
-                        'Emergency contact',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: emergencyNameController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: _inputDecoration('ICE contact name'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: emergencyNumberController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: _inputDecoration('ICE contact number'),
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedEmergencyRelation,
-                        items: _emergencyRelations
-                            .map(
-                              (relation) => DropdownMenuItem<String>(
-                                value: relation,
-                                child: Text(relation),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setModalState(
-                            () => selectedEmergencyRelation = value,
-                          );
-                        },
-                        decoration: _inputDecoration('Relationship'),
-                        dropdownColor: _quickEditBackgroundColor,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 12),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: shareEmergencyDetails,
-                        onChanged: (value) {
-                          setModalState(() {
-                            shareEmergencyDetails = value ?? false;
-                          });
-                        },
-                        title: const Text(
-                          'Allow club emergency access to these details',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        subtitle: const Text(
-                          'Used by club admins and members in an emergency during training or racing.',
-                          style: TextStyle(color: Colors.white54, fontSize: 12),
-                        ),
-                        activeColor: _clubPrimaryColor,
-                        checkColor: _isNrrClub ? Colors.white : Colors.black,
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _clubPrimaryColor,
-                            foregroundColor: _isNrrClub
-                                ? Colors.white
-                                : Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  final user = _supabase.auth.currentUser;
-                                  if (user == null) return;
-                                  final newName = nameController.text.trim();
-                                  final newEmail = emailController.text.trim();
-                                  final newEmergencyName =
-                                      emergencyNameController.text.trim();
-                                  final newEmergencyNumber =
-                                      emergencyNumberController.text.trim();
+      builder: (_) => _QuickEditSheet(
+        fullName: _fullName,
+        email: _email,
+        membershipType: _membershipType,
+        memberSince: _memberSince,
+        emergencyContactName: _emergencyContactName,
+        emergencyContactNumber: _emergencyContactNumber,
+        emergencyContactRelation: _emergencyContactRelation,
+        emergencyDetailsConsent: _emergencyDetailsConsent,
+        backgroundColor: _quickEditBackgroundColor,
+        fieldFillColor: _quickEditFieldFillColor,
+        headerGradient: _quickEditHeaderGradient,
+        primaryColor: _clubPrimaryColor,
+        secondaryColor: _clubSecondaryColor,
+        isNrrClub: _isNrrClub,
+        formatDate: _formatDate,
+      ),
+    );
 
-                                  final hasAnyEmergencyInput =
-                                      newEmergencyName.isNotEmpty ||
-                                      newEmergencyNumber.isNotEmpty ||
-                                      selectedEmergencyRelation != null ||
-                                      shareEmergencyDetails;
+    if (result == null || !mounted) return;
 
-                                  if (hasAnyEmergencyInput &&
-                                      (newEmergencyName.isEmpty ||
-                                          newEmergencyNumber.isEmpty ||
-                                          selectedEmergencyRelation == null)) {
-                                    messenger.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Please complete the emergency contact name, number and relationship',
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
-                                  try {
-                                    setModalState(() => saving = true);
+    final updateData = <String, dynamic>{
+      'full_name': result.fullName,
+      'email': result.email,
+      'membership_type': result.membershipType,
+      'emergency_contact_name': result.emergencyContactName,
+      'emergency_contact_number': result.emergencyContactNumber,
+      'emergency_contact_relation': result.emergencyContactRelation,
+      'emergency_details_consent': result.emergencyDetailsConsent,
+    };
+    if (result.memberSince != null) {
+      updateData['member_since'] = result.memberSince!.toIso8601String();
+    }
 
-                                    final updateData = <String, dynamic>{
-                                      'full_name': newName.isEmpty
-                                          ? null
-                                          : newName,
-                                      'email': newEmail.isEmpty
-                                          ? null
-                                          : newEmail,
-                                      'membership_type': selectedMembershipType,
-                                      'emergency_contact_name':
-                                          newEmergencyName.isEmpty
-                                          ? null
-                                          : newEmergencyName,
-                                      'emergency_contact_number':
-                                          newEmergencyNumber.isEmpty
-                                          ? null
-                                          : newEmergencyNumber,
-                                      'emergency_contact_relation':
-                                          selectedEmergencyRelation,
-                                      'emergency_details_consent':
-                                          shareEmergencyDetails,
-                                    };
-                                    if (selectedMemberSince != null) {
-                                      updateData['member_since'] =
-                                          selectedMemberSince!
-                                              .toIso8601String();
-                                    }
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update(updateData)
+          .eq('id', user.id);
 
-                                    await _supabase
-                                        .from('user_profiles')
-                                        .update(updateData)
-                                        .eq('id', user.id);
-
-                                    if (newName.isNotEmpty) {
-                                      await _syncProfileNameReferences(
-                                        userId: user.id,
-                                        newName: newName,
-                                      );
-                                    }
-
-                                    if (!mounted || !sheetContext.mounted) {
-                                      return;
-                                    }
-                                    if (Navigator.canPop(sheetContext)) {
-                                      Navigator.pop(sheetContext);
-                                    }
-
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _fullName = newName.isEmpty
-                                          ? null
-                                          : newName;
-                                      _email = newEmail.isEmpty
-                                          ? null
-                                          : newEmail;
-                                      _membershipType = selectedMembershipType;
-                                      _memberSince = selectedMemberSince;
-                                      _emergencyContactName =
-                                          newEmergencyName.isEmpty
-                                          ? null
-                                          : newEmergencyName;
-                                      _emergencyContactNumber =
-                                          newEmergencyNumber.isEmpty
-                                          ? null
-                                          : newEmergencyNumber;
-                                      _emergencyContactRelation =
-                                          selectedEmergencyRelation;
-                                      _emergencyDetailsConsent =
-                                          shareEmergencyDetails;
-                                    });
-
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: _clubPrimaryColor,
-                                        content: Text(
-                                          'Profile updated',
-                                          style: TextStyle(
-                                            color: _isNrrClub
-                                                ? Colors.white
-                                                : Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    setModalState(() => saving = false);
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: Colors.redAccent,
-                                        content: Text(
-                                          'Update failed\n$e',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                          child: saving
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: _isNrrClub
-                                        ? Colors.white
-                                        : Colors.black,
-                                  ),
-                                )
-                              : const Text(
-                                  'Save',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+      if (result.fullName != null && result.fullName!.isNotEmpty) {
+        await _syncProfileNameReferences(
+          userId: user.id,
+          newName: result.fullName!,
         );
-      },
-    );
-    nameController.dispose();
-    emailController.dispose();
-    emergencyNameController.dispose();
-    emergencyNumberController.dispose();
-  }
+      }
 
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70),
-      filled: true,
-      fillColor: _quickEditFieldFillColor,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: _clubSecondaryColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: _clubPrimaryColor),
-      ),
-    );
+      if (!mounted) return;
+      setState(() {
+        _fullName = result.fullName;
+        _email = result.email;
+        _membershipType = result.membershipType;
+        _memberSince = result.memberSince;
+        _emergencyContactName = result.emergencyContactName;
+        _emergencyContactNumber = result.emergencyContactNumber;
+        _emergencyContactRelation = result.emergencyContactRelation;
+        _emergencyDetailsConsent = result.emergencyDetailsConsent;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _clubPrimaryColor,
+          content: Text(
+            'Profile updated',
+            style: TextStyle(color: _isNrrClub ? Colors.white : Colors.black),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Update failed\n$e')));
+    }
   }
 
   Future<void> _syncProfileNameReferences({
@@ -1318,6 +1003,373 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       return const Color(0xFF0057B7); // NNBR blue
     }
     return colorScheme.secondary;
+  }
+}
+
+class _QuickEditSheet extends StatefulWidget {
+  const _QuickEditSheet({
+    required this.fullName,
+    required this.email,
+    required this.membershipType,
+    required this.memberSince,
+    required this.emergencyContactName,
+    required this.emergencyContactNumber,
+    required this.emergencyContactRelation,
+    required this.emergencyDetailsConsent,
+    required this.backgroundColor,
+    required this.fieldFillColor,
+    required this.headerGradient,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.isNrrClub,
+    required this.formatDate,
+  });
+
+  final String? fullName;
+  final String? email;
+  final String? membershipType;
+  final DateTime? memberSince;
+  final String? emergencyContactName;
+  final String? emergencyContactNumber;
+  final String? emergencyContactRelation;
+  final bool emergencyDetailsConsent;
+  final Color backgroundColor;
+  final Color fieldFillColor;
+  final List<Color> headerGradient;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final bool isNrrClub;
+  final String Function(DateTime date) formatDate;
+
+  @override
+  State<_QuickEditSheet> createState() => _QuickEditSheetState();
+}
+
+class _QuickEditSheetState extends State<_QuickEditSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _emergencyNameController;
+  late final TextEditingController _emergencyNumberController;
+  String? _selectedMembershipType;
+  DateTime? _selectedMemberSince;
+  String? _selectedEmergencyRelation;
+  late bool _shareEmergencyDetails;
+  String? _quickEditError;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.fullName ?? '');
+    _emailController = TextEditingController(text: widget.email ?? '');
+    _emergencyNameController = TextEditingController(
+      text: widget.emergencyContactName ?? '',
+    );
+    _emergencyNumberController = TextEditingController(
+      text: widget.emergencyContactNumber ?? '',
+    );
+    _selectedMembershipType = widget.membershipType;
+    _selectedMemberSince = widget.memberSince;
+    _selectedEmergencyRelation = widget.emergencyContactRelation;
+    _shareEmergencyDetails = widget.emergencyDetailsConsent;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _emergencyNameController.dispose();
+    _emergencyNumberController.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70),
+      filled: true,
+      fillColor: widget.fieldFillColor,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: widget.secondaryColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: widget.primaryColor),
+      ),
+    );
+  }
+
+  Future<void> _pickMemberSinceDate() async {
+    final now = DateTime.now();
+    final initial = _selectedMemberSince ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1990, 1, 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _selectedMemberSince = picked);
+  }
+
+  void _submit() {
+    final newName = _nameController.text.trim();
+    final newEmail = _emailController.text.trim();
+    final newEmergencyName = _emergencyNameController.text.trim();
+    final newEmergencyNumber = _emergencyNumberController.text.trim();
+
+    final hasAnyEmergencyInput =
+        newEmergencyName.isNotEmpty ||
+        newEmergencyNumber.isNotEmpty ||
+        _selectedEmergencyRelation != null ||
+        _shareEmergencyDetails;
+
+    if (hasAnyEmergencyInput &&
+        (newEmergencyName.isEmpty ||
+            newEmergencyNumber.isEmpty ||
+            _selectedEmergencyRelation == null)) {
+      setState(() {
+        _quickEditError =
+            'Please complete the emergency contact name, number and relationship';
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _QuickEditResult(
+        fullName: newName.isEmpty ? null : newName,
+        email: newEmail.isEmpty ? null : newEmail,
+        membershipType: _selectedMembershipType,
+        memberSince: _selectedMemberSince,
+        emergencyContactName: newEmergencyName.isEmpty
+            ? null
+            : newEmergencyName,
+        emergencyContactNumber: newEmergencyNumber.isEmpty
+            ? null
+            : newEmergencyNumber,
+        emergencyContactRelation: _selectedEmergencyRelation,
+        emergencyDetailsConsent: _shareEmergencyDetails,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: mediaQuery.viewInsets.bottom + 20,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.9),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: widget.headerGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Quick edit',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: widget.secondaryColor.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const Text(
+                'Swipe down or tap close to dismiss.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('Name / nickname'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _emailController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Membership type',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedMembershipType,
+                items: const [
+                  DropdownMenuItem(
+                    value: '1st Claim',
+                    child: Text('1st Claim'),
+                  ),
+                  DropdownMenuItem(
+                    value: '2nd Claim',
+                    child: Text('2nd Claim'),
+                  ),
+                  DropdownMenuItem(value: 'Social', child: Text('Social')),
+                  DropdownMenuItem(
+                    value: 'Full-Time Education',
+                    child: Text('Full-Time Education'),
+                  ),
+                ],
+                onChanged: (val) {
+                  setState(() => _selectedMembershipType = val);
+                },
+                decoration: _inputDecoration('Select membership'),
+                dropdownColor: widget.backgroundColor,
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Member since',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 18),
+                label: Text(
+                  _selectedMemberSince != null
+                      ? widget.formatDate(_selectedMemberSince!)
+                      : 'Select date',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: widget.secondaryColor),
+                ),
+                onPressed: _pickMemberSinceDate,
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Emergency contact',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _emergencyNameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('ICE contact name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _emergencyNumberController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('ICE contact number'),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedEmergencyRelation,
+                items: _emergencyRelations
+                    .map(
+                      (relation) => DropdownMenuItem<String>(
+                        value: relation,
+                        child: Text(relation),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedEmergencyRelation = value);
+                },
+                decoration: _inputDecoration('Relationship'),
+                dropdownColor: widget.backgroundColor,
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _shareEmergencyDetails,
+                onChanged: (value) {
+                  setState(() {
+                    _shareEmergencyDetails = value ?? false;
+                  });
+                },
+                title: const Text(
+                  'Allow club emergency access to these details',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Used by club admins and members in an emergency during training or racing.',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                activeColor: widget.primaryColor,
+                checkColor: widget.isNrrClub ? Colors.white : Colors.black,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.primaryColor,
+                    foregroundColor: widget.isNrrClub
+                        ? Colors.white
+                        : Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _submit,
+                  child: const Text(
+                    'Save',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                ),
+              ),
+              if (_quickEditError != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _quickEditError!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -3147,7 +3147,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                               'ARRS is actively looking for people to help maintain their records, as well as sponsorships.',
                           url: 'https://arrs.run/',
                           linkLabel:
-                              'View full age-grading tables at ARRS (arrs.run)',
+                              'View full single age record tables at ARRS (arrs.run)',
                         ),
                         const SizedBox(height: 8),
                         _buildCurrentStatusSection(),

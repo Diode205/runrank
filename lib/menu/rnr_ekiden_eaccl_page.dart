@@ -26,6 +26,18 @@ Color _clubPrimaryForegroundColor(String? clubName) {
   return _isNrrClubName(clubName) ? Colors.white : Colors.black;
 }
 
+Color _driveButtonColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty || _isNrrClubName(clubName)) return Colors.white;
+  return const Color(0xFF0057B7);
+}
+
+Color _driveButtonForegroundColor(String? clubName) {
+  final lower = (clubName ?? '').trim().toLowerCase();
+  if (lower.isEmpty || _isNrrClubName(clubName)) return Colors.black;
+  return Colors.white;
+}
+
 class RnrEkidenEacclPage extends StatelessWidget {
   const RnrEkidenEacclPage({super.key});
 
@@ -82,10 +94,12 @@ class _RnrPage extends StatefulWidget {
 
 class _RnrPageState extends State<_RnrPage> {
   bool _isAdmin = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _driveColor => _driveButtonColor(_clubName);
+  Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
   final List<_StageInfo> _stages = const [
     _StageInfo(
       label: "S1: King's Lynn — PE30 2NB",
@@ -335,23 +349,30 @@ class _RnrPageState extends State<_RnrPage> {
                     child: Container(
                       height: _controlHeight,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: _driveColor,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.directions, size: 18, color: Colors.black),
-                          SizedBox(width: 8),
+                        children: [
+                          Icon(
+                            Icons.directions,
+                            size: 18,
+                            color: _driveForegroundColor,
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             'Drive To',
                             style: TextStyle(
-                              color: Colors.black,
+                              color: _driveForegroundColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Icon(Icons.arrow_drop_down, color: Colors.black),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            color: _driveForegroundColor,
+                          ),
                         ],
                       ),
                     ),
@@ -487,10 +508,12 @@ class _EkidenPage extends StatefulWidget {
 
 class _EkidenPageState extends State<_EkidenPage> {
   bool _isAdmin = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _driveColor => _driveButtonColor(_clubName);
+  Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
 
   @override
   void initState() {
@@ -699,7 +722,10 @@ class _EkidenPageState extends State<_EkidenPage> {
                     ),
                     icon: const Icon(Icons.directions, size: 18),
                     label: const Text('Drive To'),
-                    style: _primaryActionStyle(Colors.white, Colors.black),
+                    style: _primaryActionStyle(
+                      _driveColor,
+                      _driveForegroundColor,
+                    ),
                   ),
                 ),
               ],
@@ -719,10 +745,12 @@ class _EacclPage extends StatefulWidget {
 
 class _EacclPageState extends State<_EacclPage> {
   bool _isAdmin = false;
-  String? _clubName;
+  String? _clubName = UserService.cachedClubName;
 
   Color get _accentColor => _clubPrimaryColor(_clubName);
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _driveColor => _driveButtonColor(_clubName);
+  Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
 
   @override
   void initState() {
@@ -1313,27 +1341,30 @@ class _EacclPageState extends State<_EacclPage> {
                         child: Container(
                           height: _controlHeight,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: _driveColor,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(
                                 Icons.directions,
                                 size: 18,
-                                color: Colors.black,
+                                color: _driveForegroundColor,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 'Drive To',
                                 style: TextStyle(
-                                  color: Colors.black,
+                                  color: _driveForegroundColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              SizedBox(width: 6),
-                              Icon(Icons.arrow_drop_down, color: Colors.black),
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                color: _driveForegroundColor,
+                              ),
                             ],
                           ),
                         ),
