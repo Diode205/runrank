@@ -20,6 +20,7 @@ class _RootNavigationState extends State<RootNavigation>
   int _unread = 0;
   int _postActivityCount = 0;
   int _eventActivityCount = 0;
+  int _clubHubRefreshToken = 0;
 
   // Track which tabs have been visited to load them lazily
   final List<bool> _activatedTabs = [true, false, false, false, false];
@@ -140,6 +141,9 @@ class _RootNavigationState extends State<RootNavigation>
       _selectedIndex = index;
       _activatedTabs[index] =
           true; // Activate the tab the first time it's clicked
+      if (index == 1) {
+        _clubHubRefreshToken++;
+      }
       if (index == 2) {
         _postActivityCount = 0;
         // Mark posts as seen so subsequent polls don't
@@ -159,7 +163,7 @@ class _RootNavigationState extends State<RootNavigation>
               ? const ClubStandardsView()
               : const SizedBox.shrink(),
           _activatedTabs[1]
-              ? const ClubEventsCalendar()
+              ? ClubEventsCalendar(refreshToken: _clubHubRefreshToken)
               : const SizedBox.shrink(),
           _activatedTabs[2]
               ? const PostsFeedFacebookScreen()

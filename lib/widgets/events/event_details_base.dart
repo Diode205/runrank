@@ -989,6 +989,30 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           'user_id': user.id,
           'emoji': emoji,
         });
+
+        try {
+          final commentRow = await supabase
+              .from('event_comments')
+              .select('user_id, event_id')
+              .eq('id', commentId)
+              .maybeSingle();
+
+          final authorId = commentRow?['user_id'] as String?;
+          final eventId = commentRow?['event_id'] as String?;
+
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your event comment',
+              body: 'Someone reacted $emoji to your comment.',
+              eventId: eventId,
+            );
+          }
+        } catch (e) {
+          debugPrint(
+            '❌ Error sending inline comment reaction notification: $e',
+          );
+        }
       }
 
       await _loadCommentReactions();

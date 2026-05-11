@@ -15,7 +15,9 @@ import 'package:runrank/services/user_service.dart';
 /// CLUB EVENTS CALENDAR — unified for all event types
 /// =============================================================
 class ClubEventsCalendar extends StatefulWidget {
-  const ClubEventsCalendar({super.key});
+  const ClubEventsCalendar({super.key, this.refreshToken = 0});
+
+  final int refreshToken;
 
   @override
   State<ClubEventsCalendar> createState() => _ClubEventsCalendarState();
@@ -122,6 +124,16 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   }
 
   @override
+  void didUpdateWidget(covariant ClubEventsCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadSeenEvents();
+      _loadEvents();
+      NotificationService.refreshEventActivityCount();
+    }
+  }
+
+  @override
   void dispose() {
     _eventsPollTimer?.cancel();
     if (_eventsChannel != null) {
@@ -183,19 +195,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
       final clubName = _clubName;
       if (_clubUserIds.isEmpty && clubName != null && clubName.isNotEmpty) {
         try {
-          final rows = await supabase
-              .from('user_profiles')
-              .select('id')
-              .eq('club', clubName);
-
-          final ids = <String>{};
-          for (final row in rows as List) {
-            final id = row['id'] as String?;
-            if (id != null && id.isNotEmpty) {
-              ids.add(id);
-            }
-          }
-          _clubUserIds = ids;
+          _clubUserIds = await NotificationService.userIdsForClub(clubName);
         } catch (e) {
           debugPrint('Error loading club user ids for events: $e');
         }

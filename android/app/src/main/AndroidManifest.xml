@@ -3,13 +3,12 @@
     <!-- Camera access -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Network access for Supabase, Firebase, Stripe, web views and external links -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Photo and Video access (Android 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-
-    <!-- Location access for Google Maps -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Storage (Android 12 and below) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -18,15 +17,10 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:label="runrank"
+        android:label="RunRank"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Google Maps API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_ANDROID_API_KEY_HERE"/>
-        
         <activity
             android:name=".MainActivity"
             android:exported="true"

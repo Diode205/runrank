@@ -501,7 +501,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
     }
   }
 
-  void _openImageFullscreen(String imageUrl) {
+  void _openImageFullscreen(List<String> imageUrls, {int initialIndex = 0}) {
+    if (imageUrls.isEmpty) return;
+
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -509,11 +511,47 @@ class _PostDetailPageState extends State<PostDetailPage> {
         insetPadding: EdgeInsets.zero,
         child: Stack(
           children: [
-            InteractiveViewer(
-              child: Center(
-                child: Image.network(imageUrl, fit: BoxFit.contain),
-              ),
+            PageView.builder(
+              controller: PageController(initialPage: initialIndex),
+              itemCount: imageUrls.length,
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  child: Center(
+                    child: Image.network(
+                      imageUrls[index],
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image,
+                        color: Colors.white54,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
+            if (imageUrls.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 32,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Swipe ${imageUrls.length} photos',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               top: 40,
               right: 16,
@@ -640,6 +678,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final imageAttachments = attachments
         .where((a) => a['type'] == 'image')
         .toList();
+    final imageUrls = <String>{
+      if (imageUrl != null && imageUrl.isNotEmpty) imageUrl,
+      ...imageAttachments
+          .map((a) => a['url'] as String?)
+          .whereType<String>()
+          .where((url) => url.isNotEmpty),
+    }.toList();
     final videoAttachments = attachments
         .where((a) => a['type'] == 'video')
         .toList();
@@ -793,29 +838,72 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
 
-                  // Image
-                  if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                  // Images
+                  if (imageUrls.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: () => _openImageFullscreen(imageUrl),
-                      child: Image.network(
-                        imageUrl,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 200,
-                          color: Colors.grey[800],
-                          child: Icon(
-                            Icons.broken_image,
-                            size: 48,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                    SizedBox(
+                      height: 320,
+                      child: PageView.builder(
+                        itemCount: imageUrls.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => _openImageFullscreen(
+                              imageUrls,
+                              initialIndex: index,
+                            ),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  imageUrls[index],
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    height: 320,
+                                    color: Colors.grey[800],
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      size: 48,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                                if (imageUrls.length > 1)
+                                  Positioned(
+                                    right: 12,
+                                    bottom: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${index + 1}/${imageUrls.length}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
                   // Attachments
-                  if (attachments.isNotEmpty || hasInlinePreview) ...[
+                  if (videoAttachments.isNotEmpty ||
+                      linkAttachments.isNotEmpty ||
+                      fileAttachments.isNotEmpty ||
+                      hasInlinePreview) ...[
                     const SizedBox(height: 12),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -834,32 +922,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (imageAttachments.isNotEmpty) ...[
-                                GestureDetector(
-                                  onTap: () => _openImageFullscreen(
-                                    imageAttachments.first['url'] as String,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      imageAttachments.first['url'] as String,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: 220,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        height: 220,
-                                        color: Colors.grey[800],
-                                        child: Icon(
-                                          Icons.broken_image,
-                                          size: 48,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                              ],
                               if (videoAttachments.isNotEmpty) ...[
                                 InlineVideoPlayer(
                                   url: videoAttachments.first['url'] as String,
@@ -868,7 +930,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                               ],
                               if (hasInlinePreview) ...[
                                 WebLinkPreviewCard(
-                                  url: firstPreviewUrl!,
+                                  url: firstPreviewUrl,
                                   buttonLabel: 'View Full Page',
                                   height: 560,
                                 ),
@@ -878,24 +940,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
-                                  ...imageAttachments.skip(1).map<Widget>((a) {
-                                    final fileName =
-                                        a['name'] as String? ?? 'Image';
-
-                                    return ActionChip(
-                                      avatar: const Icon(Icons.image, size: 18),
-                                      label: Text(
-                                        fileName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      onPressed: () {
-                                        final url = a['url'] as String?;
-                                        if (url == null || url.isEmpty) return;
-                                        _openImageFullscreen(url);
-                                      },
-                                    );
-                                  }),
                                   ...videoAttachments.skip(1).map<Widget>((a) {
                                     final fileName =
                                         a['name'] as String? ?? 'Video';
@@ -916,26 +960,31 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                     );
                                   }),
                                   ...linkAttachments
-                                      .skip(hasInlinePreview &&
-                                              linkAttachments.isNotEmpty
-                                          ? 1
-                                          : 0)
+                                      .skip(
+                                        hasInlinePreview &&
+                                                linkAttachments.isNotEmpty
+                                            ? 1
+                                            : 0,
+                                      )
                                       .map<Widget>((a) {
-                                    final fileName =
-                                        a['name'] as String? ?? 'Link';
+                                        final fileName =
+                                            a['name'] as String? ?? 'Link';
 
-                                    return ActionChip(
-                                      avatar: const Icon(Icons.link, size: 18),
-                                      label: Text(
-                                        fileName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      onPressed: () => _openAttachmentUrl(
-                                        a['url'] as String?,
-                                      ),
-                                    );
-                                  }),
+                                        return ActionChip(
+                                          avatar: const Icon(
+                                            Icons.link,
+                                            size: 18,
+                                          ),
+                                          label: Text(
+                                            fileName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          onPressed: () => _openAttachmentUrl(
+                                            a['url'] as String?,
+                                          ),
+                                        );
+                                      }),
                                   ...fileAttachments.map<Widget>((a) {
                                     final attachType =
                                         a['type'] as String? ?? 'file';
@@ -943,8 +992,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                         a['name'] as String? ?? 'Attachment';
 
                                     IconData getIcon() {
-                                      if (attachType == 'link')
+                                      if (attachType == 'link') {
                                         return Icons.link;
+                                      }
                                       if (fileName.toLowerCase().endsWith(
                                         '.pdf',
                                       )) {

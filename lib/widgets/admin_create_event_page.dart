@@ -24,6 +24,20 @@ class _SavedVenuePreset {
     return venue.trim();
   }
 
+  double? get latitudeValue => double.tryParse(latitude);
+  double? get longitudeValue => double.tryParse(longitude);
+
+  bool get hasValidCoordinates {
+    final lat = latitudeValue;
+    final lon = longitudeValue;
+    return lat != null &&
+        lon != null &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lon >= -180 &&
+        lon <= 180;
+  }
+
   Map<String, dynamic> toJson() => {
     'venue': venue,
     'address': address,
@@ -477,40 +491,102 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     return 'admin_saved_venues_$safeClub';
   }
 
-  Future<void> _loadSavedVenuePresets() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final keys = {
-        _savedVenuesPrefsKey(),
-        'admin_saved_venues_default_club',
-        ...prefs.getKeys().where(
-          (key) => key.startsWith('admin_saved_venues_'),
-        ),
-      };
+  String _savedVenueClubKey() {
+    return NotificationService.canonicalClubName(_clubName).trim();
+  }
 
-      final presetsById = <String, _SavedVenuePreset>{};
-      for (final key in keys) {
-        final raw = prefs.getStringList(key) ?? const [];
-        for (final entry in raw) {
-          try {
-            final preset = _SavedVenuePreset.fromJson(
-              jsonDecode(entry) as Map<String, dynamic>,
-            );
-            if (preset.venue.isNotEmpty) {
-              presetsById[preset.id] = preset;
-            }
-          } catch (e) {
-            debugPrint('Error decoding saved venue preset from "$key": $e');
+  _SavedVenuePreset? _presetFromSharedVenueRow(Map<String, dynamic> row) {
+    final venue = (row['venue'] as String? ?? '').trim();
+    final latitude = row['latitude'];
+    final longitude = row['longitude'];
+    if (venue.isEmpty || latitude == null || longitude == null) {
+      return null;
+    }
+
+    final preset = _SavedVenuePreset(
+      venue: venue,
+      address: (row['address'] as String? ?? '').trim(),
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+    );
+
+    return preset.hasValidCoordinates ? preset : null;
+  }
+
+  Future<List<_SavedVenuePreset>> _loadSharedVenuePresets() async {
+    final clubKey = _savedVenueClubKey();
+    if (clubKey.isEmpty) return const [];
+
+    final rows = await supabase
+        .from('saved_venues')
+        .select('venue, address, latitude, longitude')
+        .eq('club', clubKey)
+        .order('venue');
+
+    final presets = <_SavedVenuePreset>[];
+    for (final row in rows as List) {
+      final preset = _presetFromSharedVenueRow(
+        Map<String, dynamic>.from(row as Map),
+      );
+      if (preset != null) {
+        presets.add(preset);
+      }
+    }
+    return presets;
+  }
+
+  Future<List<_SavedVenuePreset>> _loadLocalVenuePresets() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = {
+      _savedVenuesPrefsKey(),
+      'admin_saved_venues_default_club',
+      ...prefs.getKeys().where((key) => key.startsWith('admin_saved_venues_')),
+    };
+
+    final presets = <_SavedVenuePreset>[];
+    for (final key in keys) {
+      final raw = prefs.getStringList(key) ?? const [];
+      for (final entry in raw) {
+        try {
+          final preset = _SavedVenuePreset.fromJson(
+            jsonDecode(entry) as Map<String, dynamic>,
+          );
+          if (preset.venue.isNotEmpty && preset.hasValidCoordinates) {
+            presets.add(preset);
           }
+        } catch (e) {
+          debugPrint('Error decoding saved venue preset from "$key": $e');
         }
       }
+    }
+    return presets;
+  }
 
-      final presets = presetsById.values.toList()
-        ..sort(
-          (a, b) => a.venue.trim().toLowerCase().compareTo(
-            b.venue.trim().toLowerCase(),
-          ),
-        );
+  Future<void> _loadSavedVenuePresets() async {
+    try {
+      final presetsById = <String, _SavedVenuePreset>{};
+
+      try {
+        for (final preset in await _loadSharedVenuePresets()) {
+          presetsById[preset.id] = preset;
+        }
+      } catch (e) {
+        debugPrint('Error loading shared venue presets: $e');
+      }
+
+      for (final preset in await _loadLocalVenuePresets()) {
+        presetsById.putIfAbsent(preset.id, () => preset);
+      }
+
+      final presets =
+          presetsById.values
+              .where((preset) => preset.hasValidCoordinates)
+              .toList()
+            ..sort(
+              (a, b) => a.venue.trim().toLowerCase().compareTo(
+                b.venue.trim().toLowerCase(),
+              ),
+            );
 
       if (!mounted) return;
       setState(() {
@@ -525,6 +601,46 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     }
   }
 
+  Future<void> _saveVenuePresetLocally(_SavedVenuePreset preset) async {
+    final prefs = await SharedPreferences.getInstance();
+    final updated = [..._savedVenuePresets];
+    final existingIndex = updated.indexWhere((p) => p.id == preset.id);
+    if (existingIndex >= 0) {
+      updated[existingIndex] = preset;
+    } else {
+      updated.add(preset);
+    }
+
+    final encoded = updated
+        .where((p) => p.hasValidCoordinates)
+        .map((p) => jsonEncode(p.toJson()))
+        .toList();
+    await prefs.setStringList(_savedVenuesPrefsKey(), encoded);
+  }
+
+  Future<void> _saveVenuePresetToSupabase(_SavedVenuePreset preset) async {
+    final userId = supabase.auth.currentUser?.id;
+    final clubKey = _savedVenueClubKey();
+    final latitude = preset.latitudeValue;
+    final longitude = preset.longitudeValue;
+    if (userId == null ||
+        clubKey.isEmpty ||
+        latitude == null ||
+        longitude == null) {
+      throw StateError('Missing user, club, or venue coordinates.');
+    }
+
+    await supabase.from('saved_venues').upsert({
+      'club': clubKey,
+      'venue': preset.venue.trim(),
+      'address': preset.address.trim(),
+      'latitude': latitude,
+      'longitude': longitude,
+      'created_by': userId,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'club,venue,address');
+  }
+
   Future<void> _saveCurrentVenuePreset() async {
     final venue = venueCtrl.text.trim();
     if (venue.isEmpty) {
@@ -534,35 +650,57 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       return;
     }
 
+    final latitude = double.tryParse(latitudeCtrl.text.trim());
+    final longitude = double.tryParse(longitudeCtrl.text.trim());
+    if (latitude == null ||
+        longitude == null ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add valid latitude and longitude before saving this venue.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final preset = _SavedVenuePreset(
       venue: venue,
       address: venueAddressCtrl.text.trim(),
-      latitude: latitudeCtrl.text.trim(),
-      longitude: longitudeCtrl.text.trim(),
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
     );
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final updated = [..._savedVenuePresets];
-      final existingIndex = updated.indexWhere((p) => p.id == preset.id);
-      if (existingIndex >= 0) {
-        updated[existingIndex] = preset;
-      } else {
-        updated.add(preset);
+      var savedForClub = true;
+      try {
+        await _saveVenuePresetToSupabase(preset);
+      } catch (e) {
+        savedForClub = false;
+        debugPrint('Failed to save shared venue preset: $e');
       }
 
-      final encoded = updated.map((p) => jsonEncode(p.toJson())).toList();
-      await prefs.setStringList(_savedVenuesPrefsKey(), encoded);
+      await _saveVenuePresetLocally(preset);
+      await _loadSavedVenuePresets();
 
       if (!mounted) return;
       setState(() {
-        _savedVenuePresets = updated;
         _selectedSavedVenueId = preset.id;
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Saved venue: ${preset.venue}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedForClub
+                ? 'Saved venue for club: ${preset.venue}'
+                : 'Saved venue on this device only until shared venues are enabled.',
+          ),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -620,6 +758,20 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       final encoded = updated.map((p) => jsonEncode(p.toJson())).toList();
       await prefs.setStringList(_savedVenuesPrefsKey(), encoded);
 
+      final clubKey = _savedVenueClubKey();
+      if (clubKey.isNotEmpty) {
+        try {
+          await supabase
+              .from('saved_venues')
+              .delete()
+              .eq('club', clubKey)
+              .eq('venue', preset.venue)
+              .eq('address', preset.address);
+        } catch (e) {
+          debugPrint('Failed to delete shared saved venue: $e');
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _savedVenuePresets = updated;
@@ -630,6 +782,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Deleted venue: ${preset.venue}')));
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to delete venue: $e')));
@@ -910,6 +1063,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(SnackBar(content: Text("Failed: $e")));
     }

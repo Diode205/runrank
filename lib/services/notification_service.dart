@@ -10,7 +10,7 @@ class NotificationService {
   static final _unreadCountController = StreamController<int>.broadcast();
   static final _eventActivityController = StreamController<int>.broadcast();
 
-  static String _canonicalClubName(String? clubName) {
+  static String canonicalClubName(String? clubName) {
     final normalized = (clubName ?? '').trim();
     final lower = normalized.toLowerCase();
     if (lower == 'nrr' ||
@@ -24,6 +24,28 @@ class NotificationService {
       return 'NNBR (North Norfolk Beach Runners)';
     }
     return normalized;
+  }
+
+  static Future<Set<String>> userIdsForClub(String? clubName) async {
+    final canonicalClub = canonicalClubName(clubName);
+    if (canonicalClub.isEmpty) return <String>{};
+
+    final users = await _supabase
+        .from('user_profiles')
+        .select('id, club')
+        .not('club', 'is', null);
+
+    final ids = <String>{};
+    for (final u in users as List) {
+      final userId = u['id'] as String?;
+      if (userId == null || userId.isEmpty) continue;
+      final userClub = canonicalClubName(u['club'] as String?);
+      if (userClub == canonicalClub) {
+        ids.add(userId);
+      }
+    }
+
+    return ids;
   }
 
   // ---------------------------------------------------------------
@@ -79,7 +101,7 @@ class NotificationService {
       "DEBUG: notifyUsersInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
     );
     try {
-      final canonicalClub = _canonicalClubName(clubName);
+      final canonicalClub = canonicalClubName(clubName);
       final users = await _supabase
           .from('user_profiles')
           .select('id, club')
@@ -89,7 +111,7 @@ class NotificationService {
         try {
           final userId = u['id'] as String?;
           if (userId == null || userId.isEmpty) continue;
-          final userClub = _canonicalClubName(u['club'] as String?);
+          final userClub = canonicalClubName(u['club'] as String?);
           if (userClub != canonicalClub) continue;
 
           final bodyWithRoute = route != null && route.isNotEmpty
@@ -132,7 +154,7 @@ class NotificationService {
       "DEBUG: notifyClubAdminsInClub called - club: $clubName, title: $title, body: $body, eventId: $eventId",
     );
     try {
-      final canonicalClub = _canonicalClubName(clubName);
+      final canonicalClub = canonicalClubName(clubName);
       final admins = await _supabase
           .from('user_profiles')
           .select('id, club, is_admin')
@@ -144,7 +166,7 @@ class NotificationService {
           final userId = u['id'] as String?;
           if (userId == null || userId.isEmpty) continue;
           if (excludeUserId != null && userId == excludeUserId) continue;
-          final userClub = _canonicalClubName(u['club'] as String?);
+          final userClub = canonicalClubName(u['club'] as String?);
           if (userClub != canonicalClub) continue;
 
           final bodyWithRoute = route != null && route.isNotEmpty
@@ -465,17 +487,7 @@ class NotificationService {
         debugClubName = clubName;
 
         if (clubName != null) {
-          final rows = await _supabase
-              .from('user_profiles')
-              .select('id')
-              .eq('club', clubName);
-
-          for (final row in rows as List) {
-            final id = row['id'] as String?;
-            if (id != null && id.isNotEmpty) {
-              clubUserIds.add(id);
-            }
-          }
+          clubUserIds = await userIdsForClub(clubName);
         }
       } catch (e) {
         print('DEBUG: unseenEventCount club resolution error: $e');
@@ -584,17 +596,7 @@ class NotificationService {
         isAdmin = (profile?['is_admin'] ?? false) as bool;
 
         if (clubName != null) {
-          final rows = await _supabase
-              .from('user_profiles')
-              .select('id')
-              .eq('club', clubName);
-
-          for (final row in rows as List) {
-            final id = row['id'] as String?;
-            if (id != null && id.isNotEmpty) {
-              clubUserIds.add(id);
-            }
-          }
+          clubUserIds = await userIdsForClub(clubName);
         }
       } catch (e) {
         print('DEBUG: unseenPostActivityCount club resolution error: $e');
@@ -673,17 +675,7 @@ class NotificationService {
         isAdmin = (profile?['is_admin'] ?? false) as bool;
 
         if (clubName != null) {
-          final rows = await _supabase
-              .from('user_profiles')
-              .select('id')
-              .eq('club', clubName);
-
-          for (final row in rows as List) {
-            final id = row['id'] as String?;
-            if (id != null && id.isNotEmpty) {
-              clubUserIds.add(id);
-            }
-          }
+          clubUserIds = await userIdsForClub(clubName);
         }
       } catch (e) {
         print('DEBUG: markPostsSeen club resolution error: $e');

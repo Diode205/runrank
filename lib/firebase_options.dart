@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyB1GD4zxHpMu1pfj3o-_dbdiX6yIIvLM8s',
-    appId: '1:612943729936:android:f70b9f0e60a868a70c0195',
+    appId: '1:612943729936:android:9faa2c4847ddcf070c0195',
     messagingSenderId: '612943729936',
     projectId: 'runrank-8171e',
     storageBucket: 'runrank-8171e.firebasestorage.app',
@@ -59,11 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBPZC6Z_fSzK_8-5BJ40PX-t9E4SXL697E',
-    appId: '1:612943729936:ios:0105e3bb476bed8a0c0195',
+    appId: '1:612943729936:ios:a88ad9833768bdd80c0195',
     messagingSenderId: '612943729936',
     projectId: 'runrank-8171e',
     storageBucket: 'runrank-8171e.firebasestorage.app',
-    iosBundleId: 'com.example.runrank',
+    iosBundleId: 'com.diodefernan.runrank',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

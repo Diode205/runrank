@@ -187,17 +187,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       final clubName = _clubName;
       if (clubName != null && clubName.isNotEmpty) {
         try {
-          final rows = await supabase
-              .from('user_profiles')
-              .select('id')
-              .eq('club', clubName);
-
-          for (final row in rows as List) {
-            final id = row['id'] as String?;
-            if (id != null && id.isNotEmpty) {
-              clubUserIds.add(id);
-            }
-          }
+          clubUserIds = await NotificationService.userIdsForClub(clubName);
         } catch (e) {
           debugPrint('PostsFeedFacebook: error loading club user ids: $e');
         }
@@ -967,25 +957,7 @@ class _PostAttachments extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (images.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              images.first['url'],
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: 200,
-              errorBuilder: (_, __, ___) => Container(
-                height: 200,
-                color: Colors.grey[800],
-                child: Icon(
-                  Icons.broken_image,
-                  size: 48,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ),
-          ),
+        if (images.isNotEmpty) _ImageCollagePreview(images: images),
         if (videos.isNotEmpty) ...[
           const SizedBox(height: 8),
           InlineVideoPlayer(url: videos.first['url'] as String),
@@ -993,56 +965,45 @@ class _PostAttachments extends StatelessWidget {
         if (hasInlinePreview) ...[
           const SizedBox(height: 8),
           WebLinkPreviewCard(
-            url: firstPreviewUrl!,
+            url: firstPreviewUrl,
             buttonLabel: 'View Full Page',
             height: 460,
           ),
         ],
-        if (images.length > 1 ||
-            links.length > 1 ||
+        if (links
+                .skip(hasInlinePreview && links.isNotEmpty ? 1 : 0)
+                .isNotEmpty ||
             files.isNotEmpty ||
-            videos.isNotEmpty) ...[
+            videos.length > 1) ...[
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
-              ...images
-                  .skip(1)
-                  .map(
-                    (a) => Chip(
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.image, size: 16),
-                      label: Text(
-                        a['name'] ?? 'Image',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
               ...links
                   .skip(hasInlinePreview && links.isNotEmpty ? 1 : 0)
                   .map(
-                (a) => ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  avatar: const Icon(Icons.link, size: 16),
-                  label: Text(
-                    a['name'] ?? 'Link',
-                    style: const TextStyle(fontSize: 12),
+                    (a) => ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.link, size: 16),
+                      label: Text(
+                        a['name'] ?? 'Link',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () async {
+                        final url = a['url'] as String?;
+                        if (url == null) return;
+                        final uri = Uri.tryParse(url);
+                        if (uri == null) return;
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                    ),
                   ),
-                  onPressed: () async {
-                    final url = a['url'] as String?;
-                    if (url == null) return;
-                    final uri = Uri.tryParse(url);
-                    if (uri == null) return;
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                    }
-                  },
-                ),
-              ),
               ...videos
                   .skip(1)
                   .map(
@@ -1093,6 +1054,99 @@ class _PostAttachments extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _ImageCollagePreview extends StatelessWidget {
+  final List images;
+
+  const _ImageCollagePreview({required this.images});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleImages = images.take(4).toList();
+
+    if (visibleImages.length == 1) {
+      return _CollageImageTile(
+        url: visibleImages.first['url'] as String?,
+        height: 220,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 240,
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: visibleImages.length == 2 ? 2 : 2,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+            childAspectRatio: visibleImages.length == 2 ? 0.82 : 1,
+          ),
+          itemCount: visibleImages.length,
+          itemBuilder: (context, index) {
+            final remaining = images.length - visibleImages.length;
+            final showMore = index == visibleImages.length - 1 && remaining > 0;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                _CollageImageTile(
+                  url: visibleImages[index]['url'] as String?,
+                  height: double.infinity,
+                  borderRadius: BorderRadius.zero,
+                ),
+                if (showMore)
+                  Container(
+                    color: Colors.black54,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '+$remaining',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CollageImageTile extends StatelessWidget {
+  final String? url;
+  final double height;
+  final BorderRadius borderRadius;
+
+  const _CollageImageTile({
+    required this.url,
+    required this.height,
+    this.borderRadius = const BorderRadius.all(Radius.circular(8)),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: Image.network(
+        url ?? '',
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: height,
+        errorBuilder: (_, __, ___) => Container(
+          height: height,
+          color: Colors.grey[800],
+          child: Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+        ),
+      ),
     );
   }
 }
