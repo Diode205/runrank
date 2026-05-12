@@ -172,11 +172,7 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
 
   Future<void> _openLink(String url, BuildContext context) async {
     final uri = Uri.parse(url);
-    if (!await launchUrl(
-      uri,
-      mode: LaunchMode.inAppWebView,
-      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
-    )) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,

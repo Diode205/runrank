@@ -370,6 +370,55 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     return null;
   }
 
+  String _cancelledResponderBody({
+    required String responseType,
+    required String reason,
+  }) {
+    final involvement = switch (responseType) {
+      'running' => 'running',
+      'marshalling' => 'marshalling',
+      'supporting' => 'supporting',
+      'unavailable' => 'following',
+      _ => 'attending',
+    };
+    final reasonText = reason.isNotEmpty ? ' Reason: $reason' : '';
+    return 'The event you are $involvement has been cancelled.$reasonText';
+  }
+
+  Future<Set<String>> _notifyCancelledEventResponders({
+    required ClubEvent event,
+    required String reason,
+  }) async {
+    final responderIds = <String>{};
+
+    try {
+      final rows = await supabase
+          .from('club_event_responses')
+          .select('user_id, response_type')
+          .eq('event_id', event.id);
+
+      for (final row in rows as List) {
+        final userId = row['user_id'] as String?;
+        if (userId == null || userId.isEmpty) continue;
+
+        responderIds.add(userId);
+        await NotificationService.notifyUser(
+          userId: userId,
+          title: '${event.title} Cancelled',
+          body: _cancelledResponderBody(
+            responseType: (row['response_type'] as String?) ?? '',
+            reason: reason,
+          ),
+          eventId: event.id,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error notifying cancelled event responders: $e');
+    }
+
+    return responderIds;
+  }
+
   @override
   Widget build(BuildContext context) {
     final brandColors = UserService.clubBrandGradient(_clubName);
@@ -631,12 +680,13 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                               if (ok == true) {
                                 try {
+                                  final cancelReason = reasonController.text
+                                      .trim();
                                   await supabase
                                       .from('club_events')
                                       .update({
                                         'is_cancelled': true,
-                                        'cancel_reason': reasonController.text
-                                            .trim(),
+                                        'cancel_reason': cancelReason,
                                         'cancelled_at': DateTime.now()
                                             .toUtc()
                                             .toIso8601String(),
@@ -645,6 +695,11 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                                   // Notify members of the relevant club about cancellation
                                   try {
+                                    final responderIds =
+                                        await _notifyCancelledEventResponders(
+                                          event: e,
+                                          reason: cancelReason,
+                                        );
                                     final clubName = await _resolveClubForEvent(
                                       e,
                                     );
@@ -653,10 +708,11 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                                       await NotificationService.notifyUsersInClub(
                                         clubName: clubName,
                                         title: '${e.title} Cancelled',
-                                        body: reasonController.text.isNotEmpty
-                                            ? 'Event cancelled. Reason: ${reasonController.text.trim()}'
+                                        body: cancelReason.isNotEmpty
+                                            ? 'Event cancelled. Reason: $cancelReason'
                                             : 'Event has been cancelled.',
                                         eventId: e.id,
+                                        excludeUserIds: responderIds,
                                       );
                                     } else {
                                       debugPrint(

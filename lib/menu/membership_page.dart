@@ -224,6 +224,86 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         : tierName;
   }
 
+  DateTime _membershipYearStart([DateTime? date]) {
+    final value = date ?? DateTime.now();
+    final mayFirst = DateTime(value.year, 5, 1);
+    return !DateTime(value.year, value.month, value.day).isBefore(mayFirst)
+        ? mayFirst
+        : DateTime(value.year - 1, 5, 1);
+  }
+
+  DateTime _membershipYearEnd(DateTime yearStart) {
+    return DateTime(yearStart.year + 1, 4, 30);
+  }
+
+  String _membershipYearStartKey(DateTime yearStart) {
+    return yearStart.toIso8601String().split('T').first;
+  }
+
+  DateTime? _parseDateOnly(dynamic value) {
+    if (value == null) return null;
+    try {
+      final parsed = DateTime.parse(value.toString());
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _joinedInMembershipYear({
+    required dynamic memberSince,
+    required DateTime yearStart,
+  }) {
+    final joined = _parseDateOnly(memberSince);
+    if (joined == null) return false;
+    final yearEnd = _membershipYearEnd(yearStart);
+    return !joined.isBefore(yearStart) && !joined.isAfter(yearEnd);
+  }
+
+  String _displayMemberSince(dynamic memberSince) {
+    if (memberSince == null) return 'Not set';
+    try {
+      return _formatMonthYear(memberSince.toString());
+    } catch (_) {
+      return 'Not set';
+    }
+  }
+
+  Future<Set<String>> _renewedMemberIdsForYear({
+    required String clubName,
+    required DateTime yearStart,
+  }) async {
+    try {
+      final rows = await _client
+          .from('membership_renewals')
+          .select('user_id')
+          .eq('club', clubName)
+          .eq('membership_year_start', _membershipYearStartKey(yearStart));
+
+      return {
+        for (final row in rows as List)
+          if (row['user_id'] != null) row['user_id'].toString(),
+      };
+    } catch (e) {
+      debugPrint('Error loading membership renewals: $e');
+      return const <String>{};
+    }
+  }
+
+  Map<String, dynamic> _membershipReportEntry(Map<String, dynamic> row) {
+    final name = (row['full_name'] as String?)?.trim();
+    final email = (row['email'] as String?)?.trim();
+    final membershipType = (row['membership_type'] as String?)?.trim();
+    return {
+      'id': row['id']?.toString() ?? '',
+      'name': (name != null && name.isNotEmpty) ? name : (email ?? 'Unknown'),
+      'type': (membershipType != null && membershipType.isNotEmpty)
+          ? membershipType
+          : 'Not assigned',
+      'memberSinceLabel': _displayMemberSince(row['member_since']),
+    };
+  }
+
   Future<bool> _launchMembershipRequestEmail({
     required String membershipSecretaryEmail,
     required String tierName,
@@ -884,7 +964,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               if (_isAdmin)
                 IconButton(
                   icon: const Icon(Icons.list_alt, color: Colors.white70),
-                  tooltip: 'View membership status report (admin only)',
+                  tooltip: 'View active membership report (admin only)',
                   onPressed: _showMembershipStatusReport,
                 ),
             ],
@@ -1079,7 +1159,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               child: OutlinedButton.icon(
                 onPressed: _showLapsedRenewalsReport,
                 icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                label: const Text('View Lapsed Renewals List'),
+                label: const Text('View Elapsed Renewal List'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.orangeAccent,
                   side: const BorderSide(color: Colors.orangeAccent, width: 1),
@@ -1096,7 +1176,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       final clubName = await UserService.currentClubName();
       var query = _client
           .from('user_profiles')
-          .select('full_name, email, membership_type, member_since, club');
+          .select('id, full_name, email, membership_type, member_since, club');
       if (clubName != null && clubName.isNotEmpty) {
         query = query.eq('club', clubName);
       }
@@ -1111,50 +1191,62 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       }
 
       final now = DateTime.now();
-      final buffer = StringBuffer();
-      buffer.writeln('NRR Membership Status Report');
-      buffer.writeln('Generated on ${_formatFullDate(now)}');
-      buffer.writeln('');
-      buffer.writeln('Name — Membership type — Member since — Renewal due');
-      buffer.writeln('');
+      final yearStart = _membershipYearStart(now);
+      final yearEnd = _membershipYearEnd(yearStart);
+      final clubKey = clubName ?? '';
+      final renewedIds = clubKey.isEmpty
+          ? const <String>{}
+          : await _renewedMemberIdsForYear(
+              clubName: clubKey,
+              yearStart: yearStart,
+            );
+      final active = <Map<String, dynamic>>[];
 
-      for (final row in rows) {
-        final name = (row['full_name'] as String?)?.trim();
-        final email = (row['email'] as String?)?.trim();
-        final membershipType = (row['membership_type'] as String?)?.trim();
-        final memberSinceStr = row['member_since'] as String?;
+      for (final row in rows as List) {
+        final rowMap = Map<String, dynamic>.from(row as Map);
+        final userId = rowMap['id']?.toString() ?? '';
+        final isActive =
+            renewedIds.contains(userId) ||
+            _joinedInMembershipYear(
+              memberSince: rowMap['member_since'],
+              yearStart: yearStart,
+            );
 
-        String memberSinceLabel = 'Not set';
-        String renewalLabel = 'Unknown';
-
-        if (memberSinceStr != null) {
-          try {
-            final dt = DateTime.parse(memberSinceStr);
-            memberSinceLabel = _formatMonthYear(memberSinceStr);
-            final due = DateTime(dt.year + 1, dt.month, dt.day);
-            renewalLabel = _formatFullDate(due);
-          } catch (_) {
-            memberSinceLabel = 'Not set';
-            renewalLabel = 'Unknown';
-          }
+        if (isActive) {
+          active.add(_membershipReportEntry(rowMap));
         }
+      }
 
-        final displayName = (name != null && name.isNotEmpty)
-            ? name
-            : (email ?? 'Unknown');
-        final typeLabel = (membershipType != null && membershipType.isNotEmpty)
-            ? membershipType
-            : 'Not assigned';
+      active.sort(
+        (a, b) => (a['name'] as String).toLowerCase().compareTo(
+          (b['name'] as String).toLowerCase(),
+        ),
+      );
 
+      final buffer = StringBuffer();
+      buffer.writeln('Active Membership Report');
+      buffer.writeln('Generated on ${_formatFullDate(now)}');
+      buffer.writeln(
+        'Membership year: ${_formatFullDate(yearStart)} to ${_formatFullDate(yearEnd)}',
+      );
+      buffer.writeln('');
+      buffer.writeln('Name — Membership type — Member since');
+      buffer.writeln('');
+
+      for (final entry in active) {
         buffer.writeln(
-          '$displayName — $typeLabel — $memberSinceLabel — $renewalLabel',
+          '${entry['name']} — ${entry['type']} — ${entry['memberSinceLabel']}',
         );
+      }
+
+      if (active.isEmpty) {
+        buffer.writeln('No active renewals recorded for this membership year.');
       }
 
       final content = buffer.toString().trimRight();
       if (!mounted) return;
       await _showMembershipReportSheet(
-        title: 'NRR Membership Status Report',
+        title: 'Active Membership Report',
         content: content,
       );
     } catch (e) {
@@ -1170,7 +1262,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       final clubName = await UserService.currentClubName();
       var query = _client
           .from('user_profiles')
-          .select('full_name, email, membership_type, member_since, club');
+          .select('id, full_name, email, membership_type, member_since, club');
       if (clubName != null && clubName.isNotEmpty) {
         query = query.eq('club', clubName);
       }
@@ -1185,85 +1277,329 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       }
 
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final yearStart = _membershipYearStart(now);
+      final yearEnd = _membershipYearEnd(yearStart);
+      final clubKey = clubName ?? '';
+      final renewedIds = clubKey.isEmpty
+          ? const <String>{}
+          : await _renewedMemberIdsForYear(
+              clubName: clubKey,
+              yearStart: yearStart,
+            );
 
       final lapsed = <Map<String, dynamic>>[];
+      for (final row in rows as List) {
+        final rowMap = Map<String, dynamic>.from(row as Map);
+        final userId = rowMap['id']?.toString() ?? '';
+        final joinedThisYear = _joinedInMembershipYear(
+          memberSince: rowMap['member_since'],
+          yearStart: yearStart,
+        );
+        final renewed = renewedIds.contains(userId);
 
-      for (final row in rows) {
-        final name = (row['full_name'] as String?)?.trim();
-        final email = (row['email'] as String?)?.trim();
-        final membershipType = (row['membership_type'] as String?)?.trim();
-        final memberSinceStr = row['member_since'] as String?;
-
-        if (memberSinceStr == null) {
-          continue; // cannot compute renewal without a start date
-        }
-
-        try {
-          final dt = DateTime.parse(memberSinceStr);
-          final due = DateTime(dt.year + 1, dt.month, dt.day);
-          final dueDateOnly = DateTime(due.year, due.month, due.day);
-          if (dueDateOnly.isBefore(today)) {
-            final displayName = (name != null && name.isNotEmpty)
-                ? name
-                : (email ?? 'Unknown');
-            final typeLabel =
-                (membershipType != null && membershipType.isNotEmpty)
-                ? membershipType
-                : 'Not assigned';
-            lapsed.add({
-              'name': displayName,
-              'type': typeLabel,
-              'memberSinceLabel': _formatMonthYear(memberSinceStr),
-              'renewalLabel': _formatFullDate(due),
-              'due': dueDateOnly,
-            });
-          }
-        } catch (_) {
-          // ignore rows with invalid dates
+        if (!joinedThisYear && !renewed) {
+          lapsed.add(_membershipReportEntry(rowMap));
         }
       }
 
       if (lapsed.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No lapsed renewals found.')),
+          const SnackBar(content: Text('No elapsed renewals found.')),
         );
         return;
       }
 
-      lapsed.sort((a, b) {
-        final da = a['due'] as DateTime;
-        final db = b['due'] as DateTime;
-        return da.compareTo(db);
-      });
+      lapsed.sort(
+        (a, b) => (a['name'] as String).toLowerCase().compareTo(
+          (b['name'] as String).toLowerCase(),
+        ),
+      );
 
-      final buffer = StringBuffer();
-      buffer.writeln('Lapsed Membership Renewals');
-      buffer.writeln('Generated on ${_formatFullDate(now)}');
-      buffer.writeln('');
-      buffer.writeln('Name — Membership type — Member since — Renewal due');
-      buffer.writeln('');
-
-      for (final entry in lapsed) {
-        buffer.writeln(
-          '${entry['name']} — ${entry['type']} — '
-          '${entry['memberSinceLabel']} — ${entry['renewalLabel']}',
-        );
-      }
-
-      final content = buffer.toString().trimRight();
       if (!mounted) return;
-      await _showMembershipReportSheet(
-        title: 'Lapsed Membership Renewals',
-        content: content,
+      await _showElapsedRenewalsSheet(
+        entries: lapsed,
+        clubName: clubKey,
+        yearStart: yearStart,
+        yearEnd: yearEnd,
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading lapsed renewals: $e')),
+        SnackBar(content: Text('Error loading elapsed renewals: $e')),
       );
     }
+  }
+
+  String _elapsedRenewalsContent({
+    required List<Map<String, dynamic>> entries,
+    required DateTime yearStart,
+    required DateTime yearEnd,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('Elapsed Renewal List');
+    buffer.writeln('Generated on ${_formatFullDate(DateTime.now())}');
+    buffer.writeln(
+      'Membership year: ${_formatFullDate(yearStart)} to ${_formatFullDate(yearEnd)}',
+    );
+    buffer.writeln('');
+    buffer.writeln('Renewed — Name — Membership type — Member since');
+    buffer.writeln('');
+
+    for (final entry in entries) {
+      buffer.writeln(
+        '[ ] — ${entry['name']} — ${entry['type']} — ${entry['memberSinceLabel']}',
+      );
+    }
+
+    return buffer.toString().trimRight();
+  }
+
+  Future<void> _markMembershipRenewed({
+    required String userId,
+    required String clubName,
+    required DateTime yearStart,
+  }) async {
+    final adminId = _client.auth.currentUser?.id;
+    if (adminId == null || userId.isEmpty || clubName.isEmpty) {
+      throw StateError('Missing admin, member, or club details.');
+    }
+
+    await _client.from('membership_renewals').upsert({
+      'user_id': userId,
+      'club': clubName,
+      'membership_year_start': _membershipYearStartKey(yearStart),
+      'renewed_by': adminId,
+      'renewed_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'user_id,club,membership_year_start');
+  }
+
+  Future<void> _showElapsedRenewalsSheet({
+    required List<Map<String, dynamic>> entries,
+    required String clubName,
+    required DateTime yearStart,
+    required DateTime yearEnd,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        var visibleEntries = List<Map<String, dynamic>>.from(entries);
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final content = _elapsedRenewalsContent(
+              entries: visibleEntries,
+              yearStart: yearStart,
+              yearEnd: yearEnd,
+            );
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  media.viewInsets.bottom + 20,
+                ),
+                child: SizedBox(
+                  height: media.size.height * 0.72,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Elapsed Renewal List',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${_formatFullDate(yearStart)} to ${_formatFullDate(yearEnd)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (visibleEntries.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Member',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Renewed',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (visibleEntries.isNotEmpty) const SizedBox(height: 4),
+                      Expanded(
+                        child: visibleEntries.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'All listed members have been marked renewed.',
+                                  style: TextStyle(color: Colors.white70),
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: visibleEntries.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(color: Colors.white12),
+                                itemBuilder: (context, index) {
+                                  final entry = visibleEntries[index];
+                                  return CheckboxListTile(
+                                    value: false,
+                                    onChanged: (value) async {
+                                      if (value != true) return;
+
+                                      try {
+                                        await _markMembershipRenewed(
+                                          userId: entry['id'] as String,
+                                          clubName: clubName,
+                                          yearStart: yearStart,
+                                        );
+
+                                        setSheetState(() {
+                                          visibleEntries.removeAt(index);
+                                        });
+
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          this.context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '${entry['name']} marked renewed.',
+                                            ),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          this.context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Could not mark renewed: $e',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    controlAffinity:
+                                        ListTileControlAffinity.trailing,
+                                    activeColor: _clubPrimaryColor,
+                                    title: Text(
+                                      entry['name'] as String,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '${entry['type']} · Member since ${entry['memberSinceLabel']}',
+                                      style: const TextStyle(
+                                        color: Colors.white60,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final navigator = Navigator.of(sheetContext);
+                                final messenger = ScaffoldMessenger.of(
+                                  this.context,
+                                );
+                                await Clipboard.setData(
+                                  ClipboardData(text: content),
+                                );
+                                if (!mounted) return;
+                                if (navigator.canPop()) {
+                                  navigator.pop();
+                                }
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Copied renewal list to clipboard.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy, size: 18),
+                              label: const Text('Copy'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.white38,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await _exportMembershipReportAsPdf(
+                                  'Elapsed Renewal List',
+                                  content,
+                                );
+                              },
+                              icon: const Icon(Icons.picture_as_pdf, size: 18),
+                              label: const Text('Export PDF'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.white38,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _showMembershipReportSheet({
@@ -1430,19 +1766,29 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
       try {
         final amountCents = _amountPenceForTier(tierName);
         if (!_isNrrClub) {
+          final clubName = _clubName ?? await UserService.currentClubName();
+          if (!mounted) return;
           final paid = await PaymentService.startMembershipPayment(
             context: context,
             tierName: tierName,
             amountCents: amountCents,
             metadata: {
               'context': 'membership_renewal',
-              'club': _clubName,
+              'club': clubName,
               'membership_tier': tierName,
               'user_id': user.id,
             },
           );
 
           if (!paid) return;
+
+          if (clubName != null && clubName.isNotEmpty) {
+            await _markMembershipRenewed(
+              userId: user.id,
+              clubName: clubName,
+              yearStart: _membershipYearStart(),
+            );
+          }
 
           final updates = {
             'membership_type': tierName,
