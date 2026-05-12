@@ -233,9 +233,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   static const List<String> _nrrTrainingEventTypes = <String>[
     'Recovery Monday',
     'Mousehold Monday',
-    'Coached Tuesday',
-    'Road Route Thursday',
-    'Paul Evans Session',
+    'Efforts Tuesday',
+    'Road Run Thursday',
+    'Track Session',
   ];
 
   bool get _usesTrainingDetails =>
@@ -918,9 +918,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         return "Training";
       case "Recovery Monday":
       case "Mousehold Monday":
+      case "Efforts Tuesday":
+      case "Road Run Thursday":
+      case "Track Session":
       case "Coached Tuesday":
       case "Road Route Thursday":
       case "Paul Evans Session":
+      case "Paul Evan Session":
         return eventType;
       case "One Mile Handicap":
         return "One Mile Handicap";

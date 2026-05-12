@@ -482,15 +482,12 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                       final normalizedType = e.eventType
                           .toLowerCase()
                           .replaceAll(" ", "_");
-                      final omitCreatorSubtitle =
-                          normalizedType == 'paul_evans_session';
                       String subtitleWithCreator(
                         String venue,
                         String creatorName,
                       ) {
                         final parts = <String>[];
-                        if (!omitCreatorSubtitle &&
-                            creatorName.trim().isNotEmpty) {
+                        if (creatorName.trim().isNotEmpty) {
                           parts.add('with ${creatorName.trim()}');
                         }
                         if (venue.trim().isNotEmpty) {
@@ -505,9 +502,13 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         'training_2': 'Training',
                         'recovery_monday': 'Recovery Monday',
                         'mousehold_monday': 'Mousehold Monday',
+                        'efforts_tuesday': 'Efforts Tuesday',
+                        'road_run_thursday': 'Road Run Thursday',
+                        'track_session': 'Track Session',
                         'coached_tuesday': 'Coached Tuesday',
                         'road_route_thursday': 'Road Route Thursday',
                         'paul_evans_session': 'Paul Evans Session',
+                        'paul_evan_session': 'Paul Evan Session',
                       };
                       if (normalizedType == 'relay') {
                         final rawTeam = e.relayTeam?.trim() ?? '';
@@ -575,8 +576,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                       }
 
                       final eventCreatorName = e.hostOrDirector.trim();
-                      if (!omitCreatorSubtitle &&
-                          eventCreatorName.isNotEmpty &&
+                      if (eventCreatorName.isNotEmpty &&
                           !displayTitle.contains(eventCreatorName) &&
                           !subtitleText.contains(eventCreatorName)) {
                         subtitleText = subtitleText.trim().isEmpty
@@ -828,9 +828,13 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
       case 'recovery_monday':
       case 'mousehold_monday':
+      case 'efforts_tuesday':
+      case 'road_run_thursday':
+      case 'track_session':
       case 'coached_tuesday':
       case 'road_route_thursday':
       case 'paul_evans_session':
+      case 'paul_evan_session':
         return const Color(0x33FFF59D);
       case 'race':
       case 'cross_country':
@@ -861,9 +865,13 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
       case 'recovery_monday':
       case 'mousehold_monday':
+      case 'efforts_tuesday':
+      case 'road_run_thursday':
+      case 'track_session':
       case 'coached_tuesday':
       case 'road_route_thursday':
       case 'paul_evans_session':
+      case 'paul_evan_session':
         return '🏃';
       case 'race':
       case 'cross_country':
