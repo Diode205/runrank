@@ -184,9 +184,14 @@ class _RunRankAppState extends State<RunRankApp> {
   bool _passwordRecoveryScreenOpen = false;
   bool _passwordRecoveryMode = false;
 
+  void _handleClubConfigRefresh() {
+    _loadClubConfig();
+  }
+
   @override
   void initState() {
     super.initState();
+    ClubConfigService.refreshNotifier.addListener(_handleClubConfigRefresh);
     _loadClubConfig();
     _listenForPasswordRecoveryLinks();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
@@ -213,6 +218,7 @@ class _RunRankAppState extends State<RunRankApp> {
 
   @override
   void dispose() {
+    ClubConfigService.refreshNotifier.removeListener(_handleClubConfigRefresh);
     _authSubscription?.cancel();
     _deepLinkSubscription?.cancel();
     super.dispose();

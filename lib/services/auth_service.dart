@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:runrank/services/club_config_service.dart';
 import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,32 @@ class AuthService {
   static final SupabaseClient _supabase = Supabase.instance.client;
   static const String passwordResetRedirectUrl =
       'runrank://login-callback/reset-password';
+
+  static Future<Map<String, dynamic>?> validateClubMemberInvite({
+    required String club,
+    required String ukaNumber,
+    required String inviteCode,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'validate_club_member_invite',
+        params: {
+          'p_club_name': club.trim(),
+          'p_uka_number': ukaNumber.trim(),
+          'p_invite_code': inviteCode.trim(),
+        },
+      );
+
+      if (result is List && result.isNotEmpty) {
+        return Map<String, dynamic>.from(result.first as Map);
+      }
+      return null;
+    } catch (e) {
+      // ignore: avoid_print
+      print('Invite validation failed: $e');
+      return null;
+    }
+  }
 
   static List<String> _ukaLookupVariants(String ukaNumber) {
     final trimmed = ukaNumber.trim();
@@ -70,6 +97,7 @@ class AuthService {
     required String emergencyContactRelation,
     required bool emergencyDetailsConsent,
     String? medicalNotes,
+    String? memberInviteId,
   }) async {
     try {
       // 1) Create user in Supabase Auth
@@ -110,6 +138,22 @@ class AuthService {
         "admin_since": null,
         "member_since": memberSince,
       });
+
+      UserService.cacheClubName(club);
+
+      if (memberInviteId != null && memberInviteId.isNotEmpty) {
+        final claimed = await _supabase.rpc(
+          'claim_club_member_invite',
+          params: {'p_invite_id': memberInviteId},
+        );
+        if (claimed != true) {
+          // ignore: avoid_print
+          print('REGISTRATION FAILED: invite could not be claimed');
+          return false;
+        }
+      }
+
+      ClubConfigService.notifyClubChanged();
 
       return true;
     } catch (e) {

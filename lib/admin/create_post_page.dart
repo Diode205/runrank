@@ -404,324 +404,349 @@ class _CreatePostPageState extends State<CreatePostPage> {
       ),
       body: _uploading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[700]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'All posts are subject to Admin approval. Any post that is deemed irrelevant and or unnecessary may not be published. Please refer to Club Policies on Privacy, Health & Safety, and Data Protection.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 12),
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Contact',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: accent,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.underline,
-                                    height: 1.5,
-                                  ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              const AdministrativeTeamPage(),
-                                        ),
-                                      );
-                                    },
-                                ),
-                                const TextSpan(
-                                  text:
-                                      ' your Admin for clarification and guidance.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white70,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Column(
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final reservedHeight = _useCustomTitle ? 455.0 : 390.0;
+                final contentHeight = (constraints.maxHeight - reservedHeight)
+                    .clamp(220.0, 720.0);
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        DropdownButtonFormField<String>(
-                          value: _titleCategory,
-                          decoration: InputDecoration(
-                            labelText: 'Title',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[850],
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[900],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[700]!),
                           ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'Announcement',
-                              child: Text('Announcement'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'All posts are subject to Admin approval. Any post that is deemed irrelevant and or unnecessary may not be published. Please refer to Club Policies on Privacy, Health & Safety, and Data Protection.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: 'Contact',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: accent,
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.underline,
+                                        height: 1.5,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  const AdministrativeTeamPage(),
+                                            ),
+                                          );
+                                        },
+                                    ),
+                                    const TextSpan(
+                                      text:
+                                          ' your Admin for clarification and guidance.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white70,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              value: _titleCategory,
+                              decoration: InputDecoration(
+                                labelText: 'Title',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[850],
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'Announcement',
+                                  child: Text('Announcement'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Race Report',
+                                  child: Text('Race Report'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Standard/Age Grade Report',
+                                  child: Text('Standard/Age Grade Report'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Team Briefing',
+                                  child: Text('Team Briefing'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Road Hazard Alert',
+                                  child: Text('Road Hazard Alert'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Custom',
+                                  child: Text('Other...'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  _titleCategory = v;
+                                  _useCustomTitle = v == 'Custom';
+                                  if (!_useCustomTitle) {
+                                    _titleController.text = v;
+                                  } else {
+                                    _titleController.clear();
+                                  }
+                                });
+                              },
                             ),
-                            DropdownMenuItem(
-                              value: 'Race Report',
-                              child: Text('Race Report'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Standard/Age Grade Report',
-                              child: Text('Standard/Age Grade Report'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Team Briefing',
-                              child: Text('Team Briefing'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Road Hazard Alert',
-                              child: Text('Road Hazard Alert'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Custom',
-                              child: Text('Other...'),
-                            ),
+                            if (_useCustomTitle) ...[
+                              const SizedBox(height: 10),
+                              TextFormField(
+                                autofocus: true,
+                                controller: _titleController,
+                                decoration: InputDecoration(
+                                  labelText: 'Custom Title',
+                                  hintText: 'Enter your custom title',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[850],
+                                ),
+                                style: const TextStyle(fontSize: 16),
+                                validator: (value) {
+                                  if (_useCustomTitle &&
+                                      (value == null || value.trim().isEmpty)) {
+                                    return 'Enter a title';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                           ],
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() {
-                              _titleCategory = v;
-                              _useCustomTitle = v == 'Custom';
-                              if (!_useCustomTitle) {
-                                _titleController.text = v;
-                              } else {
-                                _titleController.clear();
-                              }
-                            });
-                          },
                         ),
                         const SizedBox(height: 12),
-                        if (_useCustomTitle)
-                          TextFormField(
-                            autofocus: true,
-                            controller: _titleController,
-                            decoration: InputDecoration(
-                              labelText: 'Custom Title',
-                              hintText: 'Enter your custom title',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[850],
-                            ),
-                            style: const TextStyle(fontSize: 16),
-                            validator: (value) {
-                              if (_useCustomTitle &&
-                                  (value == null || value.trim().isEmpty)) {
-                                return 'Enter a title';
-                              }
-                              return null;
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Stack(
-                      children: [
-                        TextFormField(
-                          controller: _contentController,
-                          decoration: InputDecoration(
-                            labelText: 'Content',
-                            hintText:
-                                'Share your news, race report, or running story...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[850],
-                            alignLabelWithHint: true,
-                          ),
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: 10,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter content';
-                            }
-                            return null;
-                          },
-                        ),
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        SizedBox(
+                          height: contentHeight,
+                          child: Stack(
                             children: [
-                              IconButton(
-                                tooltip: 'Photo from Gallery',
-                                onPressed: _attachmentUploading
-                                    ? null
-                                    : _addAttachmentFromGallery,
-                                icon: const Icon(
-                                  Icons.image,
-                                  color: Colors.blue,
-                                  size: 24,
+                              TextFormField(
+                                controller: _contentController,
+                                decoration: InputDecoration(
+                                  labelText: 'Content',
+                                  hintText:
+                                      'Share your news, race report, or running story...',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[850],
+                                  alignLabelWithHint: true,
+                                  contentPadding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    18,
+                                    12,
+                                    62,
+                                  ),
                                 ),
+                                style: const TextStyle(fontSize: 14),
+                                expands: true,
+                                minLines: null,
+                                maxLines: null,
+                                textAlignVertical: TextAlignVertical.top,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter content';
+                                  }
+                                  return null;
+                                },
                               ),
-                              IconButton(
-                                tooltip: 'Take Photo',
-                                onPressed: _attachmentUploading
-                                    ? null
-                                    : _addAttachmentFromCamera,
-                                icon: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.green,
-                                  size: 24,
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Attach Document',
-                                onPressed: _attachmentUploading
-                                    ? null
-                                    : _addAttachmentFile,
-                                icon: const Icon(
-                                  Icons.attach_file,
-                                  color: Colors.orange,
-                                  size: 24,
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Attach Video',
-                                onPressed: _attachmentUploading
-                                    ? null
-                                    : _addAttachmentVideo,
-                                icon: const Icon(
-                                  Icons.videocam,
-                                  color: Colors.purple,
-                                  size: 24,
+                              Positioned(
+                                bottom: 8,
+                                left: 8,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Photo from Gallery',
+                                      onPressed: _attachmentUploading
+                                          ? null
+                                          : _addAttachmentFromGallery,
+                                      icon: const Icon(
+                                        Icons.image,
+                                        color: Colors.blue,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Take Photo',
+                                      onPressed: _attachmentUploading
+                                          ? null
+                                          : _addAttachmentFromCamera,
+                                      icon: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.green,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Attach Document',
+                                      onPressed: _attachmentUploading
+                                          ? null
+                                          : _addAttachmentFile,
+                                      icon: const Icon(
+                                        Icons.attach_file,
+                                        color: Colors.orange,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Attach Video',
+                                      onPressed: _attachmentUploading
+                                          ? null
+                                          : _addAttachmentVideo,
+                                      icon: const Icon(
+                                        Icons.videocam,
+                                        color: Colors.purple,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tip: Any https:// link in Content becomes a tappable link in the post. '
-                      'Videos are limited to about 50MB, which is usually around 1 to 3 minutes depending on quality. '
-                      'Posts expire automatically 100 days after publication unless removed earlier by Admin.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    if (_attachmentUploading) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tip: Any https:// link in Content becomes a tappable link in the post. '
+                          'Videos are limited to about 50MB, which is usually around 1 to 3 minutes depending on quality. '
+                          'Posts expire automatically 100 days after publication unless removed earlier by Admin.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Uploading attachment... please wait before publishing.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[400],
+                        ),
+                        if (_attachmentUploading) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Uploading attachment... please wait before publishing.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_attachments.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _attachments
+                                .map(
+                                  (att) => Chip(
+                                    label: Text(
+                                      att['name'] ?? '',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    avatar: Icon(
+                                      att['type'] == 'image'
+                                          ? Icons.image
+                                          : att['type'] == 'file'
+                                          ? Icons.description
+                                          : Icons.link,
+                                      size: 18,
+                                    ),
+                                    onDeleted: () {
+                                      setState(() => _attachments.remove(att));
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [primary, accent],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: FilledButton.icon(
+                            onPressed: (_uploading || _attachmentUploading)
+                                ? null
+                                : _submitPost,
+                            icon: const Icon(Icons.send),
+                            label: const Text('Publish Post'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.all(16),
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                    if (_attachments.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _attachments
-                            .map(
-                              (att) => Chip(
-                                label: Text(
-                                  att['name'] ?? '',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                avatar: Icon(
-                                  att['type'] == 'image'
-                                      ? Icons.image
-                                      : att['type'] == 'file'
-                                      ? Icons.description
-                                      : Icons.link,
-                                  size: 18,
-                                ),
-                                onDeleted: () {
-                                  setState(() => _attachments.remove(att));
-                                },
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [primary, accent],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: FilledButton.icon(
-                        onPressed: (_uploading || _attachmentUploading)
-                            ? null
-                            : _submitPost,
-                        icon: const Icon(Icons.send),
-                        label: const Text('Publish Post'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
     );
   }

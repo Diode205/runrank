@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:runrank/auth/register_profile_screen.dart';
+import 'package:runrank/auth/register_invite_screen.dart';
 import 'package:runrank/auth/migrate_account_screen.dart';
 
 class RegisterCodeScreen extends StatefulWidget {
@@ -86,7 +86,7 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => RegisterProfileScreen(
+                        builder: (_) => RegisterInviteScreen(
                           selectedClub: widget.selectedClub,
                         ),
                       ),

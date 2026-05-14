@@ -6,8 +6,17 @@ import 'package:url_launcher/url_launcher.dart';
 
 class RegisterProfileScreen extends StatefulWidget {
   final String selectedClub;
+  final String? verifiedInviteId;
+  final String? verifiedUkaNumber;
+  final String? prefillFullName;
 
-  const RegisterProfileScreen({super.key, required this.selectedClub});
+  const RegisterProfileScreen({
+    super.key,
+    required this.selectedClub,
+    this.verifiedInviteId,
+    this.verifiedUkaNumber,
+    this.prefillFullName,
+  });
 
   @override
   State<RegisterProfileScreen> createState() => _RegisterProfileScreenState();
@@ -125,6 +134,14 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
     final today = DateTime.now();
     _selectedMemberSince = today;
     memberSince.text = _formatDobDisplay(today);
+    final verifiedUka = widget.verifiedUkaNumber?.trim();
+    if (verifiedUka != null && verifiedUka.isNotEmpty) {
+      uka.text = verifiedUka;
+    }
+    final prefillName = widget.prefillFullName?.trim();
+    if (prefillName != null && prefillName.isNotEmpty) {
+      name.text = prefillName;
+    }
   }
 
   @override
@@ -151,8 +168,21 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
           children: [
             TextField(
               controller: name,
+              readOnly: widget.prefillFullName?.trim().isNotEmpty == true,
               decoration: const InputDecoration(labelText: "Full Name"),
             ),
+            if (widget.prefillFullName?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'Name verified from your club invite. You can update it later from your profile.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
             TextField(
               controller: email,
               decoration: const InputDecoration(labelText: "Email"),
@@ -173,8 +203,21 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             TextField(
               controller: uka,
+              readOnly: widget.verifiedUkaNumber?.trim().isNotEmpty == true,
               decoration: const InputDecoration(labelText: "UKA Member Number"),
             ),
+            if (widget.verifiedInviteId?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'UKA number verified from your club invite.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _selectedGender,
@@ -383,6 +426,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                             .trim(),
                         emergencyContactRelation: _selectedEmergencyRelation!,
                         emergencyDetailsConsent: agreeEmergencyConsent,
+                        memberInviteId: widget.verifiedInviteId,
                       );
 
                       if (!context.mounted) return;
@@ -434,7 +478,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             ),
             const SizedBox(height: 8),
             _bullet(
-              'Access is provided by your running club using a registration code',
+              'Access is provided by your running club using a club code and a member invite code',
             ),
             _bullet("You have already agreed to your club's Privacy Policy"),
             _bullet(

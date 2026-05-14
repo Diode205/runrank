@@ -24,13 +24,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
   List<Map<String, dynamic>> attachments = [];
   Map<String, List<String>> reactions = {}; // emoji -> [user_ids]
   Set<String> userReactions = {}; // emojis the current user has used
+  Map<String, Map<String, List<String>>> commentReactions = {};
   List<Map<String, dynamic>> likeUsers = []; // users who "liked" (❤️)
   bool loading = true;
   bool isAdmin = false;
   bool isAuthor = false;
   bool isApproved = true;
+  bool _commentReactionsMissing = false;
+  String? _editingCommentId;
   RealtimeChannel? _commentsChannel;
   String? _clubName;
+  final _editingCommentController = TextEditingController();
 
   static const List<String> availableEmojis = [
     '👍',
@@ -66,7 +70,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     _commentsChannel = supabase
         .channel('post_comments_${widget.postId}')
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'club_post_comments',
           filter: PostgresChangeFilter(
@@ -88,10 +92,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   .order('created_at', ascending: true);
 
               if (!mounted) return;
+              final reactionMap = await _fetchCommentReactionsFor(data);
+              if (!mounted) return;
               setState(() {
                 comments = List<Map<String, dynamic>>.from(
                   data as List<dynamic>,
                 );
+                commentReactions = reactionMap;
               });
             } catch (_) {
               // Fail silently; main refresh still works via manual reloads.
@@ -105,6 +112,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   void dispose() {
     _commentsChannel?.unsubscribe();
     _commentController.dispose();
+    _editingCommentController.dispose();
     super.dispose();
   }
 
@@ -152,6 +160,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
           .eq('post_id', widget.postId)
           .order('created_at', ascending: true);
 
+      final commentReactionMap = await _fetchCommentReactionsFor(commentsData);
+
       // Load attachments
       final attachmentsData = await supabase
           .from('club_post_attachments')
@@ -192,6 +202,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           attachments = List<Map<String, dynamic>>.from(attachmentsData);
           reactions = reactionMap;
           userReactions = userReactionSet;
+          commentReactions = commentReactionMap;
           likeUsers = likeUserList;
           loading = false;
           isAdmin = (profile?['is_admin'] ?? false) as bool;
@@ -211,6 +222,49 @@ class _PostDetailPageState extends State<PostDetailPage> {
       if (mounted) {
         setState(() => loading = false);
       }
+    }
+  }
+
+  Future<Map<String, Map<String, List<String>>>> _fetchCommentReactionsFor(
+    List<dynamic> commentRows,
+  ) async {
+    if (_commentReactionsMissing) return {};
+
+    final ids = commentRows
+        .map((c) => c['id'])
+        .where((id) => id != null)
+        .map((id) => id.toString())
+        .toList();
+    if (ids.isEmpty) return {};
+
+    try {
+      final rows = await supabase
+          .from('club_post_comment_reactions')
+          .select('comment_id, user_id, emoji')
+          .inFilter('comment_id', ids);
+
+      final map = <String, Map<String, List<String>>>{};
+      for (final row in rows) {
+        final commentId = row['comment_id']?.toString();
+        final userId = row['user_id']?.toString();
+        final emoji = row['emoji'] as String?;
+        if (commentId == null || userId == null || emoji == null) continue;
+
+        map.putIfAbsent(commentId, () => <String, List<String>>{});
+        map[commentId]!.putIfAbsent(emoji, () => <String>[]);
+        map[commentId]![emoji]!.add(userId);
+      }
+      return map;
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') {
+        _commentReactionsMissing = true;
+      } else {
+        debugPrint('Error loading post comment reactions: $e');
+      }
+      return {};
+    } catch (e) {
+      debugPrint('Error loading post comment reactions: $e');
+      return {};
     }
   }
 
@@ -499,6 +553,208 @@ class _PostDetailPageState extends State<PostDetailPage> {
         SnackBar(content: Text('Error posting comment: $e')),
       );
     }
+  }
+
+  Future<void> _toggleCommentReaction(String commentId, String emoji) async {
+    if (_commentReactionsMissing || commentId.isEmpty) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final users = commentReactions[commentId]?[emoji] ?? const <String>[];
+      final hasReacted = users.contains(user.id);
+
+      if (hasReacted) {
+        await supabase
+            .from('club_post_comment_reactions')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', user.id)
+            .eq('emoji', emoji);
+      } else {
+        await supabase.from('club_post_comment_reactions').insert({
+          'comment_id': commentId,
+          'user_id': user.id,
+          'emoji': emoji,
+        });
+
+        try {
+          final commentRow = await supabase
+              .from('club_post_comments')
+              .select('user_id')
+              .eq('id', commentId)
+              .maybeSingle();
+          final authorId = commentRow?['user_id'] as String?;
+          if (authorId != null && authorId.isNotEmpty && authorId != user.id) {
+            await NotificationService.notifyUser(
+              userId: authorId,
+              title: 'New reaction on your comment',
+              body: 'Someone reacted $emoji to your post comment.',
+              route: 'post_${widget.postId}',
+            );
+          }
+        } catch (e) {
+          debugPrint('Error sending post comment reaction notification: $e');
+        }
+      }
+
+      await _loadPostDetails();
+    } catch (e) {
+      debugPrint('Error toggling post comment reaction: $e');
+    }
+  }
+
+  Future<void> _showCommentReactionPicker(String commentId) async {
+    if (_commentReactionsMissing || commentId.isEmpty) return;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: availableEmojis
+                  .map(
+                    (emoji) => GestureDetector(
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        await _toggleCommentReaction(commentId, emoji);
+                      },
+                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _startEditingMyComment(String commentId, String currentText) {
+    if (commentId.isEmpty) return;
+    setState(() {
+      _editingCommentId = commentId;
+      _editingCommentController.text = currentText;
+      _editingCommentController.selection = TextSelection.collapsed(
+        offset: _editingCommentController.text.length,
+      );
+    });
+  }
+
+  void _cancelEditingMyComment() {
+    setState(() {
+      _editingCommentId = null;
+      _editingCommentController.clear();
+    });
+  }
+
+  Future<void> _saveEditingMyComment(
+    String commentId,
+    String currentText,
+  ) async {
+    final user = supabase.auth.currentUser;
+    if (user == null || commentId.isEmpty) return;
+
+    final updated = _editingCommentController.text.trim();
+    _cancelEditingMyComment();
+    if (updated.isEmpty || updated == currentText.trim()) return;
+
+    try {
+      await supabase
+          .from('club_post_comments')
+          .update({'comment': updated})
+          .eq('id', commentId)
+          .eq('user_id', user.id);
+      await _loadPostDetails();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not edit comment: $e')));
+    }
+  }
+
+  Future<void> _deleteEditingMyComment(String commentId) async {
+    final user = supabase.auth.currentUser;
+    if (user == null || commentId.isEmpty) return;
+
+    _cancelEditingMyComment();
+    try {
+      if (!_commentReactionsMissing) {
+        try {
+          await supabase
+              .from('club_post_comment_reactions')
+              .delete()
+              .eq('comment_id', commentId);
+        } catch (e) {
+          debugPrint(
+            'Could not clear post comment reactions before delete: $e',
+          );
+        }
+      }
+      await supabase
+          .from('club_post_comments')
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', user.id);
+      await _loadPostDetails();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete comment: $e')));
+    }
+  }
+
+  Widget _buildCommentReactionsRow(String commentId) {
+    if (_commentReactionsMissing || commentId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final emojiMap =
+        commentReactions[commentId] ?? const <String, List<String>>{};
+    final entries = emojiMap.entries
+        .where((entry) => entry.value.isNotEmpty)
+        .toList();
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final entry in entries)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(entry.key),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${entry.value.length}',
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   void _openImageFullscreen(List<String> imageUrls, {int initialIndex = 0}) {
@@ -1187,80 +1443,154 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         comment['user_profiles']?['avatar_url'] as String?;
                     final membershipType =
                         comment['user_profiles']?['membership_type'] as String?;
+                    final commentId = comment['id']?.toString() ?? '';
+                    final commentText = comment['comment'] as String? ?? '';
+                    final commentUserId = comment['user_id'] as String?;
+                    final currentUserId = supabase.auth.currentUser?.id;
+                    final isOwnComment =
+                        currentUserId != null &&
+                        commentUserId != null &&
+                        currentUserId == commentUserId;
+                    final isEditing =
+                        isOwnComment && _editingCommentId == commentId;
+
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(1.4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _membershipColor(membershipType),
-                                width: 1.4,
+                      child: GestureDetector(
+                        onLongPress: () => isOwnComment
+                            ? _startEditingMyComment(commentId, commentText)
+                            : _showCommentReactionPicker(commentId),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(1.4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _membershipColor(membershipType),
+                                  width: 1.4,
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.white12,
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(
+                                        '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                      )
+                                    : null,
+                                child: avatarUrl == null
+                                    ? Text(
+                                        commentAuthor[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Colors.white12,
-                              backgroundImage: avatarUrl != null
-                                  ? NetworkImage(
-                                      '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                    )
-                                  : null,
-                              child: avatarUrl == null
-                                  ? Text(
-                                      commentAuthor[0].toUpperCase(),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        commentAuthor,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      commentAuthor,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _getTimeAgo(comment['created_at']),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[500],
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _getTimeAgo(comment['created_at']),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  comment['comment'] ?? '',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[300],
-                                    height: 1.4,
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  if (isEditing) ...[
+                                    TextField(
+                                      controller: _editingCommentController,
+                                      autofocus: true,
+                                      minLines: 1,
+                                      maxLines: 5,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: Colors.white10,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 8,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              _deleteEditingMyComment(
+                                                commentId,
+                                              ),
+                                          child: const Text(
+                                            'Delete',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        TextButton(
+                                          onPressed: _cancelEditingMyComment,
+                                          child: const Text('Cancel'),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              _saveEditingMyComment(
+                                                commentId,
+                                                commentText,
+                                              ),
+                                          child: const Text('Save'),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    Text(
+                                      commentText,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[300],
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    _buildCommentReactionsRow(commentId),
+                                  ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }),
@@ -1270,7 +1600,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             ),
           ),
 
-          // Comment input with quick emoji row
+          // Comment input
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1278,67 +1608,36 @@ class _PostDetailPageState extends State<PostDetailPage> {
               border: Border(top: BorderSide(color: Colors.grey[800]!)),
             ),
             child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _commentController,
-                          decoration: InputDecoration(
-                            hintText: 'Add a comment...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[850],
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                          ),
-                          maxLines: null,
+                  Expanded(
+                    child: TextField(
+                      controller: _commentController,
+                      decoration: InputDecoration(
+                        hintText: 'Add a comment...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[850],
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: sendButtonColors),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: _postComment,
-                          icon: const Icon(Icons.send, color: Colors.white),
-                          iconSize: 24,
-                        ),
-                      ),
-                    ],
+                      maxLines: null,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: availableEmojis.map((emoji) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: GestureDetector(
-                            onTap: () {
-                              _commentController.text += emoji;
-                              _commentController.selection =
-                                  TextSelection.fromPosition(
-                                    TextPosition(
-                                      offset: _commentController.text.length,
-                                    ),
-                                  );
-                            },
-                            child: Text(
-                              emoji,
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: sendButtonColors),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: _postComment,
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      iconSize: 24,
                     ),
                   ),
                 ],

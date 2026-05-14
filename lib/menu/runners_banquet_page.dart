@@ -25,9 +25,6 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     TextEditingController(),
   ];
 
-  int _selectedOptionIndex = -1;
-  int _partnerOptionIndex = -1;
-  int _otherOptionIndex = -1;
   int _memberQuantity = 1;
   int _partnerQuantity = 0;
   int _otherQuantity = 0;
@@ -35,6 +32,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   final _memberPriceController = TextEditingController(text: '0.00');
   final _partnerPriceController = TextEditingController(text: '0.00');
   final _otherPriceController = TextEditingController(text: '0.00');
+  final _memberMealChoiceController = TextEditingController();
+  final _partnerMealChoiceController = TextEditingController();
+  final _otherMealChoiceController = TextEditingController();
   final _memberSpecialRequirementsController = TextEditingController();
   final _partnerSpecialRequirementsController = TextEditingController();
   final _otherSpecialRequirementsController = TextEditingController();
@@ -125,6 +125,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     _memberPriceController.dispose();
     _partnerPriceController.dispose();
     _otherPriceController.dispose();
+    _memberMealChoiceController.dispose();
+    _partnerMealChoiceController.dispose();
+    _otherMealChoiceController.dispose();
     _memberSpecialRequirementsController.dispose();
     _partnerSpecialRequirementsController.dispose();
     _otherSpecialRequirementsController.dispose();
@@ -154,13 +157,6 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       _partnerQuantity * _partnerPriceCents +
       _otherQuantity * _otherPriceCents;
 
-  String _optionLabelForIndex(int index) {
-    if (index < 0 || index >= _optionLabels.length) return 'Option';
-    final text = _optionLabels[index].text.trim();
-    if (text.isEmpty) return 'Option ${index + 1}';
-    return text;
-  }
-
   Future<void> _handleBuyPass() async {
     if (_totalAmountCents <= 0 || _totalQuantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -170,38 +166,44 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       );
       return;
     }
-    // Fallback to first option if none explicitly chosen
-    final defaultIndex = _selectedOptionIndex >= 0 ? _selectedOptionIndex : 0;
 
-    int _resolveIndex(int configuredIndex) {
-      if (configuredIndex >= 0 && configuredIndex < _optionLabels.length) {
-        return configuredIndex;
-      }
-      return defaultIndex;
+    String? cleanMealChoice(TextEditingController controller) {
+      final trimmed = controller.text.trim();
+      return trimmed.isEmpty ? null : trimmed.toUpperCase();
     }
 
-    final memberIndex = _memberQuantity > 0
-        ? _resolveIndex(_selectedOptionIndex)
+    String? cleanSpecial(String text) {
+      final trimmed = text.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    final memberMealChoice = _memberQuantity > 0
+        ? cleanMealChoice(_memberMealChoiceController)
         : null;
-    final partnerIndex = _partnerQuantity > 0
-        ? _resolveIndex(_partnerOptionIndex)
+    final partnerMealChoice = _partnerQuantity > 0
+        ? cleanMealChoice(_partnerMealChoiceController)
         : null;
-    final otherIndex = _otherQuantity > 0
-        ? _resolveIndex(_otherOptionIndex)
+    final otherMealChoice = _otherQuantity > 0
+        ? cleanMealChoice(_otherMealChoiceController)
         : null;
+
+    if ((_memberQuantity > 0 && memberMealChoice == null) ||
+        (_partnerQuantity > 0 && partnerMealChoice == null) ||
+        (_otherQuantity > 0 && otherMealChoice == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter meal choices, for example A-3-2.'),
+        ),
+      );
+      return;
+    }
 
     final metadata = <String, dynamic>{
       'context': 'runners_banquet',
       'party_name': widget.eventTitle,
-      'member_meal_option': memberIndex != null
-          ? _optionLabelForIndex(memberIndex)
-          : null,
-      'partner_meal_option': partnerIndex != null
-          ? _optionLabelForIndex(partnerIndex)
-          : null,
-      'other_meal_option': otherIndex != null
-          ? _optionLabelForIndex(otherIndex)
-          : null,
+      'member_meal_choice': memberMealChoice,
+      'partner_meal_choice': partnerMealChoice,
+      'other_meal_choice': otherMealChoice,
       'member_quantity': _memberQuantity,
       'partner_quantity': _partnerQuantity,
       'other_quantity': _otherQuantity,
@@ -246,41 +248,36 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     // counts per meal option.
     final eventId = effectiveEventId;
 
-    String? _cleanSpecial(String text) {
-      final trimmed = text.trim();
-      return trimmed.isEmpty ? null : trimmed;
-    }
-
     bool ok = true;
-    if (memberIndex != null && _memberQuantity > 0) {
+    if (memberMealChoice != null && _memberQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
         clubName: clubName,
-        optionLabel: _optionLabelForIndex(memberIndex),
+        optionLabel: memberMealChoice,
         quantity: _memberQuantity,
-        specialRequirements: _cleanSpecial(
+        specialRequirements: cleanSpecial(
           _memberSpecialRequirementsController.text,
         ),
       );
     }
-    if (ok && partnerIndex != null && _partnerQuantity > 0) {
+    if (ok && partnerMealChoice != null && _partnerQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
         clubName: clubName,
-        optionLabel: _optionLabelForIndex(partnerIndex),
+        optionLabel: partnerMealChoice,
         quantity: _partnerQuantity,
-        specialRequirements: _cleanSpecial(
+        specialRequirements: cleanSpecial(
           _partnerSpecialRequirementsController.text,
         ),
       );
     }
-    if (ok && otherIndex != null && _otherQuantity > 0) {
+    if (ok && otherMealChoice != null && _otherQuantity > 0) {
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
         clubName: clubName,
-        optionLabel: _optionLabelForIndex(otherIndex),
+        optionLabel: otherMealChoice,
         quantity: _otherQuantity,
-        specialRequirements: _cleanSpecial(
+        specialRequirements: cleanSpecial(
           _otherSpecialRequirementsController.text,
         ),
       );
@@ -318,6 +315,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         _myReservations = my;
       });
     }
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Payment completed – thank you!')),
@@ -443,10 +441,12 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   }
 
   Widget _buildAdminSection(Color themeYellow, Color themeBlue) {
+    const courseTitles = ['Starters', 'Mains', 'Desserts'];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Banquet Options (Admin Only)'),
+        _buildSectionTitle('Banquet Menu (Admin Only)'),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -458,14 +458,14 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ...List.generate(_optionLabels.length, (index) {
-                final optionNumber = index + 1;
+                final title = courseTitles[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Option $optionNumber',
+                        title,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -478,10 +478,16 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                         maxLines: null,
                         keyboardType: TextInputType.multiline,
                         style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
+                          hintText: title == 'Starters'
+                              ? 'A. Soup\nB. Pate\nC. Salad'
+                              : title == 'Mains'
+                              ? '1. Chicken\n2. Fish\n3. Vegetarian'
+                              : '1. Cheesecake\n2. Fruit\n3. Ice cream',
+                          hintStyle: const TextStyle(color: Colors.white30),
                           filled: true,
-                          fillColor: Color(0xFF161B26),
-                          border: OutlineInputBorder(
+                          fillColor: const Color(0xFF161B26),
+                          border: const OutlineInputBorder(
                             borderRadius: BorderRadius.all(Radius.circular(12)),
                           ),
                         ),
@@ -639,6 +645,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   }
 
   Widget _buildOptionsSection(Color themeYellow, Color themeBlue) {
+    const courseTitles = ['Starters', 'Mains', 'Desserts'];
     final optionIndices = List<int>.generate(
       _optionLabels.length,
       (i) => i,
@@ -647,7 +654,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Banquet Options'),
+        _buildSectionTitle('Banquet Menu'),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -659,23 +666,20 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
             children: [
               if (optionIndices.isEmpty)
                 const Text(
-                  'No options set yet – please check back later.',
+                  'No menu set yet – please check back later.',
                   style: TextStyle(color: Colors.white54),
                   textAlign: TextAlign.center,
                 )
               else
                 ...optionIndices.map((index) {
                   final label = _optionLabels[index].text.trim();
-                  final titleText = label.isEmpty
-                      ? 'Option ${index + 1}'
-                      : label.split('\n').first;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Option ${index + 1}',
+                          courseTitles[index],
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -694,7 +698,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                             ),
                           ),
                           child: Text(
-                            label.isEmpty ? titleText : label,
+                            label,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -795,15 +799,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
               ),
               const SizedBox(height: 4),
               if (_memberQuantity > 0) ...[
-                _buildMealChoiceRow(
-                  label: 'Member Meal Option',
-                  currentIndex: _selectedOptionIndex,
-                  onChanged: (i) {
-                    setState(() {
-                      _selectedOptionIndex = i;
-                    });
-                  },
-                  themeYellow: themeYellow,
+                _buildMealChoiceField(
+                  label: 'Member Meal Choice',
+                  controller: _memberMealChoiceController,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 4),
                 TextField(
@@ -868,15 +867,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
               ),
               const SizedBox(height: 4),
               if (_partnerQuantity > 0) ...[
-                _buildMealChoiceRow(
-                  label: 'Partner/Spouse Meal Option',
-                  currentIndex: _partnerOptionIndex,
-                  onChanged: (i) {
-                    setState(() {
-                      _partnerOptionIndex = i;
-                    });
-                  },
-                  themeYellow: themeYellow,
+                _buildMealChoiceField(
+                  label: 'Partner/Spouse Meal Choice',
+                  controller: _partnerMealChoiceController,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 4),
                 TextField(
@@ -941,15 +935,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
               ),
               const SizedBox(height: 8),
               if (_otherQuantity > 0) ...[
-                _buildMealChoiceRow(
-                  label: 'Other Guest Meal Option',
-                  currentIndex: _otherOptionIndex,
-                  onChanged: (i) {
-                    setState(() {
-                      _otherOptionIndex = i;
-                    });
-                  },
-                  themeYellow: themeYellow,
+                _buildMealChoiceField(
+                  label: 'Other Guest Meal Choice',
+                  controller: _otherMealChoiceController,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 4),
                 TextField(
@@ -989,6 +978,12 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
               ),
               const SizedBox(height: 8),
               const Divider(color: Colors.white24),
+              const SizedBox(height: 8),
+              const Text(
+                'Enter choices as Starter-Main-Dessert, for example A-3-2.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1046,66 +1041,46 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     );
   }
 
-  Widget _buildMealChoiceRow({
+  Widget _buildMealChoiceField({
     required String label,
-    required int currentIndex,
-    required ValueChanged<int> onChanged,
-    required Color themeYellow,
+    required TextEditingController controller,
+    required TextInputAction textInputAction,
   }) {
-    final optionIndices = List<int>.generate(
-      _optionLabels.length,
-      (i) => i,
-    ).where((i) => _optionLabels[i].text.trim().isNotEmpty).toList();
-    if (optionIndices.isEmpty) return const SizedBox.shrink();
-
-    return SizedBox(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: themeYellow,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: optionIndices.map((i) {
-              final optionLabel = 'Option ${i + 1}';
-              final isSelected = currentIndex == i;
-              return ChoiceChip(
-                label: Text(
-                  optionLabel,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black : Colors.white,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-                selected: isSelected,
-                selectedColor: themeYellow,
-                backgroundColor: const Color(0xFF161B26),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: isSelected
-                        ? themeYellow
-                        : Colors.white.withOpacity(0.3),
-                    width: 1.2,
-                  ),
-                ),
-                onSelected: (_) => onChanged(i),
-              );
-            }).toList(),
-          ),
-        ],
+    return TextField(
+      controller: controller,
+      textCapitalization: TextCapitalization.characters,
+      textInputAction: textInputAction,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: 'A-3-2',
+        helperText: 'Starter-Main-Dessert',
+        helperStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+        labelStyle: const TextStyle(color: Colors.white70),
+        filled: true,
+        fillColor: const Color(0xFF161B26),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+        suffixIcon: IconButton(
+          tooltip: 'Clear meal choice',
+          onPressed: controller.clear,
+          icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+        ),
       ),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-\s]')),
+        TextInputFormatter.withFunction((oldValue, newValue) {
+          final upperText = newValue.text.toUpperCase();
+          return newValue.copyWith(
+            text: upperText,
+            selection: TextSelection.collapsed(offset: upperText.length),
+          );
+        }),
+      ],
+      onEditingComplete: textInputAction == TextInputAction.done
+          ? () => FocusScope.of(context).unfocus()
+          : null,
     );
   }
 
@@ -1320,9 +1295,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         _memberQuantity = 1;
         _partnerQuantity = 0;
         _otherQuantity = 0;
-        _selectedOptionIndex = -1;
-        _partnerOptionIndex = -1;
-        _otherOptionIndex = -1;
+        _memberMealChoiceController.clear();
+        _partnerMealChoiceController.clear();
+        _otherMealChoiceController.clear();
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

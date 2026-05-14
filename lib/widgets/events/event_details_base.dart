@@ -41,6 +41,8 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   List<Map<String, dynamic>> comments = [];
   Map<String, Map<String, List<String>>> commentReactions = {};
   bool _commentReactionsMissing = false;
+  String? _editingCommentId;
+  final _editingCommentController = TextEditingController();
 
   // Live comments: realtime channel + periodic fallback
   RealtimeChannel? _commentsChannel;
@@ -58,6 +60,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       Supabase.instance.client.removeChannel(_commentsChannel!);
     }
     commentController.dispose();
+    _editingCommentController.dispose();
     messageController.dispose();
     super.dispose();
   }
@@ -964,6 +967,97 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
+  Future<void> _saveMyComment(
+    String commentId,
+    String updatedText,
+    String currentText,
+  ) async {
+    if (commentId.isEmpty) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final updated = updatedText.trim();
+    if (updated.isEmpty || updated == currentText.trim()) {
+      return;
+    }
+
+    try {
+      await supabase
+          .from('event_comments')
+          .update({'comment': updated})
+          .eq('id', commentId)
+          .eq('user_id', user.id);
+      await loadComments();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not edit comment: $e')));
+    }
+  }
+
+  Future<void> _deleteMyComment(String commentId) async {
+    if (commentId.isEmpty) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      if (!_commentReactionsMissing) {
+        try {
+          await supabase
+              .from('event_comment_reactions')
+              .delete()
+              .eq('comment_id', commentId);
+        } catch (e) {
+          debugPrint('Could not clear comment reactions before delete: $e');
+        }
+      }
+      await supabase
+          .from('event_comments')
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', user.id);
+      await loadComments();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete comment: $e')));
+    }
+  }
+
+  void _startEditingMyComment(String commentId, String currentText) {
+    if (commentId.isEmpty) return;
+    setState(() {
+      _editingCommentId = commentId;
+      _editingCommentController.text = currentText;
+      _editingCommentController.selection = TextSelection.collapsed(
+        offset: _editingCommentController.text.length,
+      );
+    });
+  }
+
+  void _cancelEditingMyComment() {
+    setState(() {
+      _editingCommentId = null;
+      _editingCommentController.clear();
+    });
+  }
+
+  Future<void> _saveEditingMyComment(
+    String commentId,
+    String currentText,
+  ) async {
+    final updatedText = _editingCommentController.text;
+    _cancelEditingMyComment();
+    await _saveMyComment(commentId, updatedText, currentText);
+  }
+
+  Future<void> _deleteEditingMyComment(String commentId) async {
+    _cancelEditingMyComment();
+    await _deleteMyComment(commentId);
+  }
+
   Future<void> _toggleInlineCommentReaction(
     String commentId,
     String emoji,
@@ -1091,13 +1185,16 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
             currentUserId != null &&
             commentUserId != null &&
             currentUserId == commentUserId;
+        final isEditing = isMe && _editingCommentId == commentId;
 
         final initials = name.isNotEmpty
             ? name.trim().split(' ').map((p) => p.isNotEmpty ? p[0] : '').join()
             : 'M';
 
         return GestureDetector(
-          onLongPress: () => _showInlineCommentReactionPicker(commentId),
+          onLongPress: () => isMe
+              ? _startEditingMyComment(commentId, text)
+              : _showInlineCommentReactionPicker(commentId),
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
             child: Row(
@@ -1172,13 +1269,59 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
                             ],
                           ),
                         if (ts != null) const SizedBox(height: 4),
-                        Text(
-                          text,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                        if (isEditing) ...[
+                          TextField(
+                            controller: _editingCommentController,
+                            autofocus: true,
+                            minLines: 1,
+                            maxLines: 5,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.black.withValues(alpha: 0.25),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: () =>
+                                    _deleteEditingMyComment(commentId),
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: _cancelEditingMyComment,
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 4),
+                              FilledButton(
+                                onPressed: () =>
+                                    _saveEditingMyComment(commentId, text),
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          ),
+                        ] else
+                          Text(
+                            text,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
                         if (emojiMap.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Wrap(

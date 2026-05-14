@@ -7,6 +7,13 @@ class UserService {
 
   static String? get cachedClubName => _cachedClubName;
 
+  static void cacheClubName(String? clubName) {
+    final normalized = clubName?.trim();
+    _cachedClubName = normalized != null && normalized.isNotEmpty
+        ? normalized
+        : null;
+  }
+
   static void clearCachedClubName() {
     _cachedClubName = null;
   }
@@ -39,6 +46,7 @@ class UserService {
 
     final blocked = row != null && row['is_blocked'] == true;
     if (blocked && context != null && showMessage) {
+      if (!context.mounted) return blocked;
       final reason = (row['block_reason'] as String?)?.trim();
       final message = reason != null && reason.isNotEmpty
           ? reason

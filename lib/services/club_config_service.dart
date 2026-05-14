@@ -42,6 +42,7 @@ class ClubConfig {
 
 class ClubConfigService {
   static final SupabaseClient _supabase = Supabase.instance.client;
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
 
   static const _fallback = ClubConfig(
     id: 'fallback',
@@ -50,6 +51,10 @@ class ClubConfigService {
     accentColor: Colors.white70,
     backgroundColor: Colors.black,
   );
+
+  static void notifyClubChanged() {
+    refreshNotifier.value++;
+  }
 
   static Future<ClubConfig> loadForCurrentUser() async {
     try {
