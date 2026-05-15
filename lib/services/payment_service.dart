@@ -71,6 +71,11 @@ class PaymentService {
     defaultValue: false,
   );
 
+  static const bool _googlePayTestEnv = bool.fromEnvironment(
+    'STRIPE_GOOGLE_PAY_TEST_ENV',
+    defaultValue: false,
+  );
+
   static String? _activePublishableKey;
 
   static _PaymentFlowConfig _configFor(PaymentFlow flow) {
@@ -222,7 +227,7 @@ class PaymentService {
               : null,
           googlePay: const PaymentSheetGooglePay(
             merchantCountryCode: 'GB',
-            testEnv: true,
+            testEnv: _googlePayTestEnv,
           ),
           customerId: customerId,
           customerEphemeralKeySecret: ephemeralKey,

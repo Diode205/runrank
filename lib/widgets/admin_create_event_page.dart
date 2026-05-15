@@ -233,16 +233,49 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   static const List<String> _nrrTrainingEventTypes = <String>[
     'Recovery Monday',
     'Mousehold Monday',
-    'Efforts Tuesday',
+    'Tuesday Efforts 1',
+    'Tuesday Efforts 2',
     'Road Run Thursday',
     'Track Session',
   ];
+
+  static const List<String> _legacyNrrTrainingEventTypes = <String>[
+    'Tuesday Efforts',
+    'Efforts Tuesday',
+    'Coached Tuesday',
+    'Road Route Thursday',
+    'Paul Evans Session',
+    'Paul Evan Session',
+  ];
+
+  static String _normaliseNrrTrainingEventType(String eventType) {
+    switch (eventType) {
+      case 'Tuesday Efforts':
+      case 'Efforts Tuesday':
+      case 'Coached Tuesday':
+        return 'Tuesday Efforts 1';
+      case 'Road Route Thursday':
+        return 'Road Run Thursday';
+      case 'Paul Evans Session':
+      case 'Paul Evan Session':
+        return 'Track Session';
+      default:
+        return eventType;
+    }
+  }
+
+  static bool _isNrrTrainingEventType(String eventType) =>
+      _nrrTrainingEventTypes.contains(eventType) ||
+      _legacyNrrTrainingEventTypes.contains(eventType);
 
   bool get _usesTrainingDetails =>
       _resolvedEventType == 'Training' ||
       selectedEventType == 'Training 1' ||
       selectedEventType == 'Training 2' ||
       _nrrTrainingEventTypes.contains(_resolvedEventType);
+
+  bool get _supportsWeeklyTrainingRepeat =>
+      _isNRRClub && selectedEventType == 'Training';
 
   bool get _usesHandicapDetails =>
       _resolvedEventType == 'Handicap Series' ||
@@ -285,9 +318,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     if (widget.initialEventType != null) {
       selectedCategory = "admin"; // only admin creates events here
       final initType = widget.initialEventType!;
-      if (_nrrTrainingEventTypes.contains(initType)) {
+      if (_isNrrTrainingEventType(initType)) {
         selectedEventType = "Training";
-        _selectedNrrTrainingEventType = initType;
+        _selectedNrrTrainingEventType = _normaliseNrrTrainingEventType(
+          initType,
+        );
       } else if (initType == "Training 1" || initType == "Training 2") {
         // Legacy callers may still pass the old labels; normalise
         // them into the new unified Training type.
@@ -335,6 +370,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   String selectedCategory = "";
   String _selectedNrrTrainingEventType = _nrrTrainingEventTypes.first;
   String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
+  bool _repeatWeeklyTraining = false;
+  int _trainingRepeatWeeks = 1;
 
   // Special Event subtype (e.g. AGM, Club Nights, Awards Night)
   static const List<String> _specialEventTypes = <String>[
@@ -443,8 +480,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
         if (selectedCategory == 'admin' &&
             !adminTypes.contains(selectedEventType)) {
-          if (_nrrTrainingEventTypes.contains(selectedEventType)) {
-            _selectedNrrTrainingEventType = selectedEventType;
+          if (_isNrrTrainingEventType(selectedEventType)) {
+            _selectedNrrTrainingEventType = _normaliseNrrTrainingEventType(
+              selectedEventType,
+            );
           }
           selectedEventType = adminTypes.first;
         }
@@ -918,6 +957,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         return "Training";
       case "Recovery Monday":
       case "Mousehold Monday":
+      case "Tuesday Efforts 1":
+      case "Tuesday Efforts 2":
+      case "Tuesday Efforts":
       case "Efforts Tuesday":
       case "Road Run Thursday":
       case "Track Session":
@@ -1008,46 +1050,53 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     }
 
     final eventTypeForSave = _resolvedEventType;
+    final repeatCount = _supportsWeeklyTrainingRepeat && _repeatWeeklyTraining
+        ? _trainingRepeatWeeks
+        : 1;
+    String dateIso(DateTime date) => date.toIso8601String().split("T").first;
 
-    final map = {
-      "event_type": eventTypeForSave.toLowerCase().replaceAll(" ", "_"),
-      "training_number": eventTypeForSave == "Training 1"
-          ? 1
-          : eventTypeForSave == "Training 2"
-          ? 2
-          : null,
-      "race_name": selectedEventType == "Race"
-          ? selectedRace
-          : selectedEventType == "Cross Country"
-          ? crossCountryRaceNameCtrl.text.trim()
-          : null,
-      "handicap_distance": selectedEventType == "Handicap Series"
-          ? selectedHandicapDistance
-          : null,
-      "relay_team": relayTeamValue,
-      "title": buildTitle(),
-      "date": selectedDate!.toIso8601String().split("T").first,
-      "time": timeString,
-      "host_or_director": hostCtrl.text.trim(),
-      "host_user_id": _selectedHostId,
-      "venue": venueCtrl.text.trim(),
-      "venue_address": venueAddressCtrl.text.trim(),
-      "description": descriptionCtrl.text.trim(),
-      "latitude": latitude,
-      "longitude": longitude,
-      "marshal_call_date":
-          (selectedEventType == "Race" ||
-              selectedEventType == "Cross Country" ||
-              _usesHandicapDetails)
-          ? marshalCallDate?.toIso8601String().split("T").first
-          : null,
-      "expected_time_required":
-          _usesHandicapDetails || selectedEventType == "Relay" ? true : false,
-      "created_by": supabase.auth.currentUser?.id,
-    };
+    final maps = List<Map<String, dynamic>>.generate(repeatCount, (index) {
+      final eventDate = selectedDate!.add(Duration(days: index * 7));
+      return {
+        "event_type": eventTypeForSave.toLowerCase().replaceAll(" ", "_"),
+        "training_number": eventTypeForSave == "Training 1"
+            ? 1
+            : eventTypeForSave == "Training 2"
+            ? 2
+            : null,
+        "race_name": selectedEventType == "Race"
+            ? selectedRace
+            : selectedEventType == "Cross Country"
+            ? crossCountryRaceNameCtrl.text.trim()
+            : null,
+        "handicap_distance": selectedEventType == "Handicap Series"
+            ? selectedHandicapDistance
+            : null,
+        "relay_team": relayTeamValue,
+        "title": buildTitle(),
+        "date": dateIso(eventDate),
+        "time": timeString,
+        "host_or_director": hostCtrl.text.trim(),
+        "host_user_id": _selectedHostId,
+        "venue": venueCtrl.text.trim(),
+        "venue_address": venueAddressCtrl.text.trim(),
+        "description": descriptionCtrl.text.trim(),
+        "latitude": latitude,
+        "longitude": longitude,
+        "marshal_call_date":
+            (selectedEventType == "Race" ||
+                selectedEventType == "Cross Country" ||
+                _usesHandicapDetails)
+            ? marshalCallDate?.toIso8601String().split("T").first
+            : null,
+        "expected_time_required":
+            _usesHandicapDetails || selectedEventType == "Relay" ? true : false,
+        "created_by": supabase.auth.currentUser?.id,
+      };
+    });
 
     try {
-      final result = await supabase.from("club_events").insert(map).select();
+      final result = await supabase.from("club_events").insert(maps).select();
 
       if (!mounted) return;
 
@@ -1063,7 +1112,13 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       if (mounted) {
         navigator.pop(true);
         messenger.showSnackBar(
-          const SnackBar(content: Text("Event created successfully!")),
+          SnackBar(
+            content: Text(
+              repeatCount == 1
+                  ? "Event created successfully!"
+                  : "$repeatCount weekly training events created successfully!",
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -1695,6 +1750,48 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           ],
                         ],
                       ),
+                      if (_supportsWeeklyTrainingRepeat) ...[
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          value: _repeatWeeklyTraining,
+                          onChanged: (value) {
+                            setState(() {
+                              _repeatWeeklyTraining = value;
+                              if (!value) {
+                                _trainingRepeatWeeks = 1;
+                              }
+                            });
+                          },
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Create weekly repeats',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          subtitle: const Text(
+                            'Use the selected date as the first session, then add one each week.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                        if (_repeatWeeklyTraining)
+                          DropdownButtonFormField<int>(
+                            initialValue: _trainingRepeatWeeks,
+                            decoration: const InputDecoration(
+                              labelText: 'Number of weekly sessions',
+                            ),
+                            items: List<int>.generate(12, (index) => index + 1)
+                                .map(
+                                  (count) => DropdownMenuItem<int>(
+                                    value: count,
+                                    child: Text('$count sessions'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() => _trainingRepeatWeeks = value);
+                            },
+                          ),
+                      ],
                     ],
                   ),
                 ),

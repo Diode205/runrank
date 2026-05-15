@@ -54,6 +54,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
 
   static const emergencyRelations = [
     'Spouse',
+    'Partner',
     'Parent',
     'Friend',
     'Child',

@@ -8,6 +8,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function envNameForClub(club: string): string | null {
+  const normalized = club
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized ? `STRIPE_SECRET_KEY_${normalized}` : null;
+}
+
+function stripeKeyFor(metadata: Record<string, unknown> | undefined): string | undefined {
+  const flow = typeof metadata?.payment_flow === "string"
+    ? metadata.payment_flow.toLowerCase()
+    : "";
+
+  if (flow === "platform") {
+    return Deno.env.get("PLATFORM_STRIPE_SECRET_KEY") ??
+      Deno.env.get("STRIPE_SECRET_KEY");
+  }
+
+  const club = typeof metadata?.club === "string" ? metadata.club : "";
+  const clubEnvName = club ? envNameForClub(club) : null;
+  if (clubEnvName) {
+    const clubKey = Deno.env.get(clubEnvName);
+    if (clubKey) return clubKey;
+  }
+
+  return Deno.env.get("CLUB_STRIPE_SECRET_KEY") ??
+    Deno.env.get("STRIPE_SECRET_KEY");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -26,9 +57,9 @@ serve(async (req) => {
       });
     }
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const stripeKey = stripeKeyFor(metadata);
     if (!stripeKey) {
-      return new Response(JSON.stringify({ error: "Missing STRIPE_SECRET_KEY" }), {
+      return new Response(JSON.stringify({ error: "Missing Stripe secret key" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

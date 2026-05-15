@@ -22,6 +22,7 @@ import 'package:runrank/main.dart' show routeObserver;
 
 const List<String> _emergencyRelations = [
   'Spouse',
+  'Partner',
   'Parent',
   'Friend',
   'Child',

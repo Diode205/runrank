@@ -1065,12 +1065,14 @@ class _ImageCollagePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleImages = images.take(4).toList();
+    final visibleImages = images.take(3).toList();
 
     if (visibleImages.length == 1) {
       return _CollageImageTile(
         url: visibleImages.first['url'] as String?,
-        height: 220,
+        height: 300,
+        fit: BoxFit.contain,
+        backgroundColor: Colors.black,
       );
     }
 
@@ -1078,44 +1080,78 @@ class _ImageCollagePreview extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         height: 240,
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: visibleImages.length == 2 ? 2 : 2,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
-            childAspectRatio: visibleImages.length == 2 ? 0.82 : 1,
-          ),
-          itemCount: visibleImages.length,
-          itemBuilder: (context, index) {
-            final remaining = images.length - visibleImages.length;
-            final showMore = index == visibleImages.length - 1 && remaining > 0;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                _CollageImageTile(
-                  url: visibleImages[index]['url'] as String?,
-                  height: double.infinity,
-                  borderRadius: BorderRadius.zero,
-                ),
-                if (showMore)
-                  Container(
-                    color: Colors.black54,
-                    alignment: Alignment.center,
-                    child: Text(
-                      '+$remaining',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                      ),
+        child: visibleImages.length == 2
+            ? Row(
+                children: [
+                  Expanded(
+                    child: _CollageImageTile(
+                      url: visibleImages[0]['url'] as String?,
+                      height: double.infinity,
+                      borderRadius: BorderRadius.zero,
                     ),
                   ),
-              ],
-            );
-          },
-        ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: _CollageImageTile(
+                      url: visibleImages[1]['url'] as String?,
+                      height: double.infinity,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _CollageImageTile(
+                      url: visibleImages[0]['url'] as String?,
+                      height: double.infinity,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: _CollageImageTile(
+                            url: visibleImages[1]['url'] as String?,
+                            height: double.infinity,
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Expanded(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _CollageImageTile(
+                                url: visibleImages[2]['url'] as String?,
+                                height: double.infinity,
+                                borderRadius: BorderRadius.zero,
+                              ),
+                              if (images.length > visibleImages.length)
+                                Container(
+                                  color: Colors.black54,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '+${images.length - visibleImages.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -1125,26 +1161,35 @@ class _CollageImageTile extends StatelessWidget {
   final String? url;
   final double height;
   final BorderRadius borderRadius;
+  final BoxFit fit;
+  final Color? backgroundColor;
 
   const _CollageImageTile({
     required this.url,
     required this.height,
     this.borderRadius = const BorderRadius.all(Radius.circular(8)),
+    this.fit = BoxFit.cover,
+    this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: borderRadius,
-      child: Image.network(
-        url ?? '',
-        fit: BoxFit.cover,
+      child: Container(
+        color: backgroundColor,
         width: double.infinity,
         height: height,
-        errorBuilder: (_, __, ___) => Container(
+        child: Image.network(
+          url ?? '',
+          fit: fit,
+          width: double.infinity,
           height: height,
-          color: Colors.grey[800],
-          child: Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+          errorBuilder: (_, __, ___) => Container(
+            height: height,
+            color: Colors.grey[800],
+            child: Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+          ),
         ),
       ),
     );

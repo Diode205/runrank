@@ -200,6 +200,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
 
     final metadata = <String, dynamic>{
       'context': 'runners_banquet',
+      'club': _clubName ?? '',
       'party_name': widget.eventTitle,
       'member_meal_choice': memberMealChoice,
       'partner_meal_choice': partnerMealChoice,

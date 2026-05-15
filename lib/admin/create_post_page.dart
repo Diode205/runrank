@@ -61,6 +61,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
     return File(pickedFile.path);
   }
 
+  Future<List<File>> _pickImagesFromGallery() async {
+    final picker = ImagePicker();
+    final pickedFiles = await picker.pickMultiImage(
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    return pickedFiles.map((file) => File(file.path)).toList();
+  }
+
   Future<String?> _uploadImage(File image) async {
     try {
       final user = supabase.auth.currentUser;
@@ -80,13 +89,35 @@ class _CreatePostPageState extends State<CreatePostPage> {
   }
 
   Future<void> _addAttachmentFromGallery() async {
-    final file = await _pickImageFrom(ImageSource.gallery);
-    if (file == null) return;
-    final url = await _uploadImage(file);
-    if (url != null) {
+    final files = await _pickImagesFromGallery();
+    if (files.isEmpty) return;
+
+    if (mounted) {
       setState(() {
-        _attachments.add({'type': 'image', 'url': url, 'name': 'Image'});
+        _attachmentUploading = true;
       });
+    }
+
+    try {
+      final uploadedImages = <Map<String, String>>[];
+      for (final file in files) {
+        final url = await _uploadImage(file);
+        if (url != null) {
+          uploadedImages.add({'type': 'image', 'url': url, 'name': 'Image'});
+        }
+      }
+
+      if (mounted && uploadedImages.isNotEmpty) {
+        setState(() {
+          _attachments.addAll(uploadedImages);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _attachmentUploading = false;
+        });
+      }
     }
   }
 

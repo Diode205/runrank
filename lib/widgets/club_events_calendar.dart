@@ -502,7 +502,10 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         'training_2': 'Training',
                         'recovery_monday': 'Recovery Monday',
                         'mousehold_monday': 'Mousehold Monday',
-                        'efforts_tuesday': 'Efforts Tuesday',
+                        'tuesday_efforts_1': 'Tuesday Efforts 1',
+                        'tuesday_efforts_2': 'Tuesday Efforts 2',
+                        'tuesday_efforts': 'Tuesday Efforts',
+                        'efforts_tuesday': 'Tuesday Efforts',
                         'road_run_thursday': 'Road Run Thursday',
                         'track_session': 'Track Session',
                         'coached_tuesday': 'Coached Tuesday',
@@ -828,6 +831,9 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
       case 'recovery_monday':
       case 'mousehold_monday':
+      case 'tuesday_efforts_1':
+      case 'tuesday_efforts_2':
+      case 'tuesday_efforts':
       case 'efforts_tuesday':
       case 'road_run_thursday':
       case 'track_session':
@@ -865,6 +871,9 @@ class _EventCard extends StatelessWidget {
       case 'training_2':
       case 'recovery_monday':
       case 'mousehold_monday':
+      case 'tuesday_efforts_1':
+      case 'tuesday_efforts_2':
+      case 'tuesday_efforts':
       case 'efforts_tuesday':
       case 'road_run_thursday':
       case 'track_session':

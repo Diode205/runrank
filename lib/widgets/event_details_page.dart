@@ -32,6 +32,12 @@ class EventDetailsPage extends StatelessWidget {
       case 'training_2':
       case 'recovery_monday':
       case 'mousehold_monday':
+      case 'tuesday_efforts_1':
+      case 'tuesday_efforts_2':
+      case 'tuesday_efforts':
+      case 'efforts_tuesday':
+      case 'road_run_thursday':
+      case 'track_session':
       case 'coached_tuesday':
       case 'road_route_thursday':
       case 'paul_evans_session':
