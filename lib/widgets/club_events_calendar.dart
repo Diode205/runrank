@@ -43,6 +43,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
   RealtimeChannel? _eventsChannel;
   Timer? _eventsPollTimer;
+  DateTime? _lastCleanupAt;
 
   Future<void> _loadSeenEvents() async {
     try {
@@ -104,7 +105,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
               );
               if (!mounted) return;
               // Reload events with club-based filtering
-              await _loadEvents();
+              await _loadEvents(showLoading: false);
               // Refresh unseen-event count so Club Hub badge updates
               await NotificationService.refreshEventActivityCount();
             },
@@ -118,7 +119,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     _eventsPollTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
       if (!mounted) return;
       debugPrint('ClubEventsCalendar: periodic poll -> reloading events');
-      await _loadEvents();
+      await _loadEvents(showLoading: false);
       await NotificationService.refreshEventActivityCount();
     });
   }
@@ -128,7 +129,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
       _loadSeenEvents();
-      _loadEvents();
+      _loadEvents(showLoading: false);
       NotificationService.refreshEventActivityCount();
     }
   }
@@ -157,12 +158,14 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   }
 
   /// Load all future events + today
-  Future<void> _loadEvents() async {
-    if (mounted) {
+  Future<void> _loadEvents({bool showLoading = true}) async {
+    if (mounted && showLoading) {
       setState(() => _loading = true);
     }
 
     try {
+      await _cleanupExpiredEventsIfNeeded();
+
       final user = supabase.auth.currentUser;
       if (user == null) {
         if (mounted) {
@@ -208,7 +211,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
           .order("time");
 
       debugPrint(
-        'ClubEventsCalendar: Fetched \\${rows.length} total events for club=\\${_clubName}, clubUserIds=\\${_clubUserIds.length}',
+        'ClubEventsCalendar: Fetched ${rows.length} total events for club=$_clubName, clubUserIds=${_clubUserIds.length}',
       );
 
       final now = DateTime.now();
@@ -241,10 +244,28 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
         });
       }
     } catch (e) {
-      print("ERROR loading events: $e");
+      debugPrint("ERROR loading events: $e");
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _cleanupExpiredEventsIfNeeded() async {
+    final lastCleanupAt = _lastCleanupAt;
+    final now = DateTime.now();
+    if (lastCleanupAt != null &&
+        now.difference(lastCleanupAt) < const Duration(hours: 6)) {
+      return;
+    }
+
+    _lastCleanupAt = now;
+
+    try {
+      final deleted = await supabase.rpc('run_expired_club_events_cleanup');
+      debugPrint('ClubEventsCalendar: cleaned up $deleted expired events');
+    } catch (e) {
+      debugPrint('ClubEventsCalendar: expired event cleanup skipped: $e');
     }
   }
 
@@ -443,6 +464,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : CustomScrollView(
+              key: const PageStorageKey<String>('club_events_calendar_scroll'),
               slivers: [
                 for (final group in monthGroups) ...[
                   SliverToBoxAdapter(
@@ -529,10 +551,10 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                             !displayTitle.toLowerCase().startsWith(
                               'ekiden relay',
                             )) {
-                          displayTitle = '$relayPrefix – ${displayTitle}';
+                          displayTitle = '$relayPrefix – $displayTitle';
                         }
 
-                        // Show team name on card if provided
+                        // Show team name alongside the relay title if provided.
                         if (rawTeam.isNotEmpty) {
                           String teamLabel = rawTeam;
                           if (isEkiden) {
@@ -546,9 +568,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                           }
 
                           if (teamLabel.isNotEmpty) {
-                            subtitleText = subtitleText.trim().isEmpty
-                                ? 'Team: $teamLabel'
-                                : '${e.venue} • Team: $teamLabel';
+                            displayTitle = '$displayTitle • Team: $teamLabel';
                           }
                         }
                       } else if (trainingTitleByType.containsKey(
@@ -773,14 +793,25 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
         onPressed: () async {
           // ADMIN → full event creation
           // SOCIAL → social events only
-          await Navigator.push(
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => AdminCreateEventPage(userRole: userRole),
             ),
           );
 
-          _loadEvents();
+          await _loadEvents();
+          await NotificationService.refreshEventActivityCount();
+
+          if (result == true) {
+            // Supabase realtime can arrive a moment after the insert on some
+            // devices. A short second refresh makes newly created events appear
+            // promptly without waiting for the periodic poll or an app restart.
+            await Future<void>.delayed(const Duration(milliseconds: 700));
+            if (!mounted) return;
+            await _loadEvents();
+            await NotificationService.refreshEventActivityCount();
+          }
         },
       ),
     );

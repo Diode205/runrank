@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -6,6 +8,10 @@ const _mobileUserAgent =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 '
     'Mobile/15E148 Safari/604.1';
+
+final Set<Factory<OneSequenceGestureRecognizer>> _webViewGestureRecognizers = {
+  Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+};
 
 Future<void> _loadUri(
   WebViewController controller,
@@ -189,10 +195,14 @@ class WebLinkPreviewCard extends StatefulWidget {
   }
 }
 
-class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
+class _WebLinkPreviewCardState extends State<WebLinkPreviewCard>
+    with AutomaticKeepAliveClientMixin<WebLinkPreviewCard> {
   WebViewController? _controller;
   Uri? _uri;
   var _isFitting = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -266,6 +276,8 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     if (_uri == null || _controller == null) {
       return Container(
         height: widget.height,
@@ -294,7 +306,10 @@ class _WebLinkPreviewCardState extends State<WebLinkPreviewCard> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            WebViewWidget(controller: _controller!),
+            WebViewWidget(
+              controller: _controller!,
+              gestureRecognizers: _webViewGestureRecognizers,
+            ),
             if (_isFitting)
               const ColoredBox(
                 color: Color(0xFFF4F4F4),
@@ -436,7 +451,10 @@ class _WebLinkBrowserPageState extends State<_WebLinkBrowserPage> {
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
+          WebViewWidget(
+            controller: _controller,
+            gestureRecognizers: _webViewGestureRecognizers,
+          ),
           if (_isLoading) const LinearProgressIndicator(minHeight: 2),
         ],
       ),

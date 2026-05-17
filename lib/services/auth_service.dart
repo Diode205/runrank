@@ -35,6 +35,32 @@ class AuthService {
     }
   }
 
+  static Future<Map<String, dynamic>?> requestClubMemberInvite({
+    required String club,
+    required String fullName,
+    required String ukaNumber,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'request_club_member_invite',
+        params: {
+          'p_club_name': club.trim(),
+          'p_full_name': fullName.trim(),
+          'p_uka_number': ukaNumber.trim(),
+        },
+      );
+
+      if (result is List && result.isNotEmpty) {
+        return Map<String, dynamic>.from(result.first as Map);
+      }
+      return null;
+    } catch (e) {
+      // ignore: avoid_print
+      print('Invite request failed: $e');
+      return null;
+    }
+  }
+
   static List<String> _ukaLookupVariants(String ukaNumber) {
     final trimmed = ukaNumber.trim();
     final compact = trimmed.replaceAll(RegExp(r'[\s-]+'), '');

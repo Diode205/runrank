@@ -121,7 +121,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   }
 
   void _setupFallbackRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       _loadPosts();
     });
@@ -493,6 +493,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           : RefreshIndicator(
               onRefresh: _loadPosts,
               child: ListView.builder(
+                key: const PageStorageKey<String>('posts_feed_facebook_scroll'),
                 padding: const EdgeInsets.all(12),
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
@@ -506,6 +507,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                   }
 
                   Widget card = _PostCard(
+                    key: ValueKey('post-card-$postId'),
                     post: post,
                     isAdmin: isAdmin,
                     isPending: isPending,
@@ -785,6 +787,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onOpenDetail;
 
   const _PostCard({
+    super.key,
     required this.post,
     required this.isAdmin,
     required this.isPending,

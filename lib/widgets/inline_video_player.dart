@@ -13,13 +13,14 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   bool _error = false;
+  bool _muted = false;
 
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
-      ..setVolume(0)
+      ..setVolume(1)
       ..initialize()
           .then((_) {
             if (!mounted) return;
@@ -33,6 +34,13 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
               _error = true;
             });
           });
+  }
+
+  void _toggleMute() {
+    setState(() {
+      _muted = !_muted;
+      _controller.setVolume(_muted ? 0 : 1);
+    });
   }
 
   @override
@@ -106,6 +114,22 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                 size: 40,
               ),
             ),
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: _muted ? 'Unmute video' : 'Mute video',
+                onPressed: _toggleMute,
+                icon: Icon(
+                  _muted ? Icons.volume_off : Icons.volume_up,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

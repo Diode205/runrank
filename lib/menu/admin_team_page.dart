@@ -669,17 +669,117 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       }
 
       final data = await query
-          .or('full_name.ilike.%$term%,email.ilike.%$term%,uka_number.ilike.%$term%')
+          .or(
+            'full_name.ilike.%$term%,email.ilike.%$term%,uka_number.ilike.%$term%',
+          )
           .limit(20);
 
+      final results = List<Map<String, dynamic>>.from(
+        data,
+      ).map((row) => {...row, '_result_type': 'profile'}).toList();
+
+      if (clubName != null && clubName.isNotEmpty) {
+        final inviteRows = await _supabase
+            .from('club_member_invites')
+            .select(
+              'id, full_name, uka_number, invite_code, is_active, claimed_by_user_id, claimed_at, club_name, created_at',
+            )
+            .eq('club_name', clubName)
+            .eq('is_active', true)
+            .filter('claimed_by_user_id', 'is', null)
+            .or('full_name.ilike.%$term%,uka_number.ilike.%$term%')
+            .order('created_at', ascending: false)
+            .limit(20);
+
+        final existingUkas = results
+            .map((row) => (row['uka_number'] ?? '').toString().trim())
+            .where((uka) => uka.isNotEmpty)
+            .map((uka) => uka.toUpperCase().replaceAll(RegExp(r'[\s-]+'), ''))
+            .toSet();
+
+        for (final row in inviteRows) {
+          final invite = Map<String, dynamic>.from(row);
+          final uka = (invite['uka_number'] ?? '')
+              .toString()
+              .trim()
+              .toUpperCase()
+              .replaceAll(RegExp(r'[\s-]+'), '');
+          if (uka.isNotEmpty && existingUkas.contains(uka)) continue;
+          results.add({...invite, '_result_type': 'invite'});
+        }
+      }
+
       setModalState(() {
-        _searchResults = List<Map<String, dynamic>>.from(data);
+        _searchResults = results;
       });
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Search failed: $e')));
     } finally {
       setModalState(() => _searching = false);
     }
+  }
+
+  Future<void> _showInviteCode(Map<String, dynamic> invite) async {
+    final code = (invite['invite_code'] ?? '').toString();
+    final name = (invite['full_name'] ?? 'Member').toString();
+    final uka = (invite['uka_number'] ?? '').toString();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final primary = Theme.of(dialogContext).colorScheme.primary;
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F111A),
+          title: Text('Member invite code', style: TextStyle(color: primary)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: const TextStyle(color: Colors.white)),
+              if (uka.isNotEmpty)
+                Text(
+                  'UKA: $uka',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              const SizedBox(height: 14),
+              SelectableText(
+                code,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Send this code to the member so they can continue registration.',
+                style: TextStyle(color: Colors.white70, height: 1.35),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: code));
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invite code copied')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _setAdminStatus(
@@ -1511,6 +1611,7 @@ For security we recommend using this code within the next few days. After it has
                               const Divider(color: Colors.white12, height: 16),
                           itemBuilder: (_, index) {
                             final user = _searchResults[index];
+                            final isInvite = user['_result_type'] == 'invite';
                             final isUserAdmin = user['is_admin'] == true;
                             final isBlocked = user['is_blocked'] == true;
 
@@ -1538,9 +1639,13 @@ For security we recommend using this code within the next few days. After it has
                                             ),
                                           ),
                                           Text(
-                                            user['email'] ?? '',
-                                            style: const TextStyle(
-                                              color: Colors.white70,
+                                            isInvite
+                                                ? 'Pending registration • UKA ${user['uka_number'] ?? '—'}'
+                                                : user['email'] ?? '',
+                                            style: TextStyle(
+                                              color: isInvite
+                                                  ? Colors.amberAccent
+                                                  : Colors.white70,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -1550,11 +1655,16 @@ For security we recommend using this code within the next few days. After it has
                                               children: [
                                                 Chip(
                                                   label: Text(
-                                                    isUserAdmin
+                                                    isInvite
+                                                        ? 'Invite pending'
+                                                        : isUserAdmin
                                                         ? 'Admin'
                                                         : 'Reader',
                                                   ),
-                                                  backgroundColor: isUserAdmin
+                                                  backgroundColor: isInvite
+                                                      ? Colors.amber
+                                                            .withOpacity(0.2)
+                                                      : isUserAdmin
                                                       ? Colors.green
                                                             .withOpacity(0.2)
                                                       : Colors.blue.withOpacity(
@@ -1567,18 +1677,20 @@ For security we recommend using this code within the next few days. After it has
                                                   ),
                                                 ),
                                                 const SizedBox(width: 6),
-                                                Chip(
-                                                  label: Text(
-                                                    user['membership_type'] ??
-                                                        '—',
+                                                if (!isInvite)
+                                                  Chip(
+                                                    label: Text(
+                                                      user['membership_type'] ??
+                                                          '—',
+                                                    ),
+                                                    backgroundColor: Colors
+                                                        .white
+                                                        .withOpacity(0.08),
+                                                    labelStyle: const TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 12,
+                                                    ),
                                                   ),
-                                                  backgroundColor: Colors.white
-                                                      .withOpacity(0.08),
-                                                  labelStyle: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
                                                 if (isBlocked) ...[
                                                   const SizedBox(width: 6),
                                                   Chip(
@@ -1618,117 +1730,135 @@ For security we recommend using this code within the next few days. After it has
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: [
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
+                                    if (isInvite)
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: 'Show invite code',
+                                        onPressed: () => _showInviteCode(user),
+                                        icon: const Icon(
+                                          Icons.vpn_key_outlined,
+                                          color: Colors.amberAccent,
+                                        ),
                                       ),
-                                      tooltip: isUserAdmin
-                                          ? 'Remove admin'
-                                          : 'Make admin',
-                                      onPressed: () => _setAdminStatus(
-                                        user,
-                                        !isUserAdmin,
-                                        setModalState,
+                                    if (!isInvite) ...[
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: isUserAdmin
+                                            ? 'Remove admin'
+                                            : 'Make admin',
+                                        onPressed: () => _setAdminStatus(
+                                          user,
+                                          !isUserAdmin,
+                                          setModalState,
+                                        ),
+                                        icon: Icon(
+                                          isUserAdmin
+                                              ? Icons.security_update_warning
+                                              : Icons.verified_user,
+                                          color: isUserAdmin
+                                              ? Colors.orangeAccent
+                                              : Colors.greenAccent,
+                                        ),
                                       ),
-                                      icon: Icon(
-                                        isUserAdmin
-                                            ? Icons.security_update_warning
-                                            : Icons.verified_user,
-                                        color: isUserAdmin
-                                            ? Colors.orangeAccent
-                                            : Colors.greenAccent,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: 'Warn user',
+                                        onPressed: () =>
+                                            _warnUser(user, setModalState),
+                                        icon: const Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Colors.amber,
+                                        ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: isBlocked
+                                            ? 'Unblock'
+                                            : 'Block',
+                                        onPressed: () => _blockUser(
+                                          user,
+                                          !isBlocked,
+                                          setModalState,
+                                        ),
+                                        icon: Icon(
+                                          isBlocked
+                                              ? Icons.lock_open
+                                              : Icons.block,
+                                          color: isBlocked
+                                              ? Colors.lightGreenAccent
+                                              : Colors.redAccent,
+                                        ),
                                       ),
-                                      tooltip: 'Warn user',
-                                      onPressed: () =>
-                                          _warnUser(user, setModalState),
-                                      icon: const Icon(
-                                        Icons.warning_amber_rounded,
-                                        color: Colors.amber,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: 'Generate migration code',
+                                        onPressed: () => _openMigrationDialog(
+                                          user,
+                                          setModalState,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.compare_arrows,
+                                          color: Colors.amber,
+                                        ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: 'Generate reset code',
+                                        onPressed: () =>
+                                            _openPasswordResetCodeDialog(user),
+                                        icon: const Icon(
+                                          Icons.password_rounded,
+                                          color: Colors.lightBlueAccent,
+                                        ),
                                       ),
-                                      tooltip: isBlocked ? 'Unblock' : 'Block',
-                                      onPressed: () => _blockUser(
-                                        user,
-                                        !isBlocked,
-                                        setModalState,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 36,
+                                          minHeight: 36,
+                                        ),
+                                        tooltip: 'Remove profile',
+                                        onPressed: () => _confirmRemoveProfile(
+                                          user,
+                                          setModalState,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.delete_forever_outlined,
+                                          color: Colors.redAccent,
+                                        ),
                                       ),
-                                      icon: Icon(
-                                        isBlocked
-                                            ? Icons.lock_open
-                                            : Icons.block,
-                                        color: isBlocked
-                                            ? Colors.lightGreenAccent
-                                            : Colors.redAccent,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      tooltip: 'Generate migration code',
-                                      onPressed: () => _openMigrationDialog(
-                                        user,
-                                        setModalState,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.compare_arrows,
-                                        color: Colors.amber,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      tooltip: 'Generate reset code',
-                                      onPressed: () => _openPasswordResetCodeDialog(
-                                        user,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.password_rounded,
-                                        color: Colors.lightBlueAccent,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      tooltip: 'Remove profile',
-                                      onPressed: () => _confirmRemoveProfile(
-                                        user,
-                                        setModalState,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.delete_forever_outlined,
-                                        color: Colors.redAccent,
-                                      ),
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ],
@@ -1844,7 +1974,8 @@ For security we recommend using this code within the next few days. After it has
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: () async {
-                          final instructions = '''
+                          final instructions =
+                              '''
 RunRank password reset for $memberName
 
 Reset code: $generatedCode
@@ -1897,8 +2028,7 @@ This code can be used once and will expire in 7 days.
                       return;
                     }
 
-                    final code =
-                        'RST-${initials(club)}-${randomSuffix(6)}';
+                    final code = 'RST-${initials(club)}-${randomSuffix(6)}';
 
                     try {
                       await _supabase.from('password_reset_codes').insert({
@@ -1914,9 +2044,7 @@ This code can be used once and will expire in 7 days.
                       });
 
                       messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Reset code generated: $code'),
-                        ),
+                        SnackBar(content: Text('Reset code generated: $code')),
                       );
                     } catch (e) {
                       messenger.showSnackBar(

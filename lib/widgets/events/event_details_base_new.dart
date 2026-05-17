@@ -81,7 +81,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           ),
           callback: (_) async {
             if (!mounted) return;
-            await loadComments();
+            await loadComments(showLoading: false);
           },
         )
         .subscribe();
@@ -89,7 +89,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     // Periodic fallback in case realtime misses an update.
     _commentsPollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (!mounted) return;
-      await loadComments();
+      await loadComments(showLoading: false);
     });
   }
 
@@ -219,11 +219,14 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     setState(() {});
   }
 
-  Future<void> loadComments() async {
+  Future<void> loadComments({bool showLoading = true}) async {
     if (_baseCommentsTableMissing) return;
 
-    commentsLoading = true;
-    if (mounted) setState(() {});
+    final shouldShowLoading = showLoading && comments.isEmpty;
+    if (shouldShowLoading) {
+      commentsLoading = true;
+      if (mounted) setState(() {});
+    }
 
     try {
       final data = await getCommentsWithNames(eventId: event.id);
@@ -232,7 +235,9 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     } catch (_) {
       // Errors are already logged in getCommentsWithNames.
     } finally {
-      commentsLoading = false;
+      if (shouldShowLoading) {
+        commentsLoading = false;
+      }
       if (mounted) setState(() {});
     }
   }

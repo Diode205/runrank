@@ -12,25 +12,74 @@ class RegisterInviteScreen extends StatefulWidget {
 }
 
 class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
+  final _nameController = TextEditingController();
   final _ukaController = TextEditingController();
   final _inviteController = TextEditingController();
   bool _loading = false;
+  bool _detailsSaved = false;
   String? _error;
+  String? _savedName;
+  String? _savedUka;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _ukaController.dispose();
     _inviteController.dispose();
     super.dispose();
   }
 
-  Future<void> _continue() async {
+  Future<void> _saveMemberDetails() async {
+    final name = _nameController.text.trim();
     final uka = _ukaController.text.trim();
+
+    if (name.isEmpty || uka.isEmpty) {
+      setState(() {
+        _error = 'Enter your name and UKA athlete number.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final request = await AuthService.requestClubMemberInvite(
+      club: widget.selectedClub,
+      fullName: name,
+      ukaNumber: uka,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+
+    if (request == null) {
+      setState(() {
+        _error =
+            'We could not save your member details. Please check your name and UKA number, then try again.';
+      });
+      return;
+    }
+
+    setState(() {
+      _detailsSaved = true;
+      _savedName = request['full_name']?.toString() ?? name;
+      _savedUka = request['uka_number']?.toString() ?? uka;
+      _nameController.text = _savedName!;
+      _ukaController.text = _savedUka!;
+    });
+  }
+
+  Future<void> _continue() async {
+    final uka = (_savedUka ?? _ukaController.text).trim();
     final invite = _inviteController.text.trim();
 
-    if (uka.isEmpty || invite.isEmpty) {
+    if (!_detailsSaved || uka.isEmpty || invite.isEmpty) {
       setState(() {
-        _error = 'Enter both your UKA number and member invite code.';
+        _error =
+            'Save your member details first, then enter your member invite code.';
       });
       return;
     }
@@ -74,7 +123,7 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify Member Invite')),
+      appBar: AppBar(title: const Text('Member Details')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: ListView(
@@ -85,25 +134,75 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Enter your UKA athlete number and the unique invite code provided by your club admin.',
+              'Enter your member details first. This creates a pending invite request for your club admin to verify.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, height: 1.4),
             ),
             const SizedBox(height: 20),
             TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              readOnly: _detailsSaved,
+              decoration: const InputDecoration(
+                labelText: 'Full name',
+                hintText: 'Enter your name as known by the club',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _ukaController,
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.next,
+              readOnly: _detailsSaved,
               decoration: const InputDecoration(
                 labelText: 'UKA athlete number',
                 hintText: 'Enter your UKA number',
               ),
             ),
+            const SizedBox(height: 14),
+            if (!_detailsSaved)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _loading ? null : _saveMemberDetails,
+                  icon: const Icon(Icons.save_outlined),
+                  label: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save Member Details'),
+                ),
+              )
+            else ...[
+              const Text(
+                'Your details have been saved. Please contact your club admin by text or call and ask for your unique member invite code.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _loading
+                    ? null
+                    : () {
+                        setState(() {
+                          _detailsSaved = false;
+                          _inviteController.clear();
+                          _error = null;
+                        });
+                      },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Edit member details'),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _inviteController,
               textCapitalization: TextCapitalization.characters,
               textInputAction: TextInputAction.done,
+              enabled: _detailsSaved,
               onSubmitted: (_) => _loading ? null : _continue(),
               decoration: const InputDecoration(
                 labelText: 'Member invite code',
@@ -122,7 +221,7 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _loading ? null : _continue,
+                onPressed: _loading || !_detailsSaved ? null : _continue,
                 child: _loading
                     ? const SizedBox(
                         width: 20,

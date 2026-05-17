@@ -598,6 +598,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           : RefreshIndicator(
               onRefresh: _loadPosts,
               child: ListView.builder(
+                key: const PageStorageKey<String>('posts_feed_inline_scroll'),
                 padding: const EdgeInsets.all(12),
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
@@ -623,6 +624,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                   final isApproved = post['is_approved'] ?? true;
 
                   return Card(
+                    key: ValueKey('post-card-$postId'),
                     margin: const EdgeInsets.only(bottom: 12),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -654,7 +656,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                   backgroundColor: Colors.white12,
                                   backgroundImage: authorAvatarUrl != null
                                       ? NetworkImage(
-                                          '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                          authorAvatarUrl,
                                         )
                                       : null,
                                   child: authorAvatarUrl == null
@@ -824,7 +826,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                     if (hasInlinePreview) ...[
                                       const SizedBox(height: 8),
                                       WebLinkPreviewCard(
-                                        url: firstPreviewUrl!,
+                                        url: firstPreviewUrl,
                                         buttonLabel: 'View Full Page',
                                         height: 460,
                                       ),
@@ -1159,7 +1161,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                   backgroundImage:
                                                       commentAvatarUrl != null
                                                       ? NetworkImage(
-                                                          '$commentAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                                          commentAvatarUrl,
                                                         )
                                                       : null,
                                                   child:

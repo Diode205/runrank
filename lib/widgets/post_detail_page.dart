@@ -218,7 +218,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         });
       }
     } catch (e) {
-      print('Error loading post details: $e');
+      debugPrint('Error loading post details: $e');
       if (mounted) {
         setState(() => loading = false);
       }
@@ -502,12 +502,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
             );
           }
         } catch (e) {
-          print('Error sending post reaction notification (detail): $e');
+          debugPrint('Error sending post reaction notification (detail): $e');
         }
       }
       _loadPostDetails(); // Refresh reactions
     } catch (e) {
-      print('Error toggling reaction: $e');
+      debugPrint('Error toggling reaction: $e');
     }
   }
 
@@ -546,7 +546,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           );
         }
       } catch (e) {
-        print('Error sending post comment notification (detail): $e');
+        debugPrint('Error sending post comment notification (detail): $e');
       }
     } catch (e) {
       messenger.showSnackBar(
@@ -1003,6 +1003,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
+              key: const PageStorageKey<String>('post_detail_scroll'),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1024,9 +1025,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             radius: 20,
                             backgroundColor: Colors.white12,
                             backgroundImage: authorAvatarUrl != null
-                                ? NetworkImage(
-                                    '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                  )
+                                ? NetworkImage(authorAvatarUrl)
                                 : null,
                             child: authorAvatarUrl == null
                                 ? Text(
@@ -1097,62 +1096,75 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   // Images
                   if (imageUrls.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    SizedBox(
-                      height: 320,
-                      child: PageView.builder(
-                        itemCount: imageUrls.length,
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onTap: () => _openImageFullscreen(
-                              imageUrls,
-                              initialIndex: index,
-                            ),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                Image.network(
-                                  imageUrls[index],
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    height: 320,
-                                    color: Colors.grey[800],
-                                    child: Icon(
-                                      Icons.broken_image,
-                                      size: 48,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final imageHeight = (constraints.maxWidth * 1.25).clamp(
+                          320.0,
+                          560.0,
+                        );
+                        return SizedBox(
+                          height: imageHeight,
+                          child: PageView.builder(
+                            itemCount: imageUrls.length,
+                            itemBuilder: (context, index) {
+                              return GestureDetector(
+                                onTap: () => _openImageFullscreen(
+                                  imageUrls,
+                                  initialIndex: index,
                                 ),
-                                if (imageUrls.length > 1)
-                                  Positioned(
-                                    right: 12,
-                                    bottom: 12,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black54,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '${index + 1}/${imageUrls.length}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Container(
+                                      color: Colors.black,
+                                      alignment: Alignment.center,
+                                      child: Image.network(
+                                        imageUrls[index],
+                                        width: double.infinity,
+                                        height: imageHeight,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          height: imageHeight,
+                                          color: Colors.grey[800],
+                                          child: Icon(
+                                            Icons.broken_image,
+                                            size: 48,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                    if (imageUrls.length > 1)
+                                      Positioned(
+                                        right: 12,
+                                        bottom: 12,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${index + 1}/${imageUrls.length}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ],
                   // Attachments
@@ -1390,7 +1402,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                       backgroundImage:
                                           likeUsers[i]['avatar_url'] != null
                                           ? NetworkImage(
-                                              '${likeUsers[i]['avatar_url']}?t=${DateTime.now().millisecondsSinceEpoch}',
+                                              likeUsers[i]['avatar_url']
+                                                  as String,
                                             )
                                           : null,
                                       child: likeUsers[i]['avatar_url'] == null
@@ -1479,9 +1492,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                 radius: 16,
                                 backgroundColor: Colors.white12,
                                 backgroundImage: avatarUrl != null
-                                    ? NetworkImage(
-                                        '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                      )
+                                    ? NetworkImage(avatarUrl)
                                     : null,
                                 child: avatarUrl == null
                                     ? Text(

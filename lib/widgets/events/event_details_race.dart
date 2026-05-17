@@ -75,6 +75,30 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
               children: [
+                if (e.signatureImageAsset != null &&
+                    e.signatureImageAsset!.trim().isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Image.asset(
+                        e.signatureImageAsset!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey.shade900,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.white54,
+                            size: 42,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
                 // Cancelled event banner
                 ...(e.isCancelled
                     ? [

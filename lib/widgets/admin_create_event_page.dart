@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -66,6 +67,7 @@ class AdminCreateEventPage extends StatefulWidget {
   final String? initialRelayFormat;
   final double? initialLatitude;
   final double? initialLongitude;
+  final String? initialSignatureImageAsset;
 
   const AdminCreateEventPage({
     super.key,
@@ -79,6 +81,7 @@ class AdminCreateEventPage extends StatefulWidget {
     this.initialRelayFormat,
     this.initialLatitude,
     this.initialLongitude,
+    this.initialSignatureImageAsset,
   });
 
   @override
@@ -295,14 +298,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   void initState() {
     super.initState();
 
-    adminTypes = [
-      "Training",
-      "Race",
-      "Cross Country",
-      "Handicap Series",
-      "Relay",
-      "Special Event",
-    ];
+    adminTypes = ["Training", "Handicap Series", "Relay", "Special Event"];
 
     socialTypes = ["Social Run", "Parkrun Tourism"];
 
@@ -372,6 +368,20 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
   bool _repeatWeeklyTraining = false;
   int _trainingRepeatWeeks = 1;
+  bool _savingEvent = false;
+
+  bool get _isSignatureCreatedRaceType =>
+      selectedEventType == "Race" || selectedEventType == "Cross Country";
+
+  List<String> get _eventTypeDropdownItems {
+    final items = selectedCategory == "admin" ? adminTypes : socialTypes;
+    if (selectedCategory == "admin" &&
+        _isSignatureCreatedRaceType &&
+        !items.contains(selectedEventType)) {
+      return [selectedEventType, ...items];
+    }
+    return items;
+  }
 
   // Special Event subtype (e.g. AGM, Club Nights, Awards Night)
   static const List<String> _specialEventTypes = <String>[
@@ -456,8 +466,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           adminTypes = [
             "Training",
             "One Mile Handicap",
-            "Race",
-            "Cross Country",
             "Relay",
             "Special Event",
           ];
@@ -468,8 +476,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           // Default (NNBR and other clubs).
           adminTypes = [
             "Training",
-            "Race",
-            "Cross Country",
             "Handicap Series",
             "Relay",
             "Special Event",
@@ -479,7 +485,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         }
 
         if (selectedCategory == 'admin' &&
-            !adminTypes.contains(selectedEventType)) {
+            !adminTypes.contains(selectedEventType) &&
+            !_isSignatureCreatedRaceType) {
           if (_isNrrTrainingEventType(selectedEventType)) {
             _selectedNrrTrainingEventType = _normaliseNrrTrainingEventType(
               selectedEventType,
@@ -993,6 +1000,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   }
 
   Future<void> saveEvent() async {
+    if (_savingEvent) return;
     if (!_formKey.currentState!.validate()) return;
 
     if (selectedDate == null) {
@@ -1081,6 +1089,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         "venue": venueCtrl.text.trim(),
         "venue_address": venueAddressCtrl.text.trim(),
         "description": descriptionCtrl.text.trim(),
+        if (widget.initialSignatureImageAsset != null)
+          "signature_image_asset": widget.initialSignatureImageAsset,
         "latitude": latitude,
         "longitude": longitude,
         "marshal_call_date":
@@ -1095,6 +1105,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       };
     });
 
+    setState(() => _savingEvent = true);
+
     try {
       final result = await supabase.from("club_events").insert(maps).select();
 
@@ -1106,7 +1118,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       if (result.isNotEmpty) {
         // Recompute unseen-event count so Club Hub badge reflects the
         // newly created event (which starts as "unseen").
-        await NotificationService.signalLocalEventActivityChanged();
+        unawaited(NotificationService.signalLocalEventActivityChanged());
       }
 
       if (mounted) {
@@ -1125,6 +1137,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(SnackBar(content: Text("Failed: $e")));
+      setState(() => _savingEvent = false);
     }
   }
 
@@ -1224,28 +1237,22 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 "Event Type",
                 DropdownButtonFormField<String>(
                   initialValue: selectedEventType,
-                  items: selectedCategory == "admin"
-                      ? adminTypes
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList()
-                      : socialTypes
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      selectedEventType = v;
-                      if (_isNRRClub && v == 'Training') {
-                        _selectedNrrTrainingEventType =
-                            _nrrTrainingEventTypes.first;
-                      }
-                    });
-                    _applyFixedVenuePresetForCurrentSelection();
-                  },
+                  items: _eventTypeDropdownItems
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: _isSignatureCreatedRaceType
+                      ? null
+                      : (v) {
+                          if (v == null) return;
+                          setState(() {
+                            selectedEventType = v;
+                            if (_isNRRClub && v == 'Training') {
+                              _selectedNrrTrainingEventType =
+                                  _nrrTrainingEventTypes.first;
+                            }
+                          });
+                          _applyFixedVenuePresetForCurrentSelection();
+                        },
                 ),
               ),
 
@@ -1830,9 +1837,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onPressed: saveEvent,
-                  icon: const Icon(Icons.save),
-                  label: const Text("Save Event"),
+                  onPressed: _savingEvent ? null : saveEvent,
+                  icon: _savingEvent
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_savingEvent ? "Saving..." : "Save Event"),
                 ),
               ),
             ],

@@ -25,6 +25,7 @@ class ClubEvent {
   final double? latitude;
   final double? longitude;
 
+  final String? signatureImageAsset;
   final String? relayTeam;
   final bool isCancelled;
   final String? cancelReason;
@@ -51,6 +52,7 @@ class ClubEvent {
     required this.marshalCallDate,
     required this.latitude,
     required this.longitude,
+    required this.signatureImageAsset,
     required this.relayTeam,
     required this.isCancelled,
     required this.cancelReason,
@@ -125,6 +127,7 @@ class ClubEvent {
       longitude: row['longitude'] == null
           ? null
           : (row['longitude'] as num).toDouble(),
+      signatureImageAsset: row['signature_image_asset'],
       relayTeam: row['relay_team'],
       isCancelled: row['is_cancelled'] ?? false,
       cancelReason: row['cancel_reason'],

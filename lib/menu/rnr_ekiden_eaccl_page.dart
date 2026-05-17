@@ -43,21 +43,31 @@ class RnrEkidenEacclPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
         backgroundColor: Colors.black,
-        centerTitle: true,
-        title: const Text(
-          'RNR, Ekiden & EACCL',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          centerTitle: true,
+          title: const Text(
+            'RNR, Ekiden & EACCL',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'RNR'),
+              Tab(text: 'Ekiden'),
+              Tab(text: 'EACCL'),
+            ],
+          ),
         ),
-      ),
-      // Swipeable pages: RNR, EKIDEN, EACCL
-      body: SafeArea(
-        top: false,
-        child: PageView(
-          children: const [_RnrPage(), _EkidenPage(), _EacclPage()],
+        body: const SafeArea(
+          top: false,
+          child: TabBarView(
+            physics: NeverScrollableScrollPhysics(),
+            children: [_RnrPage(), _EkidenPage(), _EacclPage()],
+          ),
         ),
       ),
     );
@@ -92,7 +102,8 @@ class _RnrPage extends StatefulWidget {
   State<_RnrPage> createState() => _RnrPageState();
 }
 
-class _RnrPageState extends State<_RnrPage> {
+class _RnrPageState extends State<_RnrPage>
+    with AutomaticKeepAliveClientMixin<_RnrPage> {
   bool _isAdmin = false;
   String? _clubName = UserService.cachedClubName;
 
@@ -100,6 +111,10 @@ class _RnrPageState extends State<_RnrPage> {
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
   Color get _driveColor => _driveButtonColor(_clubName);
   Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
+
+  @override
+  bool get wantKeepAlive => true;
+
   final List<_StageInfo> _stages = const [
     _StageInfo(
       label: "S1: King's Lynn — PE30 2NB",
@@ -295,6 +310,8 @@ class _RnrPageState extends State<_RnrPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return Padding(
       padding: const EdgeInsets.all(_pageInset),
       child: Column(
@@ -506,7 +523,8 @@ class _EkidenPage extends StatefulWidget {
   State<_EkidenPage> createState() => _EkidenPageState();
 }
 
-class _EkidenPageState extends State<_EkidenPage> {
+class _EkidenPageState extends State<_EkidenPage>
+    with AutomaticKeepAliveClientMixin<_EkidenPage> {
   bool _isAdmin = false;
   String? _clubName = UserService.cachedClubName;
 
@@ -514,6 +532,9 @@ class _EkidenPageState extends State<_EkidenPage> {
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
   Color get _driveColor => _driveButtonColor(_clubName);
   Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -658,6 +679,8 @@ class _EkidenPageState extends State<_EkidenPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     const registerHeight = 36.0;
 
     return Padding(
@@ -743,7 +766,8 @@ class _EacclPage extends StatefulWidget {
   State<_EacclPage> createState() => _EacclPageState();
 }
 
-class _EacclPageState extends State<_EacclPage> {
+class _EacclPageState extends State<_EacclPage>
+    with AutomaticKeepAliveClientMixin<_EacclPage> {
   bool _isAdmin = false;
   String? _clubName = UserService.cachedClubName;
 
@@ -751,6 +775,9 @@ class _EacclPageState extends State<_EacclPage> {
   Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
   Color get _driveColor => _driveButtonColor(_clubName);
   Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -1210,6 +1237,8 @@ class _EacclPageState extends State<_EacclPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final raceListHeight = (constraints.maxHeight * 0.16)

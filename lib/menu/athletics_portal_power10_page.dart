@@ -38,6 +38,7 @@ class AthleticsPortalPower10Page extends StatelessWidget {
         body: SafeArea(
           top: false,
           child: TabBarView(
+            physics: NeverScrollableScrollPhysics(),
             children: [
               for (final site in _sites) _AthleticsSiteView(site: site),
             ],
@@ -48,13 +49,26 @@ class AthleticsPortalPower10Page extends StatelessWidget {
   }
 }
 
-class _AthleticsSiteView extends StatelessWidget {
+class _AthleticsSiteView extends StatefulWidget {
   const _AthleticsSiteView({required this.site});
 
   final _AthleticsSite site;
 
   @override
+  State<_AthleticsSiteView> createState() => _AthleticsSiteViewState();
+}
+
+class _AthleticsSiteViewState extends State<_AthleticsSiteView>
+    with AutomaticKeepAliveClientMixin<_AthleticsSiteView> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
+
+    final site = widget.site;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: LayoutBuilder(

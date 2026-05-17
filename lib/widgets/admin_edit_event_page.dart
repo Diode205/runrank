@@ -22,12 +22,14 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
   late TextEditingController descriptionCtrl;
   late TextEditingController latitudeCtrl;
   late TextEditingController longitudeCtrl;
+  late TextEditingController relayTeamCtrl;
 
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
   DateTime? marshalCallDate; // for race/handicap
 
   bool _saving = false;
+  String _relayTeamPrefix = '';
 
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
@@ -42,6 +44,18 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     venueCtrl = TextEditingController(text: e.venue);
     venueAddressCtrl = TextEditingController(text: e.venueAddress);
     descriptionCtrl = TextEditingController(text: e.description);
+    final rawRelayTeam = e.relayTeam?.trim() ?? '';
+    if (rawRelayTeam.toLowerCase().startsWith('ekiden:')) {
+      _relayTeamPrefix = 'Ekiden: ';
+      relayTeamCtrl = TextEditingController(
+        text: rawRelayTeam.substring(rawRelayTeam.indexOf(':') + 1).trim(),
+      );
+    } else if (rawRelayTeam.toLowerCase() == 'ekiden') {
+      _relayTeamPrefix = 'Ekiden: ';
+      relayTeamCtrl = TextEditingController();
+    } else {
+      relayTeamCtrl = TextEditingController(text: rawRelayTeam);
+    }
     latitudeCtrl = TextEditingController(
       text: e.latitude != null ? e.latitude!.toStringAsFixed(6) : '',
     );
@@ -64,8 +78,12 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     descriptionCtrl.dispose();
     latitudeCtrl.dispose();
     longitudeCtrl.dispose();
+    relayTeamCtrl.dispose();
     super.dispose();
   }
+
+  bool get _isRelayEvent =>
+      widget.event.eventType.toLowerCase().replaceAll(' ', '_') == 'relay';
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -176,6 +194,18 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
       }
     }
 
+    String? relayTeamValue;
+    if (_isRelayEvent) {
+      final teamName = relayTeamCtrl.text.trim();
+      if (_relayTeamPrefix.isNotEmpty) {
+        relayTeamValue = teamName.isEmpty
+            ? 'Ekiden'
+            : '$_relayTeamPrefix$teamName';
+      } else {
+        relayTeamValue = teamName.isEmpty ? null : teamName;
+      }
+    }
+
     final payload = {
       'title': titleCtrl.text.trim().isEmpty
           ? widget.event.title
@@ -187,6 +217,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
       'venue': venueCtrl.text.trim(),
       'venue_address': venueAddressCtrl.text.trim(),
       'description': descriptionCtrl.text.trim(),
+      if (_isRelayEvent) 'relay_team': relayTeamValue,
       'latitude': latitude,
       'longitude': longitude,
       'marshal_call_date':
@@ -240,6 +271,16 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
+              if (_isRelayEvent) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: relayTeamCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Relay team',
+                    hintText: 'Team name',
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -270,7 +311,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _selectedHostId,
+                initialValue: _selectedHostId,
                 decoration: const InputDecoration(labelText: 'Host / Director'),
                 items: _hosts
                     .map(

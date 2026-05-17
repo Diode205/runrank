@@ -421,9 +421,29 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           initialVenueAddress: info.venueAddress,
           initialLatitude: info.latitude,
           initialLongitude: info.longitude,
+          initialSignatureImageAsset: _signatureImageForRace(info.keyId),
         ),
       ),
     );
+  }
+
+  String _signatureImageForRace(String keyId) {
+    switch (keyId) {
+      case 'wroxham':
+        return 'assets/images/wroxham5.png';
+      case 'broadland_xc':
+        return 'assets/images/broadlandxc.png';
+      case 'dinosaur':
+        return 'assets/images/dinodash.png';
+      case 'holt':
+        return 'assets/images/holt10.png';
+      case 'worstead':
+        return 'assets/images/worstead5m.png';
+      case 'chase':
+        return 'assets/images/chasetrain.jpg';
+      default:
+        return 'assets/images/eaccl.jpg';
+    }
   }
 
   @override
