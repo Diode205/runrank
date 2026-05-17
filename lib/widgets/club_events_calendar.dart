@@ -829,35 +829,48 @@ class _EventCard extends StatelessWidget {
       case 'training':
       case 'training_1':
       case 'training_2':
+        return const Color(0x44FFF59D);
       case 'recovery_monday':
+        return const Color(0x44DCE775);
       case 'mousehold_monday':
+        return const Color(0x444DB6AC);
       case 'tuesday_efforts_1':
+        return const Color(0x44B39DDB);
       case 'tuesday_efforts_2':
+        return const Color(0x44CE93D8);
       case 'tuesday_efforts':
       case 'efforts_tuesday':
-      case 'road_run_thursday':
-      case 'track_session':
       case 'coached_tuesday':
+        return const Color(0x44BA68C8);
+      case 'road_run_thursday':
       case 'road_route_thursday':
+        return const Color(0x444FC3F7);
+      case 'track_session':
       case 'paul_evans_session':
       case 'paul_evan_session':
-        return const Color(0x33FFF59D);
+        return const Color(0x44FFB74D);
       case 'race':
+        return const Color(0x4442A5F5);
       case 'cross_country':
-        return const Color(0x3390CAF9);
+        return const Color(0x4466BB6A);
       case 'handicap_series':
+        return const Color(0x449CCC65);
       case 'one_mile_handicap':
-        return const Color(0x33A5D6A7);
+        return const Color(0x4426A69A);
       case 'relay':
-        return const Color(0x33FFCC80);
+        return const Color(0x44FFCC80);
       case 'special_event':
-        return const Color(0x33F8BBD0);
+        return const Color(0x44F48FB1);
       case 'social_run':
+        return const Color(0x447E57C2);
       case 'parkrun_tourism':
+        return const Color(0x445C6BC0);
       case 'meet_&_drink':
+        return const Color(0x448D6E63);
       case 'swim_or_cycle':
+        return const Color(0x444DD0E1);
       case 'others':
-        return const Color(0x33CE93D8);
+        return const Color(0x4490A4AE);
       default:
         return const Color(0x22FFFFFF);
     }
