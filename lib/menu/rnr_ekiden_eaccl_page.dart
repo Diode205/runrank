@@ -39,25 +39,35 @@ Color _driveButtonForegroundColor(String? clubName) {
 }
 
 class RnrEkidenEacclPage extends StatelessWidget {
-  const RnrEkidenEacclPage({super.key});
+  const RnrEkidenEacclPage({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 6,
+      initialIndex: initialTabIndex.clamp(0, 5).toInt(),
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: Colors.black,
           centerTitle: true,
           title: const Text(
-            'RNR, Ekiden & EACCL',
+            'RELAYS & EACCL',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           bottom: const TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: EdgeInsets.zero,
+            labelPadding: EdgeInsets.symmetric(horizontal: 16),
             tabs: [
               Tab(text: 'RNR'),
               Tab(text: 'Ekiden'),
+              Tab(text: 'Alex Moore'),
+              Tab(text: 'Norwich Tri'),
+              Tab(text: 'Sandringham 24'),
               Tab(text: 'EACCL'),
             ],
           ),
@@ -66,11 +76,275 @@ class RnrEkidenEacclPage extends StatelessWidget {
           top: false,
           child: TabBarView(
             physics: NeverScrollableScrollPhysics(),
-            children: [_RnrPage(), _EkidenPage(), _EacclPage()],
+            children: [
+              _RnrPage(),
+              _EkidenPage(),
+              _RelayWebPage(
+                title: 'Alex Moore Relay',
+                url: 'https://www.norfolkgazelles.co.uk/alex-moore-relay.php',
+                relayFormat: 'AlexMoore',
+                resultsUrl: 'https://totalracetiming.co.uk/result',
+                driveQuery: 'Norfolk Showground NR5 0TT',
+              ),
+              _RelayWebPage(
+                title: 'Norwich Triathlon',
+                url: 'https://www.norwichtriathlon.co.uk/',
+                relayFormat: 'NorwichTriathlon',
+                resultsUrl: 'https://results.racetimingsolutions.co.uk/',
+                driveQuery: 'Whitlingham NR14 8TR',
+              ),
+              _RelayWebPage(
+                title: 'Sandringham 24',
+                url:
+                    'https://sandringhamestate.co.uk/events/run-sandringham-24/',
+                relayFormat: 'Sandringham24',
+                resultsUrl: 'https://www.chipresults.co.uk/endurance/',
+                driveQuery: 'PE35 6AB',
+              ),
+              _EacclPage(),
+            ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _RelayWebPage extends StatefulWidget {
+  const _RelayWebPage({
+    required this.title,
+    required this.url,
+    required this.relayFormat,
+    required this.resultsUrl,
+    required this.driveQuery,
+  });
+
+  final String title;
+  final String url;
+  final String relayFormat;
+  final String resultsUrl;
+  final String driveQuery;
+
+  @override
+  State<_RelayWebPage> createState() => _RelayWebPageState();
+}
+
+class _RelayWebPageState extends State<_RelayWebPage>
+    with AutomaticKeepAliveClientMixin<_RelayWebPage> {
+  bool _isAdmin = false;
+  String? _clubName = UserService.cachedClubName;
+
+  Color get _accentColor => _clubPrimaryColor(_clubName);
+  Color get _accentForegroundColor => _clubPrimaryForegroundColor(_clubName);
+  Color get _driveColor => _driveButtonColor(_clubName);
+  Color get _driveForegroundColor => _driveButtonForegroundColor(_clubName);
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    _isAdmin = await UserService.isAdmin();
+    _clubName = await UserService.currentClubName();
+    if (mounted) setState(() {});
+  }
+
+  void _createEvent() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminCreateEventPage(
+          userRole: _isAdmin ? 'admin' : 'social',
+          initialEventType: 'Relay',
+          initialVenue: null,
+          initialRelayFormat: widget.relayFormat,
+          initialTime: _defaultRelayTime(widget.relayFormat),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLink(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openMaps(String query) async {
+    final encoded = Uri.encodeComponent(query);
+    final List<_MapOption> options = [];
+
+    if (Platform.isIOS) {
+      final uri = Uri.parse('http://maps.apple.com/?q=$encoded');
+      options.add(
+        _MapOption(
+          label: 'Apple Maps',
+          icon: Icons.map,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final googleScheme = Platform.isIOS
+        ? Uri.parse('comgooglemaps://')
+        : Uri.parse('geo:0,0?q=$encoded');
+    if (await canLaunchUrl(googleScheme)) {
+      final uri = Platform.isIOS
+          ? Uri.parse('comgooglemaps://?q=$encoded')
+          : Uri.parse('geo:0,0?q=$encoded');
+      options.add(
+        _MapOption(
+          label: 'Google Maps',
+          icon: Icons.location_on,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final wazeScheme = Uri.parse('waze://');
+    if (await canLaunchUrl(wazeScheme)) {
+      final uri = Uri.parse('waze://?q=$encoded&navigate=yes');
+      options.add(
+        _MapOption(
+          label: 'Waze',
+          icon: Icons.directions_car,
+          launcher: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+      );
+    }
+
+    final web = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encoded',
+    );
+    options.add(
+      _MapOption(
+        label: 'Browser',
+        icon: Icons.language,
+        launcher: () => launchUrl(web, mode: LaunchMode.externalApplication),
+      ),
+    );
+
+    if (options.length == 1) {
+      await options.first.launcher();
+      return;
+    }
+
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F111A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Open with',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (final opt in options)
+              ListTile(
+                leading: Icon(opt.icon, color: Colors.white70),
+                title: Text(
+                  opt.label,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await opt.launcher();
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(_pageInset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return _OfficialSiteCard(
+                  title: widget.title,
+                  url: widget.url,
+                  accentColor: _accentColor,
+                  height: constraints.maxHeight,
+                  showAddButton: _isAdmin,
+                  onAddEvent: _createEvent,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: _contentGap),
+          SizedBox(
+            height: _controlHeight,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openLink(widget.resultsUrl),
+                    icon: const Icon(Icons.list_alt, size: 18),
+                    label: const Text('Results'),
+                    style: _primaryActionStyle(
+                      _accentColor,
+                      _accentForegroundColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openMaps(widget.driveQuery),
+                    icon: const Icon(Icons.directions, size: 18),
+                    label: const Text('Drive To'),
+                    style: _primaryActionStyle(
+                      _driveColor,
+                      _driveForegroundColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+TimeOfDay _defaultRelayTime(String relayFormat) {
+  switch (relayFormat) {
+    case 'Ekiden':
+      return const TimeOfDay(hour: 9, minute: 30);
+    case 'AlexMoore':
+      return const TimeOfDay(hour: 9, minute: 15);
+    case 'NorwichTriathlon':
+      return const TimeOfDay(hour: 6, minute: 0);
+    case 'Sandringham24':
+      return const TimeOfDay(hour: 19, minute: 0);
+    case 'RNR':
+    default:
+      return const TimeOfDay(hour: 4, minute: 0);
   }
 }
 
@@ -303,6 +577,7 @@ class _RnrPageState extends State<_RnrPage>
           userRole: _isAdmin ? 'admin' : 'social',
           initialEventType: 'Relay',
           initialVenue: null,
+          initialTime: _defaultRelayTime('RNR'),
         ),
       ),
     );
@@ -437,28 +712,6 @@ class _OfficialSiteCard extends StatelessWidget {
               buttonLabel: 'Visit Site',
               height: height,
               forceMobileViewport: url.contains('theroundnorfolkrelay.com'),
-            ),
-            Positioned(
-              left: 12,
-              top: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.68),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
             ),
             if (showAddButton && onAddEvent != null)
               Positioned(
@@ -672,6 +925,7 @@ class _EkidenPageState extends State<_EkidenPage>
           initialEventType: 'Relay',
           initialVenue: null,
           initialRelayFormat: 'Ekiden',
+          initialTime: _defaultRelayTime('Ekiden'),
         ),
       ),
     );
@@ -1048,6 +1302,7 @@ class _EacclPageState extends State<_EacclPage>
           initialVenue: venue,
           initialVenueAddress: postcode,
           initialDate: parsedDate,
+          initialTime: const TimeOfDay(hour: 14, minute: 0),
         ),
       ),
     );

@@ -514,6 +514,13 @@ class NotificationService {
         try {
           final event = ClubEvent.fromSupabase(Map<String, dynamic>.from(row));
 
+          // Cancelled events generate their own alert notification. Do not
+          // keep the Club Hub badge glowing for cancelled cards, especially
+          // when an event was cancelled before this user ever opened it.
+          if (event.isCancelled) {
+            continue;
+          }
+
           if (!event.isVisibleInCalendarAt(now)) {
             continue;
           }

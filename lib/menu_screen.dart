@@ -412,43 +412,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   },
                 ),
                 _menuTile(
-                  icon: Icons.people_alt,
-                  title: 'Administrative Team',
-                  subtitle: 'Management Committee & Contacts',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AdministrativeTeamPage(),
-                      ),
-                    );
-                  },
-                ),
-                _menuTile(
-                  icon: Icons.volunteer_activism,
-                  title: 'Charity of the Year',
-                  subtitle: 'Community Support and Donations',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CharityPage()),
-                    );
-                  },
-                ),
-                _menuTile(
-                  icon: Icons.celebration,
-                  title: 'Runners Banquette',
-                  subtitle: 'Party Pass & Food Orders',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RunnersBanquetPage(),
-                      ),
-                    );
-                  },
-                ),
-                _menuTile(
                   icon: Icons.emoji_events,
                   title: 'Inspirational Running Awards',
                   subtitle: 'Nominate, Vote, and Comments',
@@ -475,6 +438,30 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   },
                 ),
                 _menuTile(
+                  icon: Icons.celebration,
+                  title: 'Runners Banquette',
+                  subtitle: 'Party Pass & Food Orders',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RunnersBanquetPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.volunteer_activism,
+                  title: 'Charity of the Year',
+                  subtitle: 'Community Support and Donations',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CharityPage()),
+                    );
+                  },
+                ),
+                _menuTile(
                   icon: Icons.groups,
                   title: 'Relay & Cross Country Teams',
                   subtitle: 'RNR, Ekiden, and EACCL Teams',
@@ -488,19 +475,6 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   },
                 ),
                 _menuTile(
-                  icon: Icons.description,
-                  title: 'Club Governance',
-                  subtitle: 'Club policies and key mandates',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PoliciesFormsNoticesPage(),
-                      ),
-                    );
-                  },
-                ),
-                _menuTile(
                   icon: Icons.public,
                   title: 'Athletics Portal & Power of 10',
                   subtitle: 'England Athletics login and search',
@@ -509,6 +483,32 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const AthleticsPortalPower10Page(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.people_alt,
+                  title: 'Administrative Team',
+                  subtitle: 'Management Committee & Contacts',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdministrativeTeamPage(),
+                      ),
+                    );
+                  },
+                ),
+                _menuTile(
+                  icon: Icons.description,
+                  title: 'Club Governance',
+                  subtitle: 'Club policies and key mandates',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PoliciesFormsNoticesPage(),
                       ),
                     );
                   },

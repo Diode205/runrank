@@ -500,6 +500,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                       // Derive a relay label for RNR vs Ekiden
                       String displayTitle = e.title ?? "";
+                      final savedTitle = displayTitle.trim();
                       String subtitleText = e.venue;
                       final normalizedType = e.eventType
                           .toLowerCase()
@@ -535,6 +536,11 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         'paul_evans_session': 'Paul Evans Session',
                         'paul_evan_session': 'Paul Evan Session',
                       };
+                      String titleWithSavedOverride(String fallbackTitle) {
+                        if (savedTitle.isEmpty) return fallbackTitle;
+                        return savedTitle;
+                      }
+
                       if (normalizedType == 'relay') {
                         final rawTeam = e.relayTeam?.trim() ?? '';
                         final teamLower = rawTeam.toLowerCase();
@@ -580,11 +586,13 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         final host = e.hostOrDirector.trim();
                         final baseTitle =
                             trainingTitleByType[normalizedType] ?? 'Training';
-                        displayTitle = baseTitle;
+                        displayTitle = titleWithSavedOverride(baseTitle);
                         subtitleText = subtitleWithCreator(e.venue, host);
                       } else if (normalizedType == 'one_mile_handicap') {
                         final host = e.hostOrDirector.trim();
-                        displayTitle = 'One Mile Handicap';
+                        displayTitle = titleWithSavedOverride(
+                          'One Mile Handicap',
+                        );
                         subtitleText = subtitleWithCreator(e.venue, host);
                       } else if (normalizedType == 'social_run' ||
                           normalizedType == 'parkrun_tourism') {
@@ -592,7 +600,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                         final baseTitle = normalizedType == 'parkrun_tourism'
                             ? 'Parkrun Tourism'
                             : 'Social Run';
-                        displayTitle = baseTitle;
+                        displayTitle = titleWithSavedOverride(baseTitle);
                         subtitleText = subtitleWithCreator(e.venue, host);
                       } else {
                         subtitleText = e.venue;
@@ -607,7 +615,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
                             : 'with $eventCreatorName\n$subtitleText';
                       }
 
-                      final isNew = !_seenEventIds.contains(e.id);
+                      final isNew =
+                          !e.isCancelled && !_seenEventIds.contains(e.id);
 
                       Widget card = GestureDetector(
                         onTap: () => _openEvent(e),

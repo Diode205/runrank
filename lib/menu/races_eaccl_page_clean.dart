@@ -416,6 +416,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           userRole: _isAdmin ? 'admin' : 'social',
           initialEventType: info.eventType,
           initialDate: initialDate,
+          initialTime: info.initialTime,
           initialVenue: info.venueName ?? info.location,
           initialRaceName: initialRaceName,
           initialVenueAddress: info.venueAddress,
@@ -511,6 +512,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         useClubColors: _isNrrClub,
         eventType: 'Race',
         initialRaceName: 'Wroxham 5K',
+        initialTime: TimeOfDay(hour: 19, minute: 0),
         venueName: 'Broadland High Ormiston Academy',
         venueAddress: 'Wroxham',
         latitude: 52.71665374668599,
@@ -536,6 +538,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
             'Cross-country terrain through Horsford Wood · Mud and obstacles expected · Parking on site as directed',
         useClubColors: _isNrrClub,
         eventType: 'Cross Country',
+        initialTime: TimeOfDay(hour: 9, minute: 30),
         venueName: 'Oakland Organic Egg Farm',
         venueAddress: 'Sandy Ln, Horsford',
         latitude: 52.7108107164322,
@@ -570,6 +573,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         useClubColors: _isNrrClub,
         eventType: 'Race',
         initialRaceName: 'Dinosaur Dash',
+        initialTime: TimeOfDay(hour: 19, minute: 0),
         venueName: 'Roarr Adventure Park',
         venueAddress: 'Lenwade',
         latitude: 52.71297101786584,
@@ -688,6 +692,7 @@ class _RaceInfo {
   final bool useClubColors;
   final String eventType;
   final String? initialRaceName;
+  final TimeOfDay? initialTime;
   final String? venueName;
   final String? venueAddress;
   final double? latitude;
@@ -712,6 +717,7 @@ class _RaceInfo {
     this.useClubColors = false,
     this.eventType = 'Race',
     this.initialRaceName,
+    this.initialTime,
     this.venueName,
     this.venueAddress,
     this.latitude,

@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:runrank/menu/races_eaccl_page_clean.dart';
+import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/services/notification_service.dart';
 
 class _SavedVenuePreset {
@@ -61,6 +63,7 @@ class AdminCreateEventPage extends StatefulWidget {
   final String? initialEventType;
   final String? initialHandicapDistance;
   final DateTime? initialDate;
+  final TimeOfDay? initialTime;
   final String? initialVenue;
   final String? initialRaceName;
   final String? initialVenueAddress;
@@ -75,6 +78,7 @@ class AdminCreateEventPage extends StatefulWidget {
     this.initialEventType,
     this.initialHandicapDistance,
     this.initialDate,
+    this.initialTime,
     this.initialVenue,
     this.initialRaceName,
     this.initialVenueAddress,
@@ -271,6 +275,22 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       _nrrTrainingEventTypes.contains(eventType) ||
       _legacyNrrTrainingEventTypes.contains(eventType);
 
+  static String _relayFormatDisplayName(String relayFormat) {
+    switch (relayFormat) {
+      case 'Ekiden':
+        return 'Ekiden';
+      case 'AlexMoore':
+        return 'Alex Moore';
+      case 'NorwichTriathlon':
+        return 'Norwich Triathlon';
+      case 'Sandringham24':
+        return 'Sandringham 24';
+      case 'RNR':
+      default:
+        return 'RNR';
+    }
+  }
+
   bool get _usesTrainingDetails =>
       _resolvedEventType == 'Training' ||
       selectedEventType == 'Training 1' ||
@@ -298,7 +318,14 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   void initState() {
     super.initState();
 
-    adminTypes = ["Training", "Handicap Series", "Relay", "Special Event"];
+    adminTypes = [
+      "Training",
+      "Race",
+      "Relay",
+      "Cross Country",
+      "Handicap Series",
+      "Special Event",
+    ];
 
     socialTypes = ["Social Run", "Parkrun Tourism"];
 
@@ -333,6 +360,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     if (widget.initialDate != null) {
       selectedDate = widget.initialDate;
     }
+    if (widget.initialTime != null) {
+      selectedTime = widget.initialTime;
+    }
     if (widget.initialVenue != null) {
       venueCtrl.text = widget.initialVenue!;
     }
@@ -356,8 +386,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       longitudeCtrl.text = widget.initialLongitude!.toString();
     }
 
-    // Default time for all events (2:30 pm) unless explicitly changed
-    selectedTime ??= const TimeOfDay(hour: 14, minute: 30);
+    // Default time unless explicitly changed. Training defaults to 18:30.
+    selectedTime ??= _defaultTimeForCurrentSelection();
 
     _loadHosts();
   }
@@ -365,13 +395,45 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   String selectedEventType = "";
   String selectedCategory = "";
   String _selectedNrrTrainingEventType = _nrrTrainingEventTypes.first;
-  String _selectedRelayFormat = "RNR"; // "RNR" or "Ekiden"
+  String _selectedRelayFormat = "RNR";
   bool _repeatWeeklyTraining = false;
   int _trainingRepeatWeeks = 1;
   bool _savingEvent = false;
 
   bool get _isSignatureCreatedRaceType =>
       selectedEventType == "Race" || selectedEventType == "Cross Country";
+
+  bool get _wasOpenedForDirectEventCreation =>
+      widget.initialEventType != null ||
+      widget.initialRaceName != null ||
+      widget.initialRelayFormat != null ||
+      widget.initialDate != null ||
+      widget.initialVenue != null;
+
+  TimeOfDay _defaultTimeForCurrentSelection() {
+    return selectedEventType == 'Training'
+        ? const TimeOfDay(hour: 18, minute: 30)
+        : const TimeOfDay(hour: 14, minute: 30);
+  }
+
+  void _openEventSourcePage(String eventType) {
+    Widget page;
+    switch (eventType) {
+      case 'Race':
+        page = const RacesEacclPage();
+        break;
+      case 'Relay':
+        page = const RnrEkidenEacclPage();
+        break;
+      case 'Cross Country':
+        page = const RnrEkidenEacclPage(initialTabIndex: 5);
+        break;
+      default:
+        return;
+    }
+
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
 
   List<String> get _eventTypeDropdownItems {
     final items = selectedCategory == "admin" ? adminTypes : socialTypes;
@@ -415,6 +477,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   // RACE LIST (defaults for NNBR; overridden for NRR once club is known)
   String? selectedRace;
+
+  List<String> get _raceDropdownItems {
+    final items = <String>[...raceNames];
+    final current = selectedRace?.trim();
+    if (current != null && current.isNotEmpty && !items.contains(current)) {
+      items.insert(0, current);
+    }
+    return items;
+  }
 
   // NRR-specific Cross Country series races
   static const List<String> _nrrCrossCountryRaces = <String>[
@@ -465,8 +536,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           // For NRR: keep all admin event types except Handicap Series.
           adminTypes = [
             "Training",
-            "One Mile Handicap",
+            "Race",
             "Relay",
+            "Cross Country",
+            "One Mile Handicap",
             "Special Event",
           ];
 
@@ -476,8 +549,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
           // Default (NNBR and other clubs).
           adminTypes = [
             "Training",
-            "Handicap Series",
+            "Race",
             "Relay",
+            "Cross Country",
+            "Handicap Series",
             "Special Event",
           ];
 
@@ -1010,16 +1085,15 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       return;
     }
 
-    if (selectedTime == null && selectedEventType != "Relay") {
+    if (selectedTime == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Please select a time")));
       return;
     }
 
-    final timeString = selectedEventType == "Relay"
-        ? "00:00"
-        : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
+    final timeString =
+        "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
 
     double? latitude;
     double? longitude;
@@ -1050,10 +1124,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     String? relayTeamValue;
     if (selectedEventType == "Relay") {
       final teamName = relayTeamCtrl.text.trim();
-      if (_selectedRelayFormat == "Ekiden") {
-        relayTeamValue = teamName.isEmpty ? "Ekiden" : "Ekiden: $teamName";
+      final relayLabel = _relayFormatDisplayName(_selectedRelayFormat);
+      if (teamName.isEmpty) {
+        relayTeamValue = relayLabel;
       } else {
-        relayTeamValue = teamName.isEmpty ? null : teamName;
+        relayTeamValue = "$relayLabel: $teamName";
       }
     }
 
@@ -1061,6 +1136,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     final repeatCount = _supportsWeeklyTrainingRepeat && _repeatWeeklyTraining
         ? _trainingRepeatWeeks
         : 1;
+    final createdByUserId = supabase.auth.currentUser?.id;
+    final hostNameForSave = hostCtrl.text.trim();
+    final hostUserIdForSave = _selectedHostId;
     String dateIso(DateTime date) => date.toIso8601String().split("T").first;
 
     final maps = List<Map<String, dynamic>>.generate(repeatCount, (index) {
@@ -1084,8 +1162,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         "title": buildTitle(),
         "date": dateIso(eventDate),
         "time": timeString,
-        "host_or_director": hostCtrl.text.trim(),
-        "host_user_id": _selectedHostId,
+        "host_or_director": hostNameForSave,
+        "host_user_id": hostUserIdForSave,
         "venue": venueCtrl.text.trim(),
         "venue_address": venueAddressCtrl.text.trim(),
         "description": descriptionCtrl.text.trim(),
@@ -1101,7 +1179,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
             : null,
         "expected_time_required":
             _usesHandicapDetails || selectedEventType == "Relay" ? true : false,
-        "created_by": supabase.auth.currentUser?.id,
+        "created_by": createdByUserId,
       };
     });
 
@@ -1244,12 +1322,20 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                       ? null
                       : (v) {
                           if (v == null) return;
+                          if (!_wasOpenedForDirectEventCreation &&
+                              (v == 'Race' ||
+                                  v == 'Relay' ||
+                                  v == 'Cross Country')) {
+                            _openEventSourcePage(v);
+                            return;
+                          }
                           setState(() {
                             selectedEventType = v;
                             if (_isNRRClub && v == 'Training') {
                               _selectedNrrTrainingEventType =
                                   _nrrTrainingEventTypes.first;
                             }
+                            selectedTime = _defaultTimeForCurrentSelection();
                           });
                           _applyFixedVenuePresetForCurrentSelection();
                         },
@@ -1291,7 +1377,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                   "Race Name",
                   DropdownButtonFormField<String>(
                     initialValue: selectedRace,
-                    items: raceNames
+                    items: _raceDropdownItems
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
                     onChanged: (v) {
@@ -1332,7 +1418,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                       }
 
                       return DropdownButtonFormField<String>(
-                        value: current.isNotEmpty && isSeriesRace
+                        initialValue: current.isNotEmpty && isSeriesRace
                             ? current
                             : null,
                         decoration: const InputDecoration(
@@ -1382,7 +1468,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: _selectedRelayFormat,
+                        initialValue: _selectedRelayFormat,
                         decoration: const InputDecoration(
                           labelText: "Relay type",
                         ),
@@ -1431,7 +1517,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                 _section(
                   "Special Event Type",
                   DropdownButtonFormField<String>(
-                    value:
+                    initialValue:
                         _selectedSpecialEventType ?? _specialEventTypes.first,
                     items: _specialEventTypes
                         .map(
@@ -1481,7 +1567,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     return Column(
                       children: [
                         DropdownButtonFormField<String>(
-                          value: _selectedHostId,
+                          key: ValueKey(_selectedHostId),
+                          initialValue: _selectedHostId,
                           decoration: const InputDecoration(
                             labelText: "Host / Director",
                           ),
@@ -1729,32 +1816,29 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                               ),
                             ),
                           ),
-                          if (selectedEventType != "Relay") ...[
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: accent, width: 1),
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () async {
-                                  final t = await showTimePicker(
-                                    context: context,
-                                    initialTime:
-                                        selectedTime ?? TimeOfDay.now(),
-                                  );
-                                  if (t != null) {
-                                    setState(() => selectedTime = t);
-                                  }
-                                },
-                                child: Text(
-                                  selectedTime == null
-                                      ? "Pick Time"
-                                      : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}",
-                                ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: accent, width: 1),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () async {
+                                final t = await showTimePicker(
+                                  context: context,
+                                  initialTime: selectedTime ?? TimeOfDay.now(),
+                                );
+                                if (t != null) {
+                                  setState(() => selectedTime = t);
+                                }
+                              },
+                              child: Text(
+                                selectedTime == null
+                                    ? "Pick Time"
+                                    : "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}",
                               ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                       if (_supportsWeeklyTrainingRepeat) ...[
