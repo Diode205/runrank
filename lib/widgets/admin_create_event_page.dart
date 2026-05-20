@@ -311,6 +311,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
   String? _selectedHostId;
+  String? _currentUserId;
   List<_SavedVenuePreset> _savedVenuePresets = [];
   String? _selectedSavedVenueId;
 
@@ -497,6 +498,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   Future<void> _loadHosts() async {
     try {
       final currentUserId = supabase.auth.currentUser?.id;
+      _currentUserId = currentUserId;
 
       // Resolve the current user's club so that the Host/Director
       // dropdown only shows members (and admins) from the same club.
@@ -603,6 +605,22 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       _applyFixedVenuePresetForCurrentSelection();
     } catch (e) {
       debugPrint('Error loading hosts: $e');
+    }
+  }
+
+  void _selectCurrentUserAsHost() {
+    final currentUserId = _currentUserId ?? supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
+
+    final currentHost = _hosts.firstWhere(
+      (h) => h['id'] == currentUserId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    _selectedHostId = currentUserId;
+    final currentName = (currentHost['full_name'] as String?)?.trim();
+    if (currentName != null && currentName.isNotEmpty) {
+      hostCtrl.text = currentName;
     }
   }
 
@@ -1137,6 +1155,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         ? _trainingRepeatWeeks
         : 1;
     final createdByUserId = supabase.auth.currentUser?.id;
+    if (selectedCategory == "social") {
+      _selectCurrentUserAsHost();
+    }
     final hostNameForSave = hostCtrl.text.trim();
     final hostUserIdForSave = _selectedHostId;
     String dateIso(DateTime date) => date.toIso8601String().split("T").first;
@@ -1301,6 +1322,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                       onPressed: () => setState(() {
                         selectedCategory = "social";
                         selectedEventType = socialTypes.first;
+                        _selectCurrentUserAsHost();
                       }),
                       child: const Text("Social Events"),
                     ),
@@ -1566,43 +1588,52 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
                     return Column(
                       children: [
-                        DropdownButtonFormField<String>(
-                          key: ValueKey(_selectedHostId),
-                          initialValue: _selectedHostId,
-                          decoration: const InputDecoration(
-                            labelText: "Host / Director",
-                          ),
-                          items: _hosts
-                              .where(
-                                (h) => selectedCategory == "admin"
-                                    ? (h['is_admin'] as bool? ?? false)
-                                    : true,
-                              )
-                              .map(
-                                (h) => DropdownMenuItem<String>(
-                                  value: h['id'] as String,
-                                  child: Text(
-                                    (h['full_name'] as String?) ?? 'Member',
+                        if (selectedCategory == "social")
+                          TextFormField(
+                            controller: hostCtrl,
+                            readOnly: true,
+                            decoration: const InputDecoration(
+                              labelText: "Host / Director",
+                              suffixIcon: Icon(Icons.lock_outline),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : null,
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            key: ValueKey(_selectedHostId),
+                            initialValue: _selectedHostId,
+                            decoration: const InputDecoration(
+                              labelText: "Host / Director",
+                            ),
+                            items: _hosts
+                                .where((h) => h['is_admin'] as bool? ?? false)
+                                .map(
+                                  (h) => DropdownMenuItem<String>(
+                                    value: h['id'] as String,
+                                    child: Text(
+                                      (h['full_name'] as String?) ?? 'Member',
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedHostId = value;
-                              final match = _hosts.firstWhere(
-                                (h) => h['id'] == value,
-                                orElse: () => <String, dynamic>{
-                                  'full_name': '',
-                                },
-                              );
-                              hostCtrl.text =
-                                  (match['full_name'] as String?) ?? '';
-                            });
-                          },
-                          validator: (v) =>
-                              (v == null || v.isEmpty) ? 'Required' : null,
-                        ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedHostId = value;
+                                final match = _hosts.firstWhere(
+                                  (h) => h['id'] == value,
+                                  orElse: () => <String, dynamic>{
+                                    'full_name': '',
+                                  },
+                                );
+                                hostCtrl.text =
+                                    (match['full_name'] as String?) ?? '';
+                              });
+                            },
+                            validator: (v) =>
+                                (v == null || v.isEmpty) ? 'Required' : null,
+                          ),
                         if (selectedCategory == "admin")
                           const Padding(
                             padding: EdgeInsets.only(top: 6.0, bottom: 4.0),

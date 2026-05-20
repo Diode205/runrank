@@ -461,6 +461,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     );
                   },
                 ),
+                _menuSectionDivider(),
                 _menuTile(
                   icon: Icons.groups,
                   title: 'Relay & Cross Country Teams',
@@ -487,6 +488,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                     );
                   },
                 ),
+                _menuSectionDivider(),
                 _menuTile(
                   icon: Icons.people_alt,
                   title: 'Administrative Team',
@@ -950,6 +952,32 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
         trailing: const Icon(Icons.chevron_right, color: Colors.white70),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _menuSectionDivider() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final accent = _brandAccent(colorScheme);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ...List.generate(
+            3,
+            (index) => Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.75),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

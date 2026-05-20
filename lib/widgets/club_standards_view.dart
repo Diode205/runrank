@@ -13,6 +13,7 @@ import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/history_screen.dart';
+import 'package:runrank/menu/search_run_page.dart';
 
 class ClubStandardsView extends StatefulWidget {
   const ClubStandardsView({super.key});
@@ -85,6 +86,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   // Admin flag
   bool _isAdmin = false;
+  bool _archivingVaultReports = false;
 
   // Top 10 snapview state
   final List<String> _snapDistances = const [
@@ -102,6 +104,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   bool _showTop10SnapWhenLoaded = false;
   bool _searchingIceMembers = false;
   List<Map<String, dynamic>> _iceSearchResults = [];
+  final Set<String> _expandedInfoSections = {};
 
   @override
   void initState() {
@@ -381,6 +384,50 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     return 'View full club standards on club website';
   }
 
+  bool _isNrrClub() =>
+      (_clubName ?? '').toLowerCase().contains('norwich road runners');
+
+  bool _isNnbrClub() =>
+      (_clubName ?? '').toLowerCase().contains('north norfolk beach runners');
+
+  Color get _vaultSheetColor {
+    if (_isNrrClub()) return const Color(0xFF2A0808);
+    if (_isNnbrClub()) return const Color(0xFF061B36);
+    return Colors.grey.shade900;
+  }
+
+  Color get _vaultPrimaryColor {
+    if (_isNrrClub()) return const Color(0xFFD32F2F);
+    if (_isNnbrClub()) return const Color(0xFF0057B7);
+    return const Color(0xFF0055FF);
+  }
+
+  Color get _vaultAccentColor {
+    if (_isNrrClub()) return const Color(0xFFFFD54F);
+    if (_isNnbrClub()) return const Color(0xFFF5C542);
+    return Colors.white70;
+  }
+
+  ButtonStyle _vaultOutlineButtonStyle() {
+    return OutlinedButton.styleFrom(
+      foregroundColor: _vaultAccentColor,
+      side: BorderSide(color: _vaultAccentColor, width: 1.2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      minimumSize: const Size(0, 42),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+    );
+  }
+
+  ButtonStyle _vaultPublishButtonStyle() {
+    return ElevatedButton.styleFrom(
+      backgroundColor: _vaultPrimaryColor,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      minimumSize: const Size(0, 42),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+    );
+  }
+
   double _topClubPhotoHeight(BuildContext context, {required bool isNrr}) {
     final width = MediaQuery.sizeOf(context).width;
     final ratio = isNrr ? 0.49 : 0.36;
@@ -621,6 +668,17 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     if (month < 1 || month > 12) return '';
     return names[month - 1];
   }
+
+  DateTime _monthStart(DateTime date) => DateTime(date.year, date.month);
+
+  DateTime _nextMonthStart(DateTime date) =>
+      DateTime(date.year, date.month + 1);
+
+  String _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day).toIso8601String().split('T')[0];
+
+  String _monthLabel(DateTime monthStart) =>
+      '${_monthShort(monthStart.month)} ${monthStart.year}';
 
   String _formatTime(int seconds) {
     final hrs = seconds ~/ 3600;
@@ -1246,6 +1304,13 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     String? url,
     String? linkLabel,
   }) {
+    final canCollapse = content.contains('\n\n') || content.length > 180;
+    final isExpanded = _expandedInfoSections.contains(title);
+    final previewText = content.contains('\n\n')
+        ? content.split('\n\n').first
+        : (content.length > 180 ? '${content.substring(0, 180)}...' : content);
+    final displayText = canCollapse && !isExpanded ? previewText : content;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1270,7 +1335,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             const SizedBox(height: 8),
           ],
           Text(
-            content,
+            displayText,
             style: const TextStyle(
               fontSize: 12,
               color: Colors.white70,
@@ -1278,6 +1343,21 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             ),
             textAlign: TextAlign.center,
           ),
+          if (canCollapse) ...[
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  if (isExpanded) {
+                    _expandedInfoSections.remove(title);
+                  } else {
+                    _expandedInfoSections.add(title);
+                  }
+                });
+              },
+              child: Text(isExpanded ? 'Show Less' : 'Read More...'),
+            ),
+          ],
           if (url != null) ...[
             const SizedBox(height: 8),
             GestureDetector(
@@ -1479,16 +1559,151 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     );
   }
 
-  // ---------------------------------------------------------
-  // Admin-only: Club Standards awardees snapshot
-  // ---------------------------------------------------------
-  Future<Map<String, List<String>>> _loadAllAwardsSnapshot() async {
+  Widget _buildSearchRunButton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFD700), width: 1),
+            ),
+            child: const Icon(Icons.search, color: Color(0xFFFFD700)),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Search & Run',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Find your next race here',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SearchRunPage()));
+            },
+            icon: const SizedBox(
+              width: 24,
+              height: 20,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 1,
+                    child: Icon(Icons.exit_to_app, size: 19),
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -1,
+                    child: Icon(Icons.directions_run, size: 16),
+                  ),
+                ],
+              ),
+            ),
+            label: const Text('Open'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addAwardRaceRowToBest(
+    Map<String, Map<String, String>> perUserBestByDistance,
+    Map<String, dynamic> row,
+  ) {
+    final userId = row['user_id'] as String?;
+    final distance = (row['distance'] as String?) ?? '';
+    final level = _effectiveLevelFromRaceRow(row);
+
+    if (userId == null) return;
+    if (!_awardDistances.contains(distance)) return;
+    if (!_awardLevels.contains(level)) return;
+
+    perUserBestByDistance.putIfAbsent(userId, () {
+      return {for (final d in _awardDistances) d: ''};
+    });
+
+    final current = perUserBestByDistance[userId]![distance] ?? '';
+    if (current.isEmpty || _levelIndex(level) > _levelIndex(current)) {
+      perUserBestByDistance[userId]![distance] = level;
+    }
+  }
+
+  Map<String, String> _awardLevelsByUserFromBest(
+    Map<String, Map<String, String>> perUserBestByDistance,
+  ) {
+    final Map<String, String> userAwardLevel = {};
+
+    perUserBestByDistance.forEach((userId, bestByDistance) {
+      String? achievedLevel;
+      for (final level in _awardLevels.reversed) {
+        final requiredIdx = _levelIndex(level);
+        int count = 0;
+        for (final distance in _awardDistances) {
+          final achieved = bestByDistance[distance];
+          if (achieved == null || achieved.isEmpty) continue;
+          if (_levelIndex(achieved) >= requiredIdx) {
+            count++;
+          }
+        }
+        if (count >= _requiredAwardDistanceCount) {
+          achievedLevel = level;
+          break;
+        }
+      }
+      if (achievedLevel != null) {
+        userAwardLevel[userId] = achievedLevel;
+      }
+    });
+
+    return userAwardLevel;
+  }
+
+  Future<Map<String, List<String>>> _loadClubStandardAwardeesForMonth(
+    DateTime monthStart,
+  ) async {
     final client = Supabase.instance.client;
-    // Restrict to the current admin's club if known
-    Set<String>? allowedUserIds;
+    final monthEnd = _nextMonthStart(monthStart);
     final clubName = _clubName;
+
+    Set<String>? allowedUserIds;
     final Map<String, DateTime?> memberSinceByUserId = {};
     final Map<String, String> idToName = {};
+
     if (clubName != null && clubName.isNotEmpty) {
       final profileRows = await client
           .from('user_profiles')
@@ -1525,25 +1740,25 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               .select(
                 'user_id, distance, level, raceDate, time_seconds, gender, age',
               )
+              .lt('raceDate', monthEnd.toIso8601String())
         : await client
               .from('race_results')
               .select(
                 'user_id, distance, level, raceDate, time_seconds, gender, age',
               )
-              .inFilter('user_id', allowedUserIds.toList());
+              .inFilter('user_id', allowedUserIds.toList())
+              .lt('raceDate', monthEnd.toIso8601String());
 
-    final Map<String, Map<String, String>> perUserBestByDistance = {};
+    final Map<String, Map<String, String>> previousBestByDistance = {};
+    final Map<String, Map<String, String>> currentBestByDistance = {};
 
     for (final row in rows) {
       final userId = row['user_id'] as String?;
-      final distance = (row['distance'] as String?) ?? '';
       final raceDate = DateTime.tryParse(row['raceDate'] as String? ?? '');
-      final level = _effectiveLevelFromRaceRow(row);
+      if (userId == null || raceDate == null) continue;
 
-      if (userId == null) continue;
-      if (!_awardDistances.contains(distance)) continue;
       final memberSince = memberSinceByUserId[userId];
-      if (memberSince != null && raceDate != null) {
+      if (memberSince != null) {
         final memberDay = DateTime(
           memberSince.year,
           memberSince.month,
@@ -1552,90 +1767,76 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
         final raceDay = DateTime(raceDate.year, raceDate.month, raceDate.day);
         if (raceDay.isBefore(memberDay)) continue;
       }
-      if (!_awardLevels.contains(level)) continue;
 
-      perUserBestByDistance.putIfAbsent(userId, () {
-        return {for (final d in _awardDistances) d: ''};
-      });
+      _addAwardRaceRowToBest(currentBestByDistance, row);
 
-      final current = perUserBestByDistance[userId]![distance] ?? '';
-      if (current.isEmpty) {
-        perUserBestByDistance[userId]![distance] = level;
-      } else {
-        final currentIdx = _levelIndex(current);
-        final newIdx = _levelIndex(level);
-        if (newIdx > currentIdx) {
-          perUserBestByDistance[userId]![distance] = level;
-        }
+      final raceDay = DateTime(raceDate.year, raceDate.month, raceDate.day);
+      if (raceDay.isBefore(monthStart)) {
+        _addAwardRaceRowToBest(previousBestByDistance, row);
       }
     }
 
-    // Compute overall award for each user using the active club rule.
-    final Map<String, String> userAwardLevel = {};
-
-    perUserBestByDistance.forEach((userId, bestByDistance) {
-      String? achievedLevel;
-      for (final level in _awardLevels.reversed) {
-        final requiredIdx = _levelIndex(level);
-        int count = 0;
-        for (final d in _awardDistances) {
-          final lv = bestByDistance[d];
-          if (lv == null || lv.isEmpty) continue;
-          if (_levelIndex(lv) >= requiredIdx) {
-            count++;
-          }
-        }
-        if (count >= _requiredAwardDistanceCount) {
-          achievedLevel = level;
-          break;
-        }
-      }
-      if (achievedLevel != null) {
-        userAwardLevel[userId] = achievedLevel;
-      }
-    });
-
-    if (userAwardLevel.isEmpty) {
-      return {};
-    }
-
-    final userIds = userAwardLevel.keys.toList();
-    if (idToName.length < userIds.length) {
-      final profiles = await client
-          .from('user_profiles')
-          .select('id, full_name, member_since')
-          .inFilter('id', userIds);
-
-      for (final p in profiles) {
-        final id = p['id'] as String?;
-        if (id == null) continue;
-        final name = (p['full_name'] as String?)?.trim();
-        if (name != null && name.isNotEmpty) {
-          idToName[id] = name;
-        }
-        final memberSinceStr = p['member_since'] as String?;
-        memberSinceByUserId[id] =
-            (memberSinceStr != null && memberSinceStr.isNotEmpty)
-            ? DateTime.tryParse(memberSinceStr)
-            : memberSinceByUserId[id];
-      }
-    }
+    final previousLevels = _awardLevelsByUserFromBest(previousBestByDistance);
+    final currentLevels = _awardLevelsByUserFromBest(currentBestByDistance);
 
     final Map<String, List<String>> awardeesByLevel = {
       for (final level in _awardLevels.reversed) level: [],
     };
 
-    userAwardLevel.forEach((userId, level) {
+    currentLevels.forEach((userId, level) {
+      final previousLevel = previousLevels[userId];
+      final isNewAward = previousLevel == null || previousLevel.isEmpty;
+      final isUpgrade =
+          previousLevel != null &&
+          _levelIndex(level) > _levelIndex(previousLevel);
+      if (!isNewAward && !isUpgrade) return;
+
       final name = idToName[userId] ?? 'Unknown member';
       awardeesByLevel[level]!.add(name);
     });
 
-    // Sort names inside each level
     awardeesByLevel.forEach((level, list) {
       list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     });
 
     return awardeesByLevel;
+  }
+
+  String _buildClubStandardAwardeesContent(
+    DateTime monthStart,
+    Map<String, List<String>> awardeesByLevel,
+  ) {
+    final title = 'Club Standard Awardees — ${_monthLabel(monthStart)}';
+    final buffer = StringBuffer()
+      ..writeln(title)
+      ..writeln('');
+
+    var hasAwardees = false;
+    for (final level in _awardLevels.reversed) {
+      final names = awardeesByLevel[level];
+      if (names == null || names.isEmpty) continue;
+      hasAwardees = true;
+      buffer.writeln('$level Award');
+      for (final name in names) {
+        buffer.writeln(' - $name');
+      }
+      buffer.writeln('');
+    }
+
+    if (!hasAwardees) {
+      buffer.writeln(
+        'No new Club Standard awardees or award upgrades were recorded this month.',
+      );
+    }
+
+    return buffer.toString().trimRight();
+  }
+
+  Future<String> _buildClubStandardAwardeesReportForMonth(
+    DateTime monthStart,
+  ) async {
+    final awardeesByLevel = await _loadClubStandardAwardeesForMonth(monthStart);
+    return _buildClubStandardAwardeesContent(monthStart, awardeesByLevel);
   }
 
   Future<void> _exportVaultReportAsPdf(String title, String content) async {
@@ -1677,7 +1878,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey.shade900,
+      backgroundColor: _vaultSheetColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1728,34 +1929,28 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                             );
                           },
                           icon: const Icon(Icons.copy, size: 18),
-                          label: const Text('Copy'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(
-                              color: Colors.white38,
-                              width: 1,
-                            ),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Copy'),
                           ),
+                          style: _vaultOutlineButtonStyle(),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
                             await _exportVaultReportAsPdf(title, content);
                           },
                           icon: const Icon(Icons.picture_as_pdf, size: 18),
-                          label: const Text('Export PDF'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(
-                              color: Colors.white38,
-                              width: 1,
-                            ),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Export'),
                           ),
+                          style: _vaultOutlineButtonStyle(),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () async {
@@ -1766,11 +1961,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                             );
                           },
                           icon: const Icon(Icons.campaign, size: 18),
-                          label: const Text('Publish as post'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.yellow,
-                            foregroundColor: Colors.black,
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Publish'),
                           ),
+                          style: _vaultPublishButtonStyle(),
                         ),
                       ),
                     ],
@@ -1784,8 +1979,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     );
   }
 
-  Future<String?> _buildAgeGradeTopsReport() async {
+  Future<String?> _buildAgeGradeTopsReport({DateTime? monthStart}) async {
     final client = Supabase.instance.client;
+    final monthEnd = monthStart == null ? null : _nextMonthStart(monthStart);
     // Restrict to the current admin's club if known
     Set<String>? allowedUserIds;
     final clubName = _clubName;
@@ -1811,6 +2007,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               .select(
                 'user_id, race_name, distance, age_grade, level, raceDate, gender',
               )
+              .gte('raceDate', monthStart?.toIso8601String() ?? '1900-01-01')
+              .lt('raceDate', monthEnd?.toIso8601String() ?? '2999-01-01')
               .order('raceDate', ascending: false)
         : await client
               .from('race_results')
@@ -1818,6 +2016,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                 'user_id, race_name, distance, age_grade, level, raceDate, gender',
               )
               .inFilter('user_id', allowedUserIds.toList())
+              .gte('raceDate', monthStart?.toIso8601String() ?? '1900-01-01')
+              .lt('raceDate', monthEnd?.toIso8601String() ?? '2999-01-01')
               .order('raceDate', ascending: false);
 
     if (rows.isEmpty) return null;
@@ -1893,7 +2093,11 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     if (byDistance.isEmpty) return null;
 
     final buffer = StringBuffer();
-    buffer.writeln('Latest Age-Grade Tops');
+    buffer.writeln(
+      monthStart == null
+          ? 'Latest Age-Grade Tops'
+          : 'Age-Grade Tops — ${_monthLabel(monthStart)}',
+    );
     buffer.writeln('');
 
     for (final distance in _awardDistances) {
@@ -1973,6 +2177,411 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   String _ageGradeTopsGenderLabel(String gender) {
     return gender == 'F' ? 'Women' : 'Men';
+  }
+
+  Future<String> _buildAgeGradeTopsReportForMonth(DateTime monthStart) async {
+    final content = await _buildAgeGradeTopsReport(monthStart: monthStart);
+    if (content != null && content.trim().isNotEmpty) {
+      return content;
+    }
+
+    return 'Age-Grade Tops — ${_monthLabel(monthStart)}\n\n'
+        'No age-grade records were recorded this month.';
+  }
+
+  Future<void> _archivePreviousMonthVaultReports() async {
+    if (_archivingVaultReports) return;
+    final clubName = _clubName?.trim();
+    if (!_isAdmin || clubName == null || clubName.isEmpty) return;
+
+    _archivingVaultReports = true;
+    try {
+      final now = DateTime.now();
+      final thisMonthStart = _monthStart(now);
+      final previousMonthStart = DateTime(now.year, now.month - 1);
+      final previousMonthEnd = thisMonthStart;
+
+      final standardContent = await _buildClubStandardAwardeesReportForMonth(
+        previousMonthStart,
+      );
+      final ageGradeContent = await _buildAgeGradeTopsReportForMonth(
+        previousMonthStart,
+      );
+
+      final rows = [
+        {
+          'club_name': clubName,
+          'report_type': 'club_standard_awardees',
+          'month_start': _dateOnly(previousMonthStart),
+          'month_end': _dateOnly(previousMonthEnd),
+          'title':
+              'Club Standard Awardees — ${_monthLabel(previousMonthStart)}',
+          'content': standardContent,
+        },
+        {
+          'club_name': clubName,
+          'report_type': 'age_grade_tops',
+          'month_start': _dateOnly(previousMonthStart),
+          'month_end': _dateOnly(previousMonthEnd),
+          'title': 'Age-Grade Tops — ${_monthLabel(previousMonthStart)}',
+          'content': ageGradeContent,
+        },
+      ];
+
+      await Supabase.instance.client
+          .from('secretary_vault_monthly_reports')
+          .upsert(rows, onConflict: 'club_name,report_type,month_start');
+    } catch (e) {
+      debugPrint('Secretary vault monthly archive skipped: $e');
+    } finally {
+      _archivingVaultReports = false;
+    }
+  }
+
+  Future<void> _showSavedVaultReportsSheet() async {
+    await _archivePreviousMonthVaultReports();
+    final clubName = _clubName?.trim();
+    if (clubName == null || clubName.isEmpty) return;
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('secretary_vault_monthly_reports')
+          .select('title, content, report_type, month_start')
+          .eq('club_name', clubName)
+          .order('month_start', ascending: false)
+          .order('report_type', ascending: true)
+          .limit(36);
+
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No saved monthly reports yet.')),
+        );
+        return;
+      }
+
+      final groupedRows = <String, List<Map<String, dynamic>>>{};
+      for (final rawRow in rows) {
+        final row = Map<String, dynamic>.from(rawRow as Map);
+        final monthStart = (row['month_start'] as String?) ?? '';
+        groupedRows.putIfAbsent(monthStart, () => []).add(row);
+      }
+
+      final monthKeys = groupedRows.keys.toList()
+        ..sort((a, b) => b.compareTo(a));
+      for (final monthRows in groupedRows.values) {
+        monthRows.sort((a, b) {
+          final aType = (a['report_type'] as String?) ?? '';
+          final bType = (b['report_type'] as String?) ?? '';
+          return _savedVaultReportSortOrder(
+            aType,
+          ).compareTo(_savedVaultReportSortOrder(bType));
+        });
+      }
+
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: _vaultSheetColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          final media = MediaQuery.of(sheetContext);
+          Map<String, dynamic>? selectedRow;
+
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              final selectedTitle =
+                  (selectedRow?['title'] as String?) ?? 'Monthly report';
+              final selectedContent =
+                  (selectedRow?['content'] as String?) ?? '';
+
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    12,
+                    12,
+                    media.viewInsets.bottom + 16,
+                  ),
+                  child: SizedBox(
+                    height: media.size.height * 0.7,
+                    child: selectedRow == null
+                        ? Column(
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(4, 4, 4, 10),
+                                child: Text(
+                                  'Saved Monthly Vault Reports',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    4,
+                                    4,
+                                    4,
+                                    12,
+                                  ),
+                                  itemCount: monthKeys.length,
+                                  itemBuilder: (_, monthIndex) {
+                                    final monthKey = monthKeys[monthIndex];
+                                    final monthRows =
+                                        groupedRows[monthKey] ??
+                                        <Map<String, dynamic>>[];
+                                    final monthStart = DateTime.tryParse(
+                                      monthKey,
+                                    );
+                                    final monthLabel = monthStart == null
+                                        ? monthKey
+                                        : _monthLabel(monthStart);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 14,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              4,
+                                              0,
+                                              4,
+                                              6,
+                                            ),
+                                            child: Text(
+                                              monthLabel,
+                                              textAlign: TextAlign.left,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                          for (final row in monthRows)
+                                            Card(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.06,
+                                              ),
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                side: const BorderSide(
+                                                  color: Colors.white12,
+                                                ),
+                                              ),
+                                              child: ListTile(
+                                                leading: Icon(
+                                                  _savedVaultReportIcon(
+                                                    row['report_type']
+                                                        as String?,
+                                                  ),
+                                                  color: Colors.white70,
+                                                ),
+                                                title: Text(
+                                                  _savedVaultReportLabel(
+                                                    row['report_type']
+                                                        as String?,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                trailing: const Icon(
+                                                  Icons.chevron_right,
+                                                  color: Colors.white54,
+                                                ),
+                                                onTap: () {
+                                                  setSheetState(() {
+                                                    selectedRow = row;
+                                                  });
+                                                },
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      setSheetState(() {
+                                        selectedRow = null;
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.arrow_back,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      selectedTitle,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 48),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    selectedContent,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(text: selectedContent),
+                                        );
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Copied report to clipboard.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.copy, size: 18),
+                                      label: const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Copy'),
+                                      ),
+                                      style: _vaultOutlineButtonStyle(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await _exportVaultReportAsPdf(
+                                          selectedTitle,
+                                          selectedContent,
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.picture_as_pdf,
+                                        size: 18,
+                                      ),
+                                      label: const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Export'),
+                                      ),
+                                      style: _vaultOutlineButtonStyle(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        await _publishListAsPostFromStandards(
+                                          title: selectedTitle,
+                                          content: selectedContent,
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.campaign,
+                                        size: 18,
+                                      ),
+                                      label: const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Publish'),
+                                      ),
+                                      style: _vaultPublishButtonStyle(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load saved monthly reports: $e')),
+      );
+    }
+  }
+
+  int _savedVaultReportSortOrder(String reportType) {
+    switch (reportType) {
+      case 'club_standard_awardees':
+        return 0;
+      case 'age_grade_tops':
+        return 1;
+      default:
+        return 2;
+    }
+  }
+
+  String _savedVaultReportLabel(String? reportType) {
+    switch (reportType) {
+      case 'club_standard_awardees':
+        return 'Club Standard Awardees';
+      case 'age_grade_tops':
+        return 'Age-Grade Tops';
+      default:
+        return 'Monthly report';
+    }
+  }
+
+  IconData _savedVaultReportIcon(String? reportType) {
+    switch (reportType) {
+      case 'age_grade_tops':
+        return Icons.leaderboard;
+      case 'club_standard_awardees':
+        return Icons.workspace_premium;
+      default:
+        return Icons.description;
+    }
   }
 
   Future<String?> _buildWeeklyRunningReport() async {
@@ -2142,46 +2751,22 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           ),
           const SizedBox(height: 10),
           const Text(
-            'Admin-only reports based on all submitted race records.',
+            'Admin-only reports. Monthly Vault reports are saved after month end.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () async {
-              final awardeesByLevel = await _loadAllAwardsSnapshot();
+              await _archivePreviousMonthVaultReports();
+              final monthStart = _monthStart(DateTime.now());
+              final content = await _buildClubStandardAwardeesReportForMonth(
+                monthStart,
+              );
               if (!mounted) return;
 
-              if (awardeesByLevel.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('No members currently meet Club Standards.'),
-                  ),
-                );
-                return;
-              }
-
-              final now = DateTime.now();
               final title =
-                  'Latest Club Standard Awardees'
-                  ' — updated to '
-                  '${now.day.toString().padLeft(2, '0')} '
-                  '${_monthShort(now.month)} ${now.year}';
-
-              final buffer = StringBuffer();
-              buffer.writeln(title);
-              buffer.writeln('');
-              for (final level in _awardLevels.reversed) {
-                final names = awardeesByLevel[level];
-                if (names == null || names.isEmpty) continue;
-                buffer.writeln('$level Award');
-                for (final name in names) {
-                  buffer.writeln(' - $name');
-                }
-                buffer.writeln('');
-              }
-
-              final content = buffer.toString().trimRight();
+                  'Latest Club Standard Awardees — ${_monthLabel(monthStart)}';
               await _showVaultReportSheet(title: title, content: content);
             },
             icon: const Icon(Icons.workspace_premium, size: 18),
@@ -2194,18 +2779,15 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           const SizedBox(height: 10),
           ElevatedButton.icon(
             onPressed: () async {
-              final content = await _buildAgeGradeTopsReport();
+              await _archivePreviousMonthVaultReports();
+              final monthStart = _monthStart(DateTime.now());
+              final content = await _buildAgeGradeTopsReportForMonth(
+                monthStart,
+              );
               if (!mounted) return;
-              if (content == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('No age-grade records found yet.'),
-                  ),
-                );
-                return;
-              }
 
-              const title = 'Latest Age-Grade Tops';
+              final title =
+                  'Latest Age-Grade Tops — ${_monthLabel(monthStart)}';
               await _showVaultReportSheet(title: title, content: content);
             },
             icon: const Icon(Icons.leaderboard, size: 18),
@@ -2213,6 +2795,16 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0055FF),
               foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _showSavedVaultReportsSheet,
+            icon: const Icon(Icons.archive, size: 18),
+            label: const Text('Saved Monthly Reports'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white38, width: 1),
             ),
           ),
           const SizedBox(height: 10),
@@ -3151,6 +3743,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                         ),
                         const SizedBox(height: 8),
                         _buildCurrentStatusSection(),
+                        _buildSearchRunButton(),
                         _buildAdminAwardsSection(),
                         _buildIceSearchSection(),
                         const SizedBox(height: 80),

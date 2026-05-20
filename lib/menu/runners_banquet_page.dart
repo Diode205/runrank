@@ -34,10 +34,10 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
   final _otherPriceController = TextEditingController(text: '0.00');
   final _memberMealChoiceController = TextEditingController();
   final _partnerMealChoiceController = TextEditingController();
-  final _otherMealChoiceController = TextEditingController();
+  final List<TextEditingController> _otherMealChoiceControllers = [];
   final _memberSpecialRequirementsController = TextEditingController();
   final _partnerSpecialRequirementsController = TextEditingController();
-  final _otherSpecialRequirementsController = TextEditingController();
+  final List<TextEditingController> _otherSpecialRequirementsControllers = [];
 
   List<Map<String, dynamic>> _adminSummary = [];
   List<Map<String, dynamic>> _myReservations = [];
@@ -127,14 +127,35 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     _otherPriceController.dispose();
     _memberMealChoiceController.dispose();
     _partnerMealChoiceController.dispose();
-    _otherMealChoiceController.dispose();
     _memberSpecialRequirementsController.dispose();
     _partnerSpecialRequirementsController.dispose();
-    _otherSpecialRequirementsController.dispose();
+    for (final controller in _otherMealChoiceControllers) {
+      controller.dispose();
+    }
+    for (final controller in _otherSpecialRequirementsControllers) {
+      controller.dispose();
+    }
     for (final c in _optionLabels) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  void _syncOtherGuestControllers() {
+    while (_otherMealChoiceControllers.length < _otherQuantity) {
+      _otherMealChoiceControllers.add(TextEditingController());
+      _otherSpecialRequirementsControllers.add(TextEditingController());
+    }
+
+    while (_otherMealChoiceControllers.length > _otherQuantity) {
+      _otherMealChoiceControllers.removeLast().dispose();
+      _otherSpecialRequirementsControllers.removeLast().dispose();
+    }
+  }
+
+  void _setOtherQuantity(int quantity) {
+    _otherQuantity = quantity < 0 ? 0 : quantity;
+    _syncOtherGuestControllers();
   }
 
   num _parsePrice(String text) {
@@ -183,13 +204,24 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
     final partnerMealChoice = _partnerQuantity > 0
         ? cleanMealChoice(_partnerMealChoiceController)
         : null;
-    final otherMealChoice = _otherQuantity > 0
-        ? cleanMealChoice(_otherMealChoiceController)
-        : null;
+    _syncOtherGuestControllers();
+    final otherMealChoices = _otherQuantity > 0
+        ? List<String?>.generate(
+            _otherQuantity,
+            (index) => cleanMealChoice(_otherMealChoiceControllers[index]),
+          )
+        : <String?>[];
+    final otherSpecialRequirements = _otherQuantity > 0
+        ? List<String?>.generate(
+            _otherQuantity,
+            (index) =>
+                cleanSpecial(_otherSpecialRequirementsControllers[index].text),
+          )
+        : <String?>[];
 
     if ((_memberQuantity > 0 && memberMealChoice == null) ||
         (_partnerQuantity > 0 && partnerMealChoice == null) ||
-        (_otherQuantity > 0 && otherMealChoice == null)) {
+        otherMealChoices.any((choice) => choice == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter meal choices, for example A-3-2.'),
@@ -204,7 +236,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       'party_name': widget.eventTitle,
       'member_meal_choice': memberMealChoice,
       'partner_meal_choice': partnerMealChoice,
-      'other_meal_choice': otherMealChoice,
+      'other_meal_choices': otherMealChoices.whereType<String>().join('|'),
       'member_quantity': _memberQuantity,
       'partner_quantity': _partnerQuantity,
       'other_quantity': _otherQuantity,
@@ -213,8 +245,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
           .trim(),
       'partner_special_requirements': _partnerSpecialRequirementsController.text
           .trim(),
-      'other_special_requirements': _otherSpecialRequirementsController.text
-          .trim(),
+      'other_special_requirements': otherSpecialRequirements
+          .whereType<String>()
+          .join('|'),
     };
 
     final paid = await PaymentService.startMembershipPayment(
@@ -272,15 +305,15 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         ),
       );
     }
-    if (ok && otherMealChoice != null && _otherQuantity > 0) {
+    for (var i = 0; ok && i < otherMealChoices.length; i++) {
+      final otherMealChoice = otherMealChoices[i];
+      if (otherMealChoice == null) continue;
       ok = await RunnersBanquetService.addReservation(
         eventId: eventId,
         clubName: clubName,
         optionLabel: otherMealChoice,
-        quantity: _otherQuantity,
-        specialRequirements: cleanSpecial(
-          _otherSpecialRequirementsController.text,
-        ),
+        quantity: 1,
+        specialRequirements: otherSpecialRequirements[i],
       );
     }
 
@@ -903,7 +936,9 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                       IconButton(
                         onPressed: () {
                           setState(() {
-                            if (_otherQuantity > 0) _otherQuantity--;
+                            if (_otherQuantity > 0) {
+                              _setOtherQuantity(_otherQuantity - 1);
+                            }
                           });
                         },
                         icon: const Icon(
@@ -922,7 +957,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                       IconButton(
                         onPressed: () {
                           setState(() {
-                            _otherQuantity++;
+                            _setOtherQuantity(_otherQuantity + 1);
                           });
                         },
                         icon: const Icon(
@@ -936,29 +971,45 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
               ),
               const SizedBox(height: 8),
               if (_otherQuantity > 0) ...[
-                _buildMealChoiceField(
-                  label: 'Other Guest Meal Choice',
-                  controller: _otherMealChoiceController,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: _otherSpecialRequirementsController,
-                  maxLines: 1,
-                  textInputAction: TextInputAction.done,
-                  onEditingComplete: () => FocusScope.of(context).unfocus(),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Other Guest Special Requirements',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Color(0xFF161B26),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                for (var i = 0; i < _otherQuantity; i++) ...[
+                  Text(
+                    _otherQuantity == 1
+                        ? 'Other Guest'
+                        : 'Other Guest ${i + 1}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 4),
+                  _buildMealChoiceField(
+                    label: 'Other Guest ${i + 1} Meal Choice',
+                    controller: _otherMealChoiceControllers[i],
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _otherSpecialRequirementsControllers[i],
+                    maxLines: 1,
+                    textInputAction: i == _otherQuantity - 1
+                        ? TextInputAction.done
+                        : TextInputAction.next,
+                    onEditingComplete: i == _otherQuantity - 1
+                        ? () => FocusScope.of(context).unfocus()
+                        : null,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Other Guest ${i + 1} Special Requirements',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0xFF161B26),
+                      border: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1298,7 +1349,7 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         _otherQuantity = 0;
         _memberMealChoiceController.clear();
         _partnerMealChoiceController.clear();
-        _otherMealChoiceController.clear();
+        _syncOtherGuestControllers();
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

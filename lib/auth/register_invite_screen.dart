@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:runrank/auth/register_profile_screen.dart';
 import 'package:runrank/services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterInviteScreen extends StatefulWidget {
   final String selectedClub;
@@ -20,6 +21,13 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
   String? _error;
   String? _savedName;
   String? _savedUka;
+  String? _savedInviteId;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSavedMemberDetails();
+  }
 
   @override
   void dispose() {
@@ -27,6 +35,52 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
     _ukaController.dispose();
     _inviteController.dispose();
     super.dispose();
+  }
+
+  String _normaliseInviteValue(String value) {
+    return value.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  String get _clubInvitePrefsPrefix {
+    return 'pending_member_invite_${_normaliseInviteValue(widget.selectedClub)}';
+  }
+
+  String _invitePrefsKeyForUka(String uka) {
+    return '${_clubInvitePrefsPrefix}_${_normaliseInviteValue(uka)}';
+  }
+
+  Future<void> _restoreSavedMemberDetails() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastKey = prefs.getString('${_clubInvitePrefsPrefix}_last_key');
+      if (lastKey == null || lastKey.isEmpty) return;
+
+      final raw = prefs.getStringList(lastKey);
+      if (raw == null || raw.length < 3) return;
+
+      if (!mounted) return;
+      setState(() {
+        _detailsSaved = true;
+        _savedInviteId = raw[0];
+        _savedName = raw[1];
+        _savedUka = raw[2];
+        _nameController.text = _savedName!;
+        _ukaController.text = _savedUka!;
+      });
+    } catch (_) {
+      // Local recovery is a convenience only; registration still works without it.
+    }
+  }
+
+  Future<void> _cacheSavedMemberDetails({
+    required String inviteId,
+    required String fullName,
+    required String ukaNumber,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _invitePrefsKeyForUka(ukaNumber);
+    await prefs.setStringList(key, [inviteId, fullName, ukaNumber]);
+    await prefs.setString('${_clubInvitePrefsPrefix}_last_key', key);
   }
 
   Future<void> _saveMemberDetails() async {
@@ -44,6 +98,30 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
       _loading = true;
       _error = null;
     });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getStringList(_invitePrefsKeyForUka(uka));
+      if (cached != null && cached.length >= 3) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _detailsSaved = true;
+          _savedInviteId = cached[0];
+          _savedName = cached[1];
+          _savedUka = cached[2];
+          _nameController.text = _savedName!;
+          _ukaController.text = _savedUka!;
+        });
+        await prefs.setString(
+          '${_clubInvitePrefsPrefix}_last_key',
+          _invitePrefsKeyForUka(_savedUka!),
+        );
+        return;
+      }
+    } catch (_) {
+      // Fall through to Supabase; local recovery is optional.
+    }
 
     final request = await AuthService.requestClubMemberInvite(
       club: widget.selectedClub,
@@ -65,11 +143,20 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
 
     setState(() {
       _detailsSaved = true;
+      _savedInviteId = request['invite_id']?.toString();
       _savedName = request['full_name']?.toString() ?? name;
       _savedUka = request['uka_number']?.toString() ?? uka;
       _nameController.text = _savedName!;
       _ukaController.text = _savedUka!;
     });
+
+    if (_savedInviteId != null && _savedInviteId!.isNotEmpty) {
+      await _cacheSavedMemberDetails(
+        inviteId: _savedInviteId!,
+        fullName: _savedName!,
+        ukaNumber: _savedUka!,
+      );
+    }
   }
 
   Future<void> _continue() async {
@@ -189,6 +276,7 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
                     : () {
                         setState(() {
                           _detailsSaved = false;
+                          _savedInviteId = null;
                           _inviteController.clear();
                           _error = null;
                         });
