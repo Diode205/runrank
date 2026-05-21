@@ -58,10 +58,10 @@ class RnrEkidenEacclPage extends StatelessWidget {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           bottom: const TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
+            isScrollable: false,
             padding: EdgeInsets.zero,
-            labelPadding: EdgeInsets.symmetric(horizontal: 16),
+            labelPadding: EdgeInsets.symmetric(horizontal: 4),
+            indicatorSize: TabBarIndicatorSize.label,
             tabs: [
               Tab(text: 'RNR'),
               Tab(text: 'Ekiden'),
