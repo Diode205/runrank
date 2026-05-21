@@ -6,7 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class RacesEacclPage extends StatefulWidget {
-  const RacesEacclPage({super.key});
+  final bool showHandicapFirst;
+
+  const RacesEacclPage({super.key, this.showHandicapFirst = false});
 
   @override
   State<RacesEacclPage> createState() => _RacesEacclPageState();
@@ -695,9 +697,16 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         ),
     ];
 
+    final initialPage = widget.showHandicapFirst && !_isNrrClub
+        ? pages.length - 1
+        : 0;
+
     return PageView.builder(
       itemCount: pages.length,
-      controller: PageController(viewportFraction: 0.94),
+      controller: PageController(
+        viewportFraction: 0.94,
+        initialPage: initialPage,
+      ),
       itemBuilder: (context, index) => pages[index],
     );
   }

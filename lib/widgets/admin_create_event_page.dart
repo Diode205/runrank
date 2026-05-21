@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/menu/races_eaccl_page_clean.dart';
-import 'package:runrank/menu/handicap_series_page.dart';
 import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/services/notification_service.dart';
 
@@ -468,10 +467,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         page = const RnrEkidenEacclPage();
         break;
       case 'Cross Country':
-        page = const RnrEkidenEacclPage(initialTabIndex: 5);
+        page = const RnrEkidenEacclPage(initialTabIndex: 3);
         break;
       case 'Handicap Series':
-        page = const HandicapSeriesPage();
+        page = const RacesEacclPage(showHandicapFirst: true);
         break;
       default:
         return;
