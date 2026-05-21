@@ -337,11 +337,7 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
           'assets/images/nrr11.png',
           'assets/images/nrr12.png',
         ]
-      : const [
-          'assets/images/club_history_runner.jpg',
-          'assets/images/nnbr_cover.png',
-          'assets/images/nnbrdocs.png',
-        ];
+      : const ['assets/images/club_history_runner.jpg'];
 
   @override
   void initState() {

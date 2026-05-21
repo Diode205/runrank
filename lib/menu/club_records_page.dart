@@ -5,7 +5,8 @@ import 'package:runrank/services/user_service.dart';
 
 class ClubRecordsPage extends StatefulWidget {
   final String? initialDistance;
-  const ClubRecordsPage({super.key, this.initialDistance});
+  final String? initialGender;
+  const ClubRecordsPage({super.key, this.initialDistance, this.initialGender});
 
   @override
   State<ClubRecordsPage> createState() => _ClubRecordsPageState();
@@ -33,6 +34,15 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
   late final PageController _pageController;
   int _currentIndex = 0;
 
+  String? _normalizeGender(String? value) {
+    final gender = value?.trim().toUpperCase();
+    if (gender == 'M' || gender == 'MALE' || gender == "MEN'S") return 'M';
+    if (gender == 'F' || gender == 'FEMALE' || gender == "WOMEN'S") {
+      return 'F';
+    }
+    return null;
+  }
+
   bool get _isNrrClub {
     final club = _clubName?.toLowerCase() ?? '';
     return club == 'nrr' || club.contains('norwich road runners');
@@ -58,8 +68,11 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
 
     _clubName = await UserService.currentClubName();
     _isAdmin = await UserService.isAdmin();
+    final requestedGender = _normalizeGender(widget.initialGender);
     final defaultGender = await _recordsService.getDefaultGenderFilter();
-    if (defaultGender != null &&
+    if (requestedGender != null) {
+      _currentGender = requestedGender;
+    } else if (defaultGender != null &&
         (defaultGender.toUpperCase() == 'M' ||
             defaultGender.toUpperCase() == 'F')) {
       _currentGender = defaultGender.toUpperCase();
@@ -230,7 +243,11 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
         Center(
           child: Text(
             currentLabel,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -244,12 +261,12 @@ class _ClubRecordsPageState extends State<ClubRecordsPage> {
               _loadRecordsForGender(nextGender);
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
+              foregroundColor: Colors.white70,
               side: BorderSide(color: _primaryColor),
             ),
             child: Text(
               buttonLabel,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
             ),
           ),
         ),

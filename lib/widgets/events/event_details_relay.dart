@@ -105,6 +105,45 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     return t.startsWith('ekiden');
   }
 
+  bool get _isRnrRelay {
+    final t = widget.event.relayTeam?.trim().toLowerCase() ?? '';
+    return t.startsWith('rnr');
+  }
+
+  bool get _usesRunningOnlyFlow => !_isRnrRelay;
+
+  String get _relayName {
+    final raw = widget.event.relayTeam?.trim() ?? '';
+    final name = raw.split(':').first.trim();
+    return name.isEmpty ? 'Relay' : name;
+  }
+
+  String get _relayTitle {
+    final name = _relayName;
+    return name.toLowerCase().endsWith('relay') ? name : '$name Relay';
+  }
+
+  String get _relayTeamName {
+    final raw = widget.event.relayTeam?.trim() ?? '';
+    final parts = raw.split(':');
+    if (parts.length < 2) return '';
+    return parts.sublist(1).join(':').trim();
+  }
+
+  int get _marshalStageNumber {
+    final club = (viewerClubName ?? '').toLowerCase();
+    if (club.contains('norwich road runners') || club == 'nrr') {
+      return 5;
+    }
+    return 6;
+  }
+
+  String get _marshalRoleLabel => 'Stage $_marshalStageNumber Marshal';
+
+  String get _marshalRolePluralLabel => 'Stage $_marshalStageNumber Marshals';
+
+  String get _marshalListTitle => 'Stage $_marshalStageNumber Marshal List';
+
   @override
   Widget build(BuildContext context) {
     final e = widget.event;
@@ -257,7 +296,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                       ),
                       const Divider(height: 32, color: Colors.white12),
 
-                      // Relay type chip (RNR vs Ekiden) + optional team name
+                      // Relay type chip + optional team name
                       if (e.relayTeam != null && e.relayTeam!.trim().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -269,12 +308,12 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _isEkidenRelay
+                                  color: _usesRunningOnlyFlow
                                       ? const Color(0x3322C55E)
                                       : const Color(0x334A90E2),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: _isEkidenRelay
+                                    color: _usesRunningOnlyFlow
                                         ? const Color(0xFF22C55E)
                                         : const Color(0xFF4A90E2),
                                   ),
@@ -283,19 +322,17 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      _isEkidenRelay
+                                      _usesRunningOnlyFlow
                                           ? Icons.groups_2
                                           : Icons.route,
                                       size: 16,
-                                      color: _isEkidenRelay
+                                      color: _usesRunningOnlyFlow
                                           ? const Color(0xFF22C55E)
                                           : const Color(0xFF4A90E2),
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _isEkidenRelay
-                                          ? 'Ekiden Relay'
-                                          : 'RNR Relay',
+                                      _relayTitle,
                                       style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
@@ -306,18 +343,19 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Team: ${e.relayTeam}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                              if (_relayTeamName.isNotEmpty)
+                                Expanded(
+                                  child: Text(
+                                    'Team: $_relayTeamName',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -593,7 +631,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 const SizedBox(height: 12),
               ],
               // Support roles (RNR relay only)
-              if (!_isEkidenRelay && myRelayRoles.isNotEmpty) ...[
+              if (!_usesRunningOnlyFlow && myRelayRoles.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -625,13 +663,13 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                 const SizedBox(height: 12),
               ],
               // Marshalling (RNR relay only)
-              if (!_isEkidenRelay && responseType == "marshalling") ...[
+              if (!_usesRunningOnlyFlow && responseType == "marshalling") ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "🦺 Stage 6 Marshal",
-                      style: TextStyle(
+                    Text(
+                      "🦺 $_marshalRoleLabel",
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -643,7 +681,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                   ],
                 ),
               ],
-              if (!_isEkidenRelay) ...[
+              if (!_usesRunningOnlyFlow) ...[
                 const SizedBox(height: 12),
                 Center(
                   child: FilledButton.icon(
@@ -660,8 +698,9 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     }
 
     // New response options
-    if (_isEkidenRelay) {
-      // Ekiden: only allow Running responses
+    if (_usesRunningOnlyFlow) {
+      // Ekiden and other modern relays: only allow Running responses.
+      // Ekiden still captures leg/pace; other relays just record attendance.
       return Center(
         child: FilledButton.icon(
           onPressed: () => showRelayRunningDialog(),
@@ -822,8 +861,9 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   List<Widget> _getParticipantLines() {
-    // For Ekiden, only show running participants; RNR keeps full breakdown
-    if (_isEkidenRelay) {
+    // Ekiden and other non-RNR relays only show running participants; RNR keeps
+    // the full support/marshal breakdown.
+    if (_usesRunningOnlyFlow) {
       return [
         _buildParticipantLine(
           "🏃‍♀️ Running",
@@ -844,7 +884,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         onTap: () => _showRelayRunningList(),
       ),
       _buildParticipantLine(
-        "🦺 Stage 6 Marshals",
+        "🦺 $_marshalRolePluralLabel",
         volunteers.length,
         volunteers,
         onTap: () => _showMarshalList(),
@@ -933,11 +973,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, 'marshal'),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.safety_check),
-                SizedBox(width: 8),
-                Text('Marshal (Stage 6)'),
+                const Icon(Icons.safety_check),
+                const SizedBox(width: 8),
+                Text('Marshal (Stage $_marshalStageNumber)'),
               ],
             ),
           ),
@@ -965,6 +1005,14 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> showRelayRunningDialog() async {
+    if (!_isEkidenRelay) {
+      myRelayStages = [];
+      myPredictedPace = null;
+      myPredictedFinishHHMMSS = null;
+      await submitResponse(type: "run");
+      return;
+    }
+
     final messenger = ScaffoldMessenger.of(context);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1404,7 +1452,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     String buildExportText() {
       final buffer = StringBuffer();
       buffer.writeln(
-        "Stage 6 Marshal List — ${event.title ?? "Relay"} (${weekday(event.dateTime)}, ${event.dateTime.day} ${month(event.dateTime.month)} ${event.dateTime.year})",
+        "$_marshalListTitle — ${event.title ?? "Relay"} (${weekday(event.dateTime)}, ${event.dateTime.day} ${month(event.dateTime.month)} ${event.dateTime.year})",
       );
       buffer.writeln();
       for (var i = 0; i < attendees.length; i++) {
@@ -1419,7 +1467,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("🦺 Stage 6 Marshals"),
+        title: Text("🦺 $_marshalRolePluralLabel"),
         content: SizedBox(
           width: double.maxFinite,
           height: 360,
@@ -1440,7 +1488,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         actions: [
           TextButton.icon(
             onPressed: () async {
-              await _exportListAsPdf("Stage 6 Marshal List", exportText);
+              await _exportListAsPdf(_marshalListTitle, exportText);
             },
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text("Export PDF"),
@@ -1460,7 +1508,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
           TextButton.icon(
             onPressed: () async {
               await _publishListAsPost(
-                title: "Stage 6 Marshal List — ${event.title ?? "Relay"}",
+                title: "$_marshalListTitle — ${event.title ?? "Relay"}",
                 content: exportText,
               );
             },

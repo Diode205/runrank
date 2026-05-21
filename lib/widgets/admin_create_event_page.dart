@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/menu/races_eaccl_page_clean.dart';
+import 'package:runrank/menu/handicap_series_page.dart';
 import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/services/notification_service.dart';
 
@@ -94,6 +95,24 @@ class AdminCreateEventPage extends StatefulWidget {
 
 class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   static const Map<String, _SavedVenuePreset> _raceVenuePresets = {
+    'Holt 10K': _SavedVenuePreset(
+      venue: 'Gresham School',
+      address: 'Cromer Road, Holt',
+      latitude: '52.910199',
+      longitude: '1.104856',
+    ),
+    'Worstead 5M': _SavedVenuePreset(
+      venue: 'Worstead Village Hall',
+      address: 'North Walsham',
+      latitude: '52.783583',
+      longitude: '1.410747',
+    ),
+    'Chase The Train': _SavedVenuePreset(
+      venue: 'Bure Valley Railway',
+      address: 'Aylsham Station',
+      latitude: '52.791254',
+      longitude: '1.254838',
+    ),
     'Dinosaur Dash': _SavedVenuePreset(
       venue: 'Roarr Adventure Park',
       address: 'Lenwade Norwich',
@@ -210,17 +229,44 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       latitude: '52.64978545095906',
       longitude: '1.1767761647985628',
     ),
-    'NorwichTriathlon': _SavedVenuePreset(
-      venue: 'Whitlingham Country Park',
-      address: 'Norwich',
-      latitude: '52.621704228248134',
-      longitude: '1.3391771752640746',
+  };
+
+  static const Map<String, _SavedVenuePreset> _handicapVenuePresets = {
+    '5K': _SavedVenuePreset(
+      venue: 'The Avenue',
+      address: 'Cromer',
+      latitude: '52.912648',
+      longitude: '1.314740',
     ),
-    'Sandringham24': _SavedVenuePreset(
-      venue: 'Sandringham Estate',
-      address: 'Norfolk',
-      latitude: '52.82982259449807',
-      longitude: '0.5124635792869614',
+    'Beach Run': _SavedVenuePreset(
+      venue: 'Beech Road',
+      address: 'Mundesley',
+      latitude: '52.877383',
+      longitude: '1.438650',
+    ),
+    '10M': _SavedVenuePreset(
+      venue: 'Hillside',
+      address: 'Norwich Road, Cromer',
+      latitude: '52.918606',
+      longitude: '1.307063',
+    ),
+    '5M': _SavedVenuePreset(
+      venue: 'Aldborough',
+      address: 'Norwich',
+      latitude: '52.861983',
+      longitude: '1.242988',
+    ),
+    '10K': _SavedVenuePreset(
+      venue: 'Hillside',
+      address: 'Norwich Road, Cromer',
+      latitude: '52.919162',
+      longitude: '1.305687',
+    ),
+    '7M': _SavedVenuePreset(
+      venue: 'Woodfield/Kelling Roads',
+      address: 'Holt',
+      latitude: '52.911485',
+      longitude: '1.097483',
     ),
   };
 
@@ -236,6 +282,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
   bool get _isNRRClub =>
       _clubName != null &&
       _clubName!.toLowerCase().contains('norwich road runners');
+  bool get _isNNBRClub =>
+      _clubName != null &&
+      _clubName!.toLowerCase().contains('north norfolk beach runners');
 
   static const List<String> _nrrTrainingEventTypes = <String>[
     'Recovery Monday',
@@ -281,10 +330,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         return 'Ekiden';
       case 'AlexMoore':
         return 'Alex Moore';
-      case 'NorwichTriathlon':
-        return 'Norwich Triathlon';
-      case 'Sandringham24':
-        return 'Sandringham 24';
       case 'RNR':
       default:
         return 'RNR';
@@ -347,10 +392,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         _selectedNrrTrainingEventType = _normaliseNrrTrainingEventType(
           initType,
         );
-      } else if (initType == "Training 1" || initType == "Training 2") {
-        // Legacy callers may still pass the old labels; normalise
-        // them into the new unified Training type.
-        selectedEventType = "Training";
       } else {
         selectedEventType = initType;
       }
@@ -412,7 +453,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       widget.initialVenue != null;
 
   TimeOfDay _defaultTimeForCurrentSelection() {
-    return selectedEventType == 'Training'
+    return selectedEventType.startsWith('Training')
         ? const TimeOfDay(hour: 18, minute: 30)
         : const TimeOfDay(hour: 14, minute: 30);
   }
@@ -428,6 +469,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         break;
       case 'Cross Country':
         page = const RnrEkidenEacclPage(initialTabIndex: 5);
+        break;
+      case 'Handicap Series':
+        page = const HandicapSeriesPage();
         break;
       default:
         return;
@@ -550,7 +594,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         } else {
           // Default (NNBR and other clubs).
           adminTypes = [
-            "Training",
+            if (_isNNBRClub) ...["Training 1", "Training 2"] else "Training",
             "Race",
             "Relay",
             "Cross Country",
@@ -676,11 +720,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
 
   Future<List<_SavedVenuePreset>> _loadLocalVenuePresets() async {
     final prefs = await SharedPreferences.getInstance();
-    final keys = {
-      _savedVenuesPrefsKey(),
-      'admin_saved_venues_default_club',
-      ...prefs.getKeys().where((key) => key.startsWith('admin_saved_venues_')),
-    };
+    final keys = {_savedVenuesPrefsKey()};
 
     final presets = <_SavedVenuePreset>[];
     for (final key in keys) {
@@ -965,9 +1005,12 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       case 'Relay':
         preset = _relayVenuePresets[_selectedRelayFormat];
         break;
+      case 'Handicap Series':
+        preset = _handicapVenuePresets[selectedHandicapDistance];
+        break;
     }
 
-    if (!mounted) return;
+    if (!mounted || preset == null) return;
     setState(() {
       _selectedSavedVenueId = null;
       _setVenueFieldsFromPreset(preset);
@@ -1052,9 +1095,11 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     final eventType = _resolvedEventType;
     switch (eventType) {
       case "Training":
-      case "Training 1":
-      case "Training 2":
         return "Training";
+      case "Training 1":
+        return "Training 1";
+      case "Training 2":
+        return "Training 2";
       case "Recovery Monday":
       case "Mousehold Monday":
       case "Tuesday Efforts 1":
@@ -1347,7 +1392,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           if (!_wasOpenedForDirectEventCreation &&
                               (v == 'Race' ||
                                   v == 'Relay' ||
-                                  v == 'Cross Country')) {
+                                  v == 'Cross Country' ||
+                                  v == 'Handicap Series')) {
                             _openEventSourcePage(v);
                             return;
                           }
@@ -1477,8 +1523,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     items: handicapDistances
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
-                    onChanged: (v) =>
-                        setState(() => selectedHandicapDistance = v),
+                    onChanged: (v) {
+                      setState(() => selectedHandicapDistance = v);
+                      _applyFixedVenuePreset(_handicapVenuePresets[v]);
+                    },
                   ),
                 ),
 
@@ -1506,14 +1554,6 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                           DropdownMenuItem(
                             value: "AlexMoore",
                             child: Text("Alex Moore Relay"),
-                          ),
-                          DropdownMenuItem(
-                            value: "NorwichTriathlon",
-                            child: Text("Norwich Triathlon Relay"),
-                          ),
-                          DropdownMenuItem(
-                            value: "Sandringham24",
-                            child: Text("Sandringham 24 Relay"),
                           ),
                         ],
                         onChanged: (v) {

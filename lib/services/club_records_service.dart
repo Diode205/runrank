@@ -163,12 +163,7 @@ class ClubRecordsService {
           .eq('id', user.id)
           .maybeSingle();
 
-      final raw = (row?['gender'] as String?)?.trim().toUpperCase();
-      if (raw == 'M' || raw == 'F') {
-        _cachedUserGender = raw;
-      } else {
-        _cachedUserGender = null;
-      }
+      _cachedUserGender = _normalizeGender(row?['gender'] as String?);
       _userGenderLoaded = true;
       return _cachedUserGender;
     } catch (e) {
@@ -181,7 +176,15 @@ class ClubRecordsService {
 
   String? _normalizeGender(String? raw) {
     final normalized = raw?.trim().toUpperCase();
-    return normalized == 'M' || normalized == 'F' ? normalized : null;
+    if (normalized == 'M' || normalized == 'MALE' || normalized == "MEN'S") {
+      return 'M';
+    }
+    if (normalized == 'F' ||
+        normalized == 'FEMALE' ||
+        normalized == "WOMEN'S") {
+      return 'F';
+    }
+    return null;
   }
 
   String _recordSyncKey(int timeSeconds, String raceName, String raceDate) {
@@ -735,12 +738,15 @@ class ClubRecordsService {
       }
 
       final distanceToken = distance.replaceAll(' ', '_');
+      final genderToken =
+          _normalizeGender(currentHolder.gender) ?? genderFilter;
       await NotificationService.notifyUsersInClub(
         clubName: clubName,
         title: 'New club record set',
         body:
             '$runnerName set a new $distance club record in ${currentHolder.formattedTime}.',
-        route: 'club_records/' + distanceToken,
+        route:
+            'club_records/$distanceToken${genderToken != null ? '/$genderToken' : ''}',
       );
     } catch (e) {
       print('Error notifying for live club record achievement: $e');
@@ -774,6 +780,7 @@ class ClubRecordsService {
         final distance = record.distance;
         final time = record.formattedTime;
         final distanceToken = distance.replaceAll(' ', '_');
+        final genderToken = _normalizeGender(payload['gender'] as String?);
         final clubName = currentClub;
 
         if (clubName != null && clubName.isNotEmpty) {
@@ -781,7 +788,8 @@ class ClubRecordsService {
             clubName: clubName,
             title: 'New club record set',
             body: '$runner set a new $distance club record in $time.',
-            route: 'club_records/' + distanceToken,
+            route:
+                'club_records/$distanceToken${genderToken != null ? '/$genderToken' : ''}',
           );
         } else {
           print(

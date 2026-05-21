@@ -46,8 +46,8 @@ class RnrEkidenEacclPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
-      initialIndex: initialTabIndex.clamp(0, 5).toInt(),
+      length: 4,
+      initialIndex: initialTabIndex.clamp(0, 3).toInt(),
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -66,8 +66,6 @@ class RnrEkidenEacclPage extends StatelessWidget {
               Tab(text: 'RNR'),
               Tab(text: 'Ekiden'),
               Tab(text: 'Alex Moore'),
-              Tab(text: 'Norwich Tri'),
-              Tab(text: 'Sandringham 24'),
               Tab(text: 'EACCL'),
             ],
           ),
@@ -85,21 +83,6 @@ class RnrEkidenEacclPage extends StatelessWidget {
                 relayFormat: 'AlexMoore',
                 resultsUrl: 'https://totalracetiming.co.uk/result',
                 driveQuery: 'Norfolk Showground NR5 0TT',
-              ),
-              _RelayWebPage(
-                title: 'Norwich Triathlon',
-                url: 'https://www.norwichtriathlon.co.uk/',
-                relayFormat: 'NorwichTriathlon',
-                resultsUrl: 'https://results.racetimingsolutions.co.uk/',
-                driveQuery: 'Whitlingham NR14 8TR',
-              ),
-              _RelayWebPage(
-                title: 'Sandringham 24',
-                url:
-                    'https://sandringhamestate.co.uk/events/run-sandringham-24/',
-                relayFormat: 'Sandringham24',
-                resultsUrl: 'https://www.chipresults.co.uk/endurance/',
-                driveQuery: 'PE35 6AB',
               ),
               _EacclPage(),
             ],
@@ -338,10 +321,6 @@ TimeOfDay _defaultRelayTime(String relayFormat) {
       return const TimeOfDay(hour: 9, minute: 30);
     case 'AlexMoore':
       return const TimeOfDay(hour: 9, minute: 15);
-    case 'NorwichTriathlon':
-      return const TimeOfDay(hour: 6, minute: 0);
-    case 'Sandringham24':
-      return const TimeOfDay(hour: 19, minute: 0);
     case 'RNR':
     default:
       return const TimeOfDay(hour: 4, minute: 0);

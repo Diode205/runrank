@@ -521,8 +521,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                       final trainingTitleByType = <String, String>{
                         'training': 'Training',
-                        'training_1': 'Training',
-                        'training_2': 'Training',
+                        'training_1': 'Training 1',
+                        'training_2': 'Training 2',
                         'recovery_monday': 'Recovery Monday',
                         'mousehold_monday': 'Mousehold Monday',
                         'tuesday_efforts_1': 'Tuesday Efforts 1',
@@ -543,39 +543,21 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
 
                       if (normalizedType == 'relay') {
                         final rawTeam = e.relayTeam?.trim() ?? '';
-                        final teamLower = rawTeam.toLowerCase();
-                        final isEkiden = teamLower.startsWith('ekiden');
-                        final relayPrefix = isEkiden
-                            ? 'Ekiden Relay'
-                            : 'RNR Relay';
+                        final parts = rawTeam.split(':');
+                        final relayName = parts.first.trim();
+                        final teamName = parts.length > 1
+                            ? parts.sublist(1).join(':').trim()
+                            : '';
+                        final relayPrefix = relayName.isEmpty
+                            ? 'Relay'
+                            : relayName.toLowerCase().endsWith('relay')
+                            ? relayName
+                            : '$relayName Relay';
 
-                        if (displayTitle.isEmpty || displayTitle == 'Relay') {
-                          displayTitle = relayPrefix;
-                        } else if (!displayTitle.toLowerCase().startsWith(
-                              'rnr relay',
-                            ) &&
-                            !displayTitle.toLowerCase().startsWith(
-                              'ekiden relay',
-                            )) {
-                          displayTitle = '$relayPrefix – $displayTitle';
-                        }
+                        displayTitle = relayPrefix;
 
-                        // Show team name alongside the relay title if provided.
-                        if (rawTeam.isNotEmpty) {
-                          String teamLabel = rawTeam;
-                          if (isEkiden) {
-                            final parts = rawTeam.split(':');
-                            if (parts.length > 1 &&
-                                parts[1].trim().isNotEmpty) {
-                              teamLabel = parts[1].trim();
-                            } else {
-                              teamLabel = 'Ekiden';
-                            }
-                          }
-
-                          if (teamLabel.isNotEmpty) {
-                            displayTitle = '$displayTitle • Team: $teamLabel';
-                          }
+                        if (teamName.isNotEmpty) {
+                          displayTitle = '$displayTitle - Team: $teamName';
                         }
                       } else if (trainingTitleByType.containsKey(
                         normalizedType,
@@ -798,6 +780,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
             ),
 
       floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFFFFD700),
+        foregroundColor: Colors.black,
         child: const Icon(Icons.add),
         onPressed: () async {
           // ADMIN → full event creation

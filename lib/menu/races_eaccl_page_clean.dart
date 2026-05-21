@@ -272,50 +272,6 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     });
   }
 
-  void _editHandicapVenue(_HandicapRace r) {
-    final controller = TextEditingController(text: r.venue);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F111A),
-        title: Text(
-          'Update venue — ${r.title}',
-          style: const TextStyle(color: Color(0xFFFFD700)),
-        ),
-        content: TextField(
-          controller: controller,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Venue name/address',
-            labelStyle: TextStyle(color: Colors.white54),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => r.venue = controller.text.trim());
-              _saveHandicap(r);
-              _saveHandicapRemote(r);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFD700),
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatDate(DateTime d) {
     const months = [
       'Jan',
@@ -376,14 +332,15 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
   void _createEventFrom(_HandicapRace r) {
     String? distance;
     final t = r.title.toLowerCase();
-    if (t.contains('5k')) distance = '5K';
-    if (t.contains('10k')) distance = '10K';
+    if (RegExp(r'5\s*k').hasMatch(t)) distance = '5K';
+    if (RegExp(r'10\s*k').hasMatch(t)) distance = '10K';
     if (t.contains('10 mile') || t.contains('10m')) distance = '10M';
     if (t.contains('5 mile') || t.contains('5m')) distance = '5M';
     if (t.contains('7 mile') || t.contains('7m')) distance = '7M';
     if (t.contains('beach')) distance = 'Beach Run';
 
     final initialDate = _parseDateLabel(r.date);
+    final venue = _handicapVenueForDistance(distance);
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -392,10 +349,63 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           initialEventType: 'Handicap Series',
           initialHandicapDistance: distance,
           initialDate: initialDate,
-          initialVenue: r.venue.trim().isEmpty ? null : r.venue.trim(),
+          initialVenue:
+              venue?.venue ?? (r.venue.trim().isEmpty ? null : r.venue.trim()),
+          initialVenueAddress: venue?.address,
+          initialLatitude: venue?.latitude,
+          initialLongitude: venue?.longitude,
         ),
       ),
     );
+  }
+
+  _HandicapVenuePreset? _handicapVenueForDistance(String? distance) {
+    switch (distance) {
+      case '5K':
+        return const _HandicapVenuePreset(
+          venue: 'The Avenue',
+          address: 'Cromer',
+          latitude: 52.912648,
+          longitude: 1.314740,
+        );
+      case 'Beach Run':
+        return const _HandicapVenuePreset(
+          venue: 'Beech Road',
+          address: 'Mundesley',
+          latitude: 52.877383,
+          longitude: 1.438650,
+        );
+      case '10M':
+        return const _HandicapVenuePreset(
+          venue: 'Hillside',
+          address: 'Norwich Road, Cromer',
+          latitude: 52.918606,
+          longitude: 1.307063,
+        );
+      case '5M':
+        return const _HandicapVenuePreset(
+          venue: 'Aldborough',
+          address: 'Norwich',
+          latitude: 52.861983,
+          longitude: 1.242988,
+        );
+      case '10K':
+        return const _HandicapVenuePreset(
+          venue: 'Hillside',
+          address: 'Norwich Road, Cromer',
+          latitude: 52.919162,
+          longitude: 1.305687,
+        );
+      case '7M':
+        return const _HandicapVenuePreset(
+          venue: 'Woodfield/Kelling Roads',
+          address: 'Holt',
+          latitude: 52.911485,
+          longitude: 1.097483,
+        );
+      default:
+        return null;
+    }
   }
 
   void _createSignatureEvent(
@@ -600,6 +610,12 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
               mapUrl: 'https://goo.gl/maps/7hhzQwfBWNtfySbU6',
               facilities:
                   'Free parking (NR25 6EA) · Toilets · Prizes (age categories & teams) · First aid · Cake & refreshments · No bag drop/changing',
+              initialRaceName: 'Holt 10K',
+              initialTime: const TimeOfDay(hour: 19, minute: 0),
+              venueName: 'Gresham School',
+              venueAddress: 'Cromer Road, Holt',
+              latitude: 52.910199,
+              longitude: 1.104856,
             ),
             _RaceInfo(
               keyId: 'worstead',
@@ -617,6 +633,12 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
               mapUrl: 'https://goo.gl/maps/bAfXx4dkocZTWD8X6',
               facilities:
                   'Parking (festival car park, NR28 9SD) · Toilets (limited) · No changing facilities · Prizes (age group trophies) · First aid',
+              initialRaceName: 'Worstead 5M',
+              initialTime: const TimeOfDay(hour: 19, minute: 0),
+              venueName: 'Worstead Village Hall',
+              venueAddress: 'North Walsham',
+              latitude: 52.783583,
+              longitude: 1.410747,
             ),
             _RaceInfo(
               keyId: 'chase',
@@ -634,6 +656,12 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
               mapUrl: 'https://goo.gl/maps/mKE2PoEV1gM6yZC79',
               facilities:
                   'Bag drop via special train · Parking (limited at start) · Toilets (start & finish) · First aid · Very limited changing · No prizes/refreshments included',
+              initialRaceName: 'Chase The Train',
+              initialTime: const TimeOfDay(hour: 10, minute: 30),
+              venueName: 'Bure Valley Railway',
+              venueAddress: 'Aylsham Station',
+              latitude: 52.791254,
+              longitude: 1.254838,
             ),
           ];
 
@@ -660,8 +688,8 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
           child: _HandicapCard(
             races: _handicapRaces,
             isAdmin: _isAdmin,
+            clubName: _clubName,
             onEditDate: _editHandicapDate,
-            onEditVenue: _editHandicapVenue,
             onCreateEvent: _createEventFrom,
           ),
         ),
@@ -734,6 +762,20 @@ class _RaceSeriesDate {
   const _RaceSeriesDate({required this.keyId, required this.label});
 }
 
+class _HandicapVenuePreset {
+  final String venue;
+  final String address;
+  final double latitude;
+  final double longitude;
+
+  const _HandicapVenuePreset({
+    required this.venue,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+  });
+}
+
 class _HandicapRace {
   final String id;
   final String title;
@@ -750,15 +792,15 @@ class _HandicapRace {
 class _HandicapCard extends StatefulWidget {
   final List<_HandicapRace> races;
   final bool isAdmin;
+  final String? clubName;
   final void Function(_HandicapRace) onEditDate;
-  final void Function(_HandicapRace) onEditVenue;
   final void Function(_HandicapRace) onCreateEvent;
 
   const _HandicapCard({
     required this.races,
     required this.isAdmin,
+    required this.clubName,
     required this.onEditDate,
-    required this.onEditVenue,
     required this.onCreateEvent,
   });
 
@@ -770,6 +812,15 @@ class _MedalWinner {
   final String name;
   final String? userId;
   const _MedalWinner({required this.name, this.userId});
+}
+
+class _Top3DialogResult {
+  final bool clear;
+  final List<_MedalWinner>? winners;
+
+  const _Top3DialogResult.clear() : clear = true, winners = null;
+
+  const _Top3DialogResult.save(List<_MedalWinner> this.winners) : clear = false;
 }
 
 class _HandicapCardState extends State<_HandicapCard> {
@@ -971,10 +1022,8 @@ class _HandicapCardState extends State<_HandicapCard> {
             ],
           ),
           const SizedBox(height: 2),
-          // Combined row: Date (left half) and Venue (right half)
           Row(
             children: [
-              // Left: Date section
               Expanded(
                 child: Row(
                   children: [
@@ -1027,60 +1076,6 @@ class _HandicapCardState extends State<_HandicapCard> {
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Right: Venue section
-              Expanded(
-                child: Row(
-                  children: [
-                    if (widget.isAdmin)
-                      IconButton(
-                        tooltip: 'Edit venue',
-                        onPressed: () => widget.onEditVenue(r),
-                        icon: const Icon(
-                          Icons.edit_location_alt,
-                          color: Color(0xFFFFD700),
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      )
-                    else
-                      const Icon(
-                        Icons.place,
-                        color: Color(0xFFFFD700),
-                        size: 20,
-                      ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child:
-                          (r.venue.trim().isEmpty ||
-                              r.venue.toLowerCase() == 'tbd')
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Color(0xFF4A90E2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: const Text(
-                                'Venue',
-                                style: TextStyle(color: Colors.white),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            )
-                          : Text(
-                              r.venue,
-                              style: const TextStyle(color: Colors.white),
                               overflow: TextOverflow.ellipsis,
                             ),
                     ),
@@ -1149,220 +1144,69 @@ class _HandicapCardState extends State<_HandicapCard> {
   }
 
   Future<void> _openTop3Dialog(_HandicapRace r) async {
-    final initial =
-        (_top3[r.id] ??
-        [
-          const _MedalWinner(name: '', userId: null),
-          const _MedalWinner(name: '', userId: null),
-          const _MedalWinner(name: '', userId: null),
-        ]);
-    final goldCtrl = TextEditingController(text: initial[0].name);
-    final silverCtrl = TextEditingController(text: initial[1].name);
-    final bronzeCtrl = TextEditingController(text: initial[2].name);
-    String? goldUserId = initial[0].userId;
-    String? silverUserId = initial[1].userId;
-    String? bronzeUserId = initial[2].userId;
+    final initial = _normalisedTop3(_top3[r.id]);
+    final clubMembers = await _loadClubMemberOptions();
+    if (!mounted) return;
 
-    List<Map<String, String>> goldSuggestions = const [];
-    List<Map<String, String>> silverSuggestions = const [];
-    List<Map<String, String>> bronzeSuggestions = const [];
-
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setDState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF0F111A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(
-                  color: Color.fromRGBO(21, 0, 255, 1),
-                  width: 1,
-                ),
-              ),
-              title: const Text(
-                'Top 3 Finishers',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _medalField(
-                      label: 'Gold',
-                      controller: goldCtrl,
-                      color: const Color(0xFFFFD700),
-                      suggestions: goldSuggestions,
-                      onChanged: (q) async {
-                        goldSuggestions = await _searchUsers(q);
-                        setDState(() {});
-                      },
-                      onPick: (opt) {
-                        goldCtrl.text = opt['full_name'] ?? '';
-                        goldUserId = opt['id'];
-                        goldSuggestions = const [];
-                        setDState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _medalField(
-                      label: 'Silver',
-                      controller: silverCtrl,
-                      color: const Color(0xFFC0C0C0),
-                      suggestions: silverSuggestions,
-                      onChanged: (q) async {
-                        silverSuggestions = await _searchUsers(q);
-                        setDState(() {});
-                      },
-                      onPick: (opt) {
-                        silverCtrl.text = opt['full_name'] ?? '';
-                        silverUserId = opt['id'];
-                        silverSuggestions = const [];
-                        setDState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _medalField(
-                      label: 'Bronze',
-                      controller: bronzeCtrl,
-                      color: const Color(0xFFCD7F32),
-                      suggestions: bronzeSuggestions,
-                      onChanged: (q) async {
-                        bronzeSuggestions = await _searchUsers(q);
-                        setDState(() {});
-                      },
-                      onPick: (opt) {
-                        bronzeCtrl.text = opt['full_name'] ?? '';
-                        bronzeUserId = opt['id'];
-                        bronzeSuggestions = const [];
-                        setDState(() {});
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD700),
-                    foregroundColor: Colors.black,
-                  ),
-                  onPressed: () async {
-                    final winners = [
-                      _MedalWinner(
-                        name: goldCtrl.text.trim(),
-                        userId: goldUserId,
-                      ),
-                      _MedalWinner(
-                        name: silverCtrl.text.trim(),
-                        userId: silverUserId,
-                      ),
-                      _MedalWinner(
-                        name: bronzeCtrl.text.trim(),
-                        userId: bronzeUserId,
-                      ),
-                    ];
-                    setState(() => _top3[r.id] = winners);
-                    await _saveTop3(r.id, winners);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _medalField({
-    required String label,
-    required TextEditingController controller,
-    required Color color,
-    required List<Map<String, String>> suggestions,
-    required ValueChanged<String> onChanged,
-    required ValueChanged<Map<String, String>> onPick,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.emoji_events, color: color, size: 18),
-            const SizedBox(width: 6),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                onChanged: onChanged,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: '$label finisher',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  enabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF4A90E2), width: 1),
-                  ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Color(0xFF4A90E2),
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+    final result = await Navigator.of(context).push<_Top3DialogResult>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _Top3EditorPage(
+          raceTitle: r.title,
+          initial: initial,
+          clubMembers: clubMembers,
         ),
-        if (suggestions.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F111A),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF4A90E2), width: 1),
-            ),
-            constraints: const BoxConstraints(maxHeight: 120),
-            child: ListView.builder(
-              itemCount: suggestions.length,
-              itemBuilder: (ctx, i) {
-                final opt = suggestions[i];
-                final name = opt['full_name'] ?? '';
-                return ListTile(
-                  dense: true,
-                  title: Text(
-                    name,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  onTap: () => onPick(opt),
-                );
-              },
-            ),
-          ),
-      ],
+      ),
     );
+    if (result == null || !mounted) return;
+    if (result.clear) {
+      setState(() => _top3.remove(r.id));
+      await _saveTop3(r.id, const []);
+      return;
+    }
+
+    final winners = _normalisedTop3(result.winners);
+    setState(() {
+      if (winners.any((w) => w.name.trim().isNotEmpty)) {
+        _top3[r.id] = winners;
+      } else {
+        _top3.remove(r.id);
+      }
+    });
+    await _saveTop3(r.id, winners);
   }
 
-  Future<List<Map<String, String>>> _searchUsers(String query) async {
-    final q = query.trim();
-    if (q.isEmpty) return const [];
+  List<_MedalWinner> _normalisedTop3(List<_MedalWinner>? winners) {
+    return List<_MedalWinner>.generate(3, (index) {
+      if (winners != null && index < winners.length) {
+        return winners[index];
+      }
+      return const _MedalWinner(name: '', userId: null);
+    });
+  }
+
+  Future<List<Map<String, String>>> _loadClubMemberOptions() async {
     try {
-      final rows = await Supabase.instance.client
-          .from('user_profiles')
-          .select('id, full_name')
-          .ilike('full_name', '%$q%')
-          .limit(6);
+      final supabase = Supabase.instance.client;
+      var clubName = widget.clubName?.trim();
+      if (clubName == null || clubName.isEmpty) {
+        final currentUserId = supabase.auth.currentUser?.id;
+        if (currentUserId != null) {
+          final profile = await supabase
+              .from('user_profiles')
+              .select('club')
+              .eq('id', currentUserId)
+              .maybeSingle();
+          clubName = (profile?['club'] as String?)?.trim();
+        }
+      }
+
+      var query = supabase.from('user_profiles').select('id, full_name, club');
+      if (clubName != null && clubName.isNotEmpty) {
+        query = query.eq('club', clubName);
+      }
+
+      final rows = await query.order('full_name');
       return rows
           .map<Map<String, String>>(
             (r) => {
@@ -1379,22 +1223,29 @@ class _HandicapCardState extends State<_HandicapCard> {
 
   Future<void> _saveTop3(String raceId, List<_MedalWinner> winners) async {
     // Try Supabase first (table: handicap_top3 with columns: race_id, gold, silver, bronze)
+    final top3 = _normalisedTop3(winners);
+    String? nameAt(int index) {
+      final name = top3[index].name.trim();
+      return name.isEmpty ? null : name;
+    }
+
+    String? userIdAt(int index) =>
+        nameAt(index) == null ? null : top3[index].userId;
+
     try {
       await Supabase.instance.client.from('handicap_top3').upsert({
         'race_id': raceId,
-        'gold': winners.isNotEmpty ? winners[0].name : null,
-        'silver': winners.length > 1 ? winners[1].name : null,
-        'bronze': winners.length > 2 ? winners[2].name : null,
-        'gold_user_id': winners.isNotEmpty ? winners[0].userId : null,
-        'silver_user_id': winners.length > 1 ? winners[1].userId : null,
-        'bronze_user_id': winners.length > 2 ? winners[2].userId : null,
+        'gold': nameAt(0),
+        'silver': nameAt(1),
+        'bronze': nameAt(2),
+        'gold_user_id': userIdAt(0),
+        'silver_user_id': userIdAt(1),
+        'bronze_user_id': userIdAt(2),
       });
     } catch (_) {
       // Fallback to local persistence
       final prefs = await SharedPreferences.getInstance();
-      final lines = winners
-          .map((w) => '${w.name}|${w.userId ?? ''}')
-          .join('\n');
+      final lines = top3.map((w) => '${w.name}|${w.userId ?? ''}').join('\n');
       await prefs.setString('handicap_' + raceId + '_top3', lines);
     }
   }
@@ -1436,8 +1287,9 @@ class _HandicapCardState extends State<_HandicapCard> {
             (venue != null && venue.isNotEmpty)) {
           for (final hr in widget.races) {
             if (hr.id == id) {
-              if (dateLabel != null && dateLabel.isNotEmpty)
+              if (dateLabel != null && dateLabel.isNotEmpty) {
                 hr.date = dateLabel;
+              }
               if (venue != null && venue.isNotEmpty) hr.venue = venue;
               break;
             }
@@ -1462,6 +1314,301 @@ class _HandicapCardState extends State<_HandicapCard> {
       }
       if (mounted) setState(() {});
     }
+  }
+}
+
+class _Top3EditorPage extends StatefulWidget {
+  final String raceTitle;
+  final List<_MedalWinner> initial;
+  final List<Map<String, String>> clubMembers;
+
+  const _Top3EditorPage({
+    required this.raceTitle,
+    required this.initial,
+    required this.clubMembers,
+  });
+
+  @override
+  State<_Top3EditorPage> createState() => _Top3EditorPageState();
+}
+
+class _Top3EditorPageState extends State<_Top3EditorPage> {
+  late final TextEditingController _goldCtrl;
+  late final TextEditingController _silverCtrl;
+  late final TextEditingController _bronzeCtrl;
+  String? _goldUserId;
+  String? _silverUserId;
+  String? _bronzeUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _goldCtrl = TextEditingController(text: widget.initial[0].name);
+    _silverCtrl = TextEditingController(text: widget.initial[1].name);
+    _bronzeCtrl = TextEditingController(text: widget.initial[2].name);
+    _goldUserId = widget.initial[0].userId;
+    _silverUserId = widget.initial[1].userId;
+    _bronzeUserId = widget.initial[2].userId;
+  }
+
+  @override
+  void dispose() {
+    _goldCtrl.dispose();
+    _silverCtrl.dispose();
+    _bronzeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _chooseMember({
+    required TextEditingController controller,
+    required ValueChanged<String?> onUserId,
+  }) async {
+    final member = await _pickClubMember();
+    if (member == null) return;
+    controller.text = member['full_name'] ?? '';
+    onUserId(member['id']);
+  }
+
+  Future<Map<String, String>?> _pickClubMember() async {
+    var query = '';
+    return showModalBottomSheet<Map<String, String>>(
+      context: context,
+      backgroundColor: const Color(0xFF0F111A),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final filtered = widget.clubMembers
+                .where(
+                  (member) => (member['full_name'] ?? '')
+                      .toLowerCase()
+                      .contains(query.trim().toLowerCase()),
+                )
+                .take(30)
+                .toList(growable: false);
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(ctx).viewInsets.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Search club members',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Color(0xFFFFD700),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Color(0xFF4A90E2),
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Color(0xFFFFD700),
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        query = value;
+                        setSheetState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 320),
+                      child: filtered.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(18),
+                              child: Text(
+                                'No matching club members',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                color: Colors.white12,
+                                height: 1,
+                              ),
+                              itemBuilder: (ctx, i) {
+                                final member = filtered[i];
+                                return ListTile(
+                                  title: Text(
+                                    member['full_name'] ?? '',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  onTap: () => Navigator.pop(ctx, member),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _medalField({
+    required String label,
+    required TextEditingController controller,
+    required Color color,
+    required ValueChanged<String> onChanged,
+    required VoidCallback onSearch,
+  }) {
+    return Row(
+      children: [
+        Icon(Icons.emoji_events, color: color, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            onChanged: onChanged,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: '$label finisher',
+              hintText: 'Type a name or search club members',
+              labelStyle: const TextStyle(color: Colors.white70),
+              hintStyle: const TextStyle(color: Colors.white38),
+              suffixIcon: IconButton(
+                tooltip: 'Search club members',
+                onPressed: onSearch,
+                icon: const Icon(Icons.search, color: Color(0xFFFFD700)),
+              ),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF4A90E2), width: 1),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFFFD700), width: 1.2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<_MedalWinner> _winners() {
+    return [
+      _MedalWinner(
+        name: _goldCtrl.text.trim(),
+        userId: _goldCtrl.text.trim().isEmpty ? null : _goldUserId,
+      ),
+      _MedalWinner(
+        name: _silverCtrl.text.trim(),
+        userId: _silverCtrl.text.trim().isEmpty ? null : _silverUserId,
+      ),
+      _MedalWinner(
+        name: _bronzeCtrl.text.trim(),
+        userId: _bronzeCtrl.text.trim().isEmpty ? null : _bronzeUserId,
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Text(
+          widget.raceTitle,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, _Top3DialogResult.save(_winners())),
+            child: const Text(
+              'Save',
+              style: TextStyle(
+                color: Color(0xFFFFD700),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+          children: [
+            const Text(
+              'Top 3 Finishers',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _medalField(
+              label: 'Gold',
+              controller: _goldCtrl,
+              color: const Color(0xFFFFD700),
+              onChanged: (_) => _goldUserId = null,
+              onSearch: () => _chooseMember(
+                controller: _goldCtrl,
+                onUserId: (id) => _goldUserId = id,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _medalField(
+              label: 'Silver',
+              controller: _silverCtrl,
+              color: const Color(0xFFC0C0C0),
+              onChanged: (_) => _silverUserId = null,
+              onSearch: () => _chooseMember(
+                controller: _silverCtrl,
+                onUserId: (id) => _silverUserId = id,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _medalField(
+              label: 'Bronze',
+              controller: _bronzeCtrl,
+              color: const Color(0xFFCD7F32),
+              onChanged: (_) => _bronzeUserId = null,
+              onSearch: () => _chooseMember(
+                controller: _bronzeCtrl,
+                onUserId: (id) => _bronzeUserId = id,
+              ),
+            ),
+            const SizedBox(height: 22),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  Navigator.pop(context, const _Top3DialogResult.clear()),
+              icon: const Icon(Icons.clear),
+              label: const Text('Clear winners'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFFFD700),
+                side: const BorderSide(color: Color(0xFFFFD700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

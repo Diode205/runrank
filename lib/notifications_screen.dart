@@ -40,6 +40,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return text.replaceAll(RegExp(r"\[route:[^\]]+\]\s*"), "");
   }
 
+  String? _normalizeClubRecordGenderRoute(String? value) {
+    final gender = value?.trim().toUpperCase();
+    if (gender == 'M' || gender == 'MALE' || gender == "MEN'S") return 'M';
+    if (gender == 'F' || gender == 'FEMALE' || gender == "WOMEN'S") {
+      return 'F';
+    }
+    return null;
+  }
+
+  Future<String?> _inferClubRecordGenderFromNotification({
+    required String body,
+    required String? distance,
+  }) async {
+    if (distance == null || distance.isEmpty) return null;
+    final match = RegExp(r'^(.+?)\s+set a new\s+').firstMatch(body);
+    final runnerName = match?.group(1)?.trim();
+    if (runnerName == null || runnerName.isEmpty) return null;
+
+    try {
+      final currentClub = await UserService.currentClubName();
+      final profileRows = await Supabase.instance.client
+          .from('user_profiles')
+          .select('gender, club')
+          .eq('full_name', runnerName)
+          .limit(10);
+      for (final raw in profileRows as List) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final profileClub = NotificationService.canonicalClubName(
+          row['club'] as String?,
+        );
+        if (currentClub != null &&
+            profileClub != NotificationService.canonicalClubName(currentClub)) {
+          continue;
+        }
+        final gender = _normalizeClubRecordGenderRoute(
+          row['gender'] as String?,
+        );
+        if (gender != null) return gender;
+      }
+
+      final row = await Supabase.instance.client
+          .from('club_records')
+          .select('gender')
+          .eq('distance', distance)
+          .eq('runner_name', runnerName)
+          .order('updated_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      return _normalizeClubRecordGenderRoute(row?['gender'] as String?);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -337,18 +391,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       if (route.startsWith('club_records')) {
-        // Route may be just 'club_records' or 'club_records/<distance>'
+        // Route may be:
+        // - club_records
+        // - club_records/<distance>
+        // - club_records/<distance>/<gender>
         String? initialDistance;
+        String? initialGender;
         final parts = route.split('/');
         if (parts.length > 1 && parts[1].isNotEmpty) {
           // Decode distance token (e.g. 'Half_M' -> 'Half M')
           initialDistance = parts[1].replaceAll('_', ' ');
         }
+        if (parts.length > 2 && parts[2].isNotEmpty) {
+          initialGender = _normalizeClubRecordGenderRoute(parts[2]);
+        }
+        initialGender ??= await _inferClubRecordGenderFromNotification(
+          body: body,
+          distance: initialDistance,
+        );
+        if (!mounted) return;
 
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ClubRecordsPage(initialDistance: initialDistance),
+            builder: (_) => ClubRecordsPage(
+              initialDistance: initialDistance,
+              initialGender: initialGender,
+            ),
           ),
         ).then((_) => loadData());
         return;
