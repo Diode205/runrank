@@ -526,6 +526,14 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                   child: Text('Announcement'),
                                 ),
                                 DropdownMenuItem(
+                                  value: 'Reminders',
+                                  child: Text('Reminders'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'News Report',
+                                  child: Text('News Report'),
+                                ),
+                                DropdownMenuItem(
                                   value: 'Race Report',
                                   child: Text('Race Report'),
                                 ),

@@ -1781,71 +1781,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _contactHost() async {
-    final hostUserId =
-        widget.event.hostUserId ??
-        widget.event.createdBy ??
-        supabase.auth.currentUser?.id;
-    if (hostUserId == null || hostUserId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "No creator id found for this event. Please re-save the event.",
-          ),
-        ),
-      );
-      return;
-    }
-
-    final currentUserId = supabase.auth.currentUser?.id;
-    final isHost = currentUserId != null && currentUserId == hostUserId;
-
-    String chatPartnerName;
-    if (!isHost) {
-      chatPartnerName = widget.event.hostOrDirector.isNotEmpty
-          ? widget.event.hostOrDirector
-          : 'Host / Coach';
-    } else {
-      try {
-        final rows = await supabase
-            .from('event_host_messages')
-            .select('sender_id')
-            .eq('event_id', widget.event.id)
-            .neq('sender_id', hostUserId)
-            .order('created_at', ascending: false)
-            .limit(1);
-
-        if (rows.isNotEmpty && rows.first['sender_id'] != null) {
-          final partnerId = rows.first['sender_id'] as String;
-          final profile = await supabase
-              .from('user_profiles')
-              .select('full_name')
-              .eq('id', partnerId)
-              .maybeSingle();
-
-          chatPartnerName = (profile != null && profile['full_name'] != null)
-              ? profile['full_name'] as String
-              : 'Club Member';
-        } else {
-          chatPartnerName = 'Club Member';
-        }
-      } catch (_) {
-        chatPartnerName = 'Club Member';
-      }
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => HostChatSheet(
-        event: widget.event,
-        hostUserId: hostUserId,
-        hostDisplayName: chatPartnerName,
-        messageController: messageController,
-        loadMessages: getHostMessagesWithNames,
-        sendMessage: sendHostMessage,
-      ),
-    );
+    await openHostChatRoom();
   }
 
   Future<void> _submitComment() async {

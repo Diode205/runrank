@@ -7,7 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:runrank/chat/chat_list_page.dart';
+import 'package:runrank/chat/chat_room_page.dart';
 import 'package:runrank/models/club_event.dart';
+import 'package:runrank/services/chat_service.dart';
 import 'package:runrank/services/notification_service.dart';
 
 // Prevent repeated Supabase error spam if the comments table is absent.
@@ -620,6 +623,62 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       }
     }
     return map;
+  }
+
+  Future<void> openHostChatRoom() async {
+    final hostUserId =
+        event.hostUserId ?? event.createdBy ?? supabase.auth.currentUser?.id;
+    if (hostUserId == null || hostUserId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "No creator id found for this event. Please re-save the event.",
+          ),
+        ),
+      );
+      return;
+    }
+
+    final currentUserId = supabase.auth.currentUser?.id;
+    if (currentUserId != null && currentUserId == hostUserId) {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ChatListPage()));
+      return;
+    }
+
+    var hostName = event.hostOrDirector.trim();
+    if (hostName.isEmpty) {
+      try {
+        final profile = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', hostUserId)
+            .maybeSingle();
+        hostName = (profile?['full_name'] as String? ?? '').trim();
+      } catch (_) {
+        hostName = '';
+      }
+    }
+
+    final member = ChatMember(
+      id: hostUserId,
+      name: hostName.isNotEmpty ? hostName : 'Host / Coach',
+    );
+    final threadId = await ChatService.createDirectChat(member);
+    if (!mounted) return;
+
+    final eventTitle = (event.title ?? '').trim();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatRoomPage(
+          threadId: threadId,
+          title: eventTitle.isNotEmpty
+              ? '$eventTitle • ${member.name}'
+              : member.name,
+        ),
+      ),
+    );
   }
 
   Future<List<Map<String, dynamic>>> getHostMessagesWithNames(

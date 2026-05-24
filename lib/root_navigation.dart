@@ -5,7 +5,10 @@ import 'package:runrank/widgets/club_events_calendar.dart';
 import 'package:runrank/posts_feed_facebook.dart';
 import 'package:runrank/notifications_screen.dart';
 import 'package:runrank/menu_screen.dart';
+import 'package:runrank/chat/chat_list_page.dart';
+import 'package:runrank/services/chat_service.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 class RootNavigation extends StatefulWidget {
   const RootNavigation({super.key});
@@ -20,7 +23,9 @@ class _RootNavigationState extends State<RootNavigation>
   int _unread = 0;
   int _postActivityCount = 0;
   int _eventActivityCount = 0;
+  int _chatUnreadCount = 0;
   int _clubHubRefreshToken = 0;
+  Color _chatAccent = UserService.clubPrimaryColor(UserService.cachedClubName);
 
   // Track which tabs have been visited to load them lazily
   final List<bool> _activatedTabs = [true, false, false, false, false];
@@ -30,6 +35,7 @@ class _RootNavigationState extends State<RootNavigation>
   Timer? _unreadPollTimer;
   Timer? _eventPollTimer;
   Timer? _postPollTimer;
+  Timer? _chatPollTimer;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -50,6 +56,8 @@ class _RootNavigationState extends State<RootNavigation>
     _loadInitialUnreadCount();
     _loadInitialEventActivityCount();
     _loadInitialPostActivityCount();
+    _loadInitialChatUnreadCount();
+    _loadChatAccent();
 
     _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
       count,
@@ -94,6 +102,14 @@ class _RootNavigationState extends State<RootNavigation>
       }
     });
 
+    _chatPollTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      if (!mounted) return;
+      final count = await ChatService.unreadCount();
+      if (mounted) {
+        setState(() => _chatUnreadCount = count);
+      }
+    });
+
     // Watch for event activity (unseen events) to highlight Club Hub
     _eventActivitySubscription = NotificationService.watchEventActivityStream()
         .listen((count) {
@@ -107,6 +123,14 @@ class _RootNavigationState extends State<RootNavigation>
         });
   }
 
+  Future<void> _loadChatAccent() async {
+    final clubName = await UserService.currentClubName();
+    if (!mounted) return;
+    setState(() {
+      _chatAccent = UserService.clubPrimaryColor(clubName);
+    });
+  }
+
   @override
   void dispose() {
     _unreadSubscription?.cancel();
@@ -115,6 +139,7 @@ class _RootNavigationState extends State<RootNavigation>
     _eventActivitySubscription?.cancel();
     _eventPollTimer?.cancel();
     _postPollTimer?.cancel();
+    _chatPollTimer?.cancel();
     super.dispose();
   }
 
@@ -134,6 +159,18 @@ class _RootNavigationState extends State<RootNavigation>
       debugPrint('RootNavigation: initial unseenPostActivityCount=$count');
       setState(() => _postActivityCount = count);
     }
+  }
+
+  Future<void> _loadInitialChatUnreadCount() async {
+    final count = await ChatService.unreadCount();
+    if (mounted) setState(() => _chatUnreadCount = count);
+  }
+
+  Future<void> _openChat() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ChatListPage()));
+    _loadInitialChatUnreadCount();
   }
 
   void _onItemTapped(int index) {
@@ -156,22 +193,34 @@ class _RootNavigationState extends State<RootNavigation>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
+      body: Stack(
         children: [
-          _activatedTabs[0]
-              ? const ClubStandardsView()
-              : const SizedBox.shrink(),
-          _activatedTabs[1]
-              ? ClubEventsCalendar(refreshToken: _clubHubRefreshToken)
-              : const SizedBox.shrink(),
-          _activatedTabs[2]
-              ? const PostsFeedFacebookScreen()
-              : const SizedBox.shrink(),
-          _activatedTabs[3]
-              ? const NotificationsScreen()
-              : const SizedBox.shrink(),
-          _activatedTabs[4] ? const MenuScreen() : const SizedBox.shrink(),
+          IndexedStack(
+            index: _selectedIndex,
+            children: [
+              _activatedTabs[0]
+                  ? const ClubStandardsView()
+                  : const SizedBox.shrink(),
+              _activatedTabs[1]
+                  ? ClubEventsCalendar(refreshToken: _clubHubRefreshToken)
+                  : const SizedBox.shrink(),
+              _activatedTabs[2]
+                  ? const PostsFeedFacebookScreen()
+                  : const SizedBox.shrink(),
+              _activatedTabs[3]
+                  ? const NotificationsScreen()
+                  : const SizedBox.shrink(),
+              _activatedTabs[4] ? const MenuScreen() : const SizedBox.shrink(),
+            ],
+          ),
+          Positioned(
+            right: 18,
+            bottom: 20,
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 78),
+              child: _buildFloatingChatButton(),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -232,6 +281,71 @@ class _RootNavigationState extends State<RootNavigation>
     );
   }
 
+  Widget _buildFloatingChatButton() {
+    final color = _chatAccent;
+    final buttonColor = color.withValues(alpha: 0.78);
+    final foreground = UserService.readableOn(color);
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: _chatUnreadCount > 0
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.45),
+                          blurRadius: _glowAnimation.value + 8,
+                          spreadRadius: _glowAnimation.value * 0.35,
+                        ),
+                      ]
+                    : const [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: FloatingActionButton(
+                heroTag: 'global_chat_button',
+                mini: true,
+                backgroundColor: buttonColor,
+                foregroundColor: foreground,
+                onPressed: _openChat,
+                tooltip: 'Chat',
+                child: const Icon(Icons.chat_bubble_rounded),
+              ),
+            ),
+            if (_chatUnreadCount > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    _chatUnreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildBadgeIcon(IconData icon, int count, Color color) {
     return AnimatedBuilder(
       animation: _glowAnimation,
@@ -244,7 +358,7 @@ class _RootNavigationState extends State<RootNavigation>
                   ? BoxDecoration(
                       boxShadow: [
                         BoxShadow(
-                          color: color.withOpacity(0.4),
+                          color: color.withValues(alpha: 0.4),
                           blurRadius: _glowAnimation.value,
                           spreadRadius: _glowAnimation.value * 0.4,
                         ),

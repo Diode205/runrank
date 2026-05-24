@@ -342,7 +342,10 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       _nrrTrainingEventTypes.contains(_resolvedEventType);
 
   bool get _supportsWeeklyTrainingRepeat =>
-      _isNRRClub && selectedEventType == 'Training';
+      (_isNRRClub && selectedEventType == 'Training') ||
+      (_isNNBRClub &&
+          (selectedEventType == 'Training 1' ||
+              selectedEventType == 'Training 2'));
 
   bool get _usesHandicapDetails =>
       _resolvedEventType == 'Handicap Series' ||
@@ -452,6 +455,12 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       widget.initialVenue != null;
 
   TimeOfDay _defaultTimeForCurrentSelection() {
+    if (_isNNBRClub && selectedEventType == 'Training 1') {
+      return const TimeOfDay(hour: 17, minute: 30);
+    }
+    if (_isNNBRClub && selectedEventType == 'Training 2') {
+      return const TimeOfDay(hour: 18, minute: 30);
+    }
     return selectedEventType.startsWith('Training')
         ? const TimeOfDay(hour: 18, minute: 30)
         : const TimeOfDay(hour: 14, minute: 30);
@@ -613,6 +622,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
             );
           }
           selectedEventType = adminTypes.first;
+          if (widget.initialTime == null) {
+            selectedTime = _defaultTimeForCurrentSelection();
+          }
         }
 
         _hosts = rows

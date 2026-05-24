@@ -94,4 +94,19 @@ class UserService {
     // Default NNBR-style yellow/blue
     return const [Color(0x4DFFD300), Color(0x4D0057B7)];
   }
+
+  static Color clubPrimaryColor(String? clubName) {
+    final lower = clubName?.toLowerCase() ?? '';
+    if (lower.contains('norwich road runners')) {
+      return const Color(0xFFD32F2F);
+    }
+    if (lower.isEmpty) {
+      return const Color(0xFF6B7280);
+    }
+    return const Color(0xFFFFD300);
+  }
+
+  static Color readableOn(Color color) {
+    return color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+  }
 }
