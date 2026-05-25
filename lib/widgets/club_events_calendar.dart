@@ -443,6 +443,7 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
   @override
   Widget build(BuildContext context) {
     final brandColors = UserService.clubBrandGradient(_clubName);
+    final addButtonColor = UserService.clubPrimaryColor(_clubName);
 
     return Scaffold(
       appBar: AppBar(
@@ -780,8 +781,8 @@ class _ClubEventsCalendarState extends State<ClubEventsCalendar> {
             ),
 
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFFFD700),
-        foregroundColor: Colors.black,
+        backgroundColor: addButtonColor,
+        foregroundColor: UserService.readableOn(addButtonColor),
         child: const Icon(Icons.add),
         onPressed: () async {
           // ADMIN → full event creation

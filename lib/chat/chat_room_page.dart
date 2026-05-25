@@ -8,8 +8,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ChatRoomPage extends StatefulWidget {
   final String threadId;
   final String title;
+  final String? subtitle;
 
-  const ChatRoomPage({super.key, required this.threadId, required this.title});
+  const ChatRoomPage({
+    super.key,
+    required this.threadId,
+    required this.title,
+    this.subtitle,
+  });
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -154,14 +160,33 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             _ChatAvatar(member: headerMember, accent: _accent, size: 34),
             const SizedBox(width: 10),
             Flexible(
-              child: Text(
-                widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (widget.subtitle?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.subtitle!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -478,6 +503,16 @@ class _ChatMembersSheetState extends State<_ChatMembersSheet> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _members.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchCtrl.text.trim().isEmpty
+                            ? 'Type a name to search members'
+                            : 'No members found',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: _members.length,
                       itemBuilder: (context, index) {

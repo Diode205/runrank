@@ -66,7 +66,11 @@ class _ChatListPageState extends State<ChatListPage> {
   Future<void> _openThread(ChatThread thread) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ChatRoomPage(threadId: thread.id, title: thread.title),
+        builder: (_) => ChatRoomPage(
+          threadId: thread.id,
+          title: thread.title,
+          subtitle: thread.subtitle,
+        ),
       ),
     );
     _loadThreads();
@@ -278,6 +282,19 @@ class _ChatThreadTile extends StatelessWidget {
                       fontSize: 16,
                     ),
                   ),
+                  if (thread.subtitle?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      thread.subtitle!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 5),
                   Row(
                     children: [
@@ -489,14 +506,8 @@ class _NewChatSheetState extends State<_NewChatSheet> {
   final Set<String> _selectedIds = {};
   final Map<String, ChatMember> _selectedMembers = {};
   bool _groupMode = false;
-  bool _loading = true;
+  bool _loading = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMembers();
-  }
 
   @override
   void dispose() {
@@ -607,6 +618,16 @@ class _NewChatSheetState extends State<_NewChatSheet> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _members.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchCtrl.text.trim().isEmpty
+                            ? 'Type a name to search members'
+                            : 'No members found',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: _members.length,
                       itemBuilder: (context, index) {

@@ -58,8 +58,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   List<Map<String, dynamic>> _searchResults = [];
   bool _searching = false;
   bool _committeeLoaded = false;
+  bool _committeeEditMode = false;
   ClubConfig? _clubConfig;
-  int _deletionRequestCount = 0;
+  final Map<String, List<String>> _committeeMailNotificationIdsByRole = {};
 
   final List<Map<String, dynamic>> _committee = [];
 
@@ -100,7 +101,7 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     super.initState();
     _loadAdmin();
     _loadClubConfig();
-    _loadDeletionRequestCount();
+    _loadCommitteeMailNotifications();
   }
 
   @override
@@ -211,24 +212,75 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     }
   }
 
-  Future<void> _loadDeletionRequestCount() async {
+  String _roleKey(String? role) {
+    return (role ?? '').trim().toLowerCase();
+  }
+
+  Future<void> _loadCommitteeMailNotifications() async {
     final currentUser = _supabase.auth.currentUser;
     if (currentUser == null) return;
 
     try {
-      final data = await _supabase
+      final rows = await _supabase
           .from('notifications')
-          .select('id, body, is_read')
+          .select('id, body')
           .eq('user_id', currentUser.id)
           .eq('is_read', false)
+          .eq('title', 'Committee email opened')
           .ilike('body', '%[route:club_committee]%');
+
+      final idsByRole = <String, List<String>>{};
+      for (final row in rows as List) {
+        final map = row as Map;
+        final id = map['id']?.toString();
+        final body = map['body']?.toString() ?? '';
+        if (id == null || id.isEmpty) continue;
+
+        final match = RegExp(
+          r'role as ([^.]+)\.',
+          caseSensitive: false,
+        ).firstMatch(body);
+        final role = _roleKey(match?.group(1));
+        if (role.isEmpty) continue;
+        idsByRole.putIfAbsent(role, () => <String>[]).add(id);
+      }
 
       if (!mounted) return;
       setState(() {
-        _deletionRequestCount = (data as List).length;
+        _committeeMailNotificationIdsByRole
+          ..clear()
+          ..addAll(idsByRole);
       });
     } catch (e) {
-      debugPrint('Error loading deletion request count: $e');
+      debugPrint('Error loading committee mail notifications: $e');
+    }
+  }
+
+  Future<void> _openMailAppForRole(String role) async {
+    final ids = _committeeMailNotificationIdsByRole[_roleKey(role)] ?? const [];
+    if (ids.isNotEmpty) {
+      try {
+        await _supabase
+            .from('notifications')
+            .update({'is_read': true})
+            .inFilter('id', ids);
+        await NotificationService.refreshUnreadCount();
+      } catch (e) {
+        debugPrint('Error marking committee mail notifications read: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _committeeMailNotificationIdsByRole.remove(_roleKey(role));
+        });
+      }
+    }
+
+    final mailUri = Uri(scheme: 'mailto');
+    if (!await launchUrl(mailUri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No email app available')));
     }
   }
 
@@ -2088,11 +2140,30 @@ This code can be used once and will expire in 7 days.
     final userId = rawUserId?.toString().trim();
     if (userId != null && userId.isNotEmpty) {
       try {
+        String senderName = 'A club member';
+        String senderEmail = '';
+        final currentUser = _supabase.auth.currentUser;
+        if (currentUser != null) {
+          final profile = await _supabase
+              .from('user_profiles')
+              .select('full_name, email')
+              .eq('id', currentUser.id)
+              .maybeSingle();
+          final profileName = profile?['full_name']?.toString().trim();
+          final profileEmail = profile?['email']?.toString().trim();
+          if (profileName != null && profileName.isNotEmpty) {
+            senderName = profileName;
+          }
+          if (profileEmail != null && profileEmail.isNotEmpty) {
+            senderEmail = ' ($profileEmail)';
+          }
+        }
+
         await NotificationService.notifyUser(
           userId: userId,
           title: 'Committee email opened',
           body:
-              'A club member has opened an email draft to you for your role as $role.',
+              '$senderName$senderEmail has opened an email draft to you for your role as $role.',
           route: 'club_committee',
         );
       } catch (e) {
@@ -2108,6 +2179,7 @@ This code can be used once and will expire in 7 days.
     final colorScheme = Theme.of(context).colorScheme;
     final primary = _brandPrimary(colorScheme);
     final accent = _brandAccent(colorScheme);
+    final currentUserId = _supabase.auth.currentUser?.id;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -2226,56 +2298,20 @@ This code can be used once and will expire in 7 days.
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          tooltip: 'Acknowledgement email',
-                          onPressed: () {
-                            // Reset the local counter when the icon is tapped
-                            setState(() {
-                              _deletionRequestCount = 0;
-                            });
-
-                            // Open the device email app with a generic
-                            // acknowledgement template that admins can use
-                            // when replying to member enquiries.
-                            _launchEmail(
-                              subject: 'RunRank club enquiry – acknowledgement',
-                              body:
-                                  'Thank you for your email. We will endeavour to resolve your query as soon as possible.\n\nYour Admin Team',
-                            );
+                          tooltip: _committeeEditMode
+                              ? 'Hide role edit buttons'
+                              : 'Long press to edit committee roles',
+                          onLongPress: () {
+                            setState(() => _committeeEditMode = true);
                           },
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                Icons.email_outlined,
-                                color: _deletionRequestCount > 0
-                                    ? Colors.amberAccent
-                                    : primary,
-                              ),
-                              if (_deletionRequestCount > 0)
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 16,
-                                      minHeight: 16,
-                                    ),
-                                    child: Text(
-                                      '$_deletionRequestCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          onPressed: _committeeEditMode
+                              ? () => setState(() => _committeeEditMode = false)
+                              : () {},
+                          icon: Icon(
+                            Icons.edit,
+                            color: _committeeEditMode
+                                ? Colors.white
+                                : primary.withValues(alpha: 0.92),
                           ),
                         ),
                         IconButton(
@@ -2300,11 +2336,33 @@ This code can be used once and will expire in 7 days.
                     itemCount: _committee.length,
                     itemBuilder: (context, index) {
                       final member = _committee[index];
+                      final role = (member['role'] ?? '').toString();
                       final hasEmail = (member['email'] ?? '').isNotEmpty;
                       final avatarUrl = member['avatarUrl'] ?? '';
+                      final width = MediaQuery.sizeOf(context).width;
+                      final isCompact = width < 390;
+                      final avatarSize = isCompact ? 42.0 : 48.0;
+                      final avatarRadius = avatarSize / 2;
+                      final horizontalPadding = isCompact ? 12.0 : 16.0;
+                      final textGap = isCompact ? 12.0 : 16.0;
+                      final actionTapSize = isCompact ? 32.0 : 34.0;
+                      final actionIconSize = isCompact ? 19.0 : 21.0;
+                      final rightReserve =
+                          actionTapSize + (isCompact ? 16.0 : 20.0);
+                      final isRoleHolder =
+                          currentUserId != null &&
+                          currentUserId == member['userId']?.toString();
+                      final incomingMailCount =
+                          _committeeMailNotificationIdsByRole[_roleKey(role)]
+                              ?.length ??
+                          0;
+                      final hasIncomingMail =
+                          isRoleHolder && incomingMailCount > 0;
+                      final showContactEmail = hasEmail && !isRoleHolder;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
+                        height: 84,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           gradient: LinearGradient(
@@ -2323,12 +2381,15 @@ This code can be used once and will expire in 7 days.
                         child: Stack(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding,
+                                vertical: 12,
+                              ),
                               child: Row(
                                 children: [
                                   if (avatarUrl.isNotEmpty)
                                     CircleAvatar(
-                                      radius: 24,
+                                      radius: avatarRadius,
                                       backgroundColor: primary.withOpacity(
                                         0.25,
                                       ),
@@ -2336,8 +2397,8 @@ This code can be used once and will expire in 7 days.
                                     )
                                   else
                                     Container(
-                                      width: 48,
-                                      height: 48,
+                                      width: avatarSize,
+                                      height: avatarSize,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         gradient: LinearGradient(
@@ -2347,17 +2408,21 @@ This code can be used once and will expire in 7 days.
                                       child: const Icon(
                                         Icons.person,
                                         color: Colors.white,
-                                        size: 24,
+                                        size: 22,
                                       ),
                                     ),
-                                  const SizedBox(width: 16),
+                                  SizedBox(width: textGap),
                                   Expanded(
                                     child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          member['role'] ?? '',
+                                          role,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: accent,
                                             fontSize: 12,
@@ -2365,88 +2430,137 @@ This code can be used once and will expire in 7 days.
                                             letterSpacing: 0.5,
                                           ),
                                         ),
-                                        const SizedBox(height: 6),
+                                        const SizedBox(height: 4),
                                         Text(
                                           member['name'] ?? '',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
-                                        if (hasEmail)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 6,
-                                            ),
-                                            child: Text(
-                                              member['email'] ?? '',
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(width: rightReserve),
+                                ],
+                              ),
+                            ),
+                            // Edit stays top-right; mail actions sit lower-right.
+                            if (_isAdmin && _committeeEditMode)
+                              Positioned(
+                                top: 7,
+                                right: 9,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _editMember(index),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: actionTapSize,
+                                      height: actionTapSize,
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        Icons.edit,
+                                        color: primary,
+                                        size: actionIconSize,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (isRoleHolder)
+                              Positioned(
+                                bottom: 7,
+                                right: 9,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: hasIncomingMail
+                                        ? () => _openMailAppForRole(role)
+                                        : null,
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Container(
+                                          width: actionTapSize,
+                                          height: actionTapSize,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: hasIncomingMail
+                                                ? [
+                                                    BoxShadow(
+                                                      color: Colors.greenAccent
+                                                          .withValues(
+                                                            alpha: 0.45,
+                                                          ),
+                                                      blurRadius: 14,
+                                                      spreadRadius: 1,
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          child: Icon(
+                                            Icons.mark_email_unread_outlined,
+                                            color: hasIncomingMail
+                                                ? Colors.greenAccent
+                                                : Colors.white54,
+                                            size: actionIconSize,
+                                          ),
+                                        ),
+                                        if (hasIncomingMail)
+                                          Positioned(
+                                            right: -2,
+                                            top: -2,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(3),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 17,
+                                                minHeight: 17,
+                                              ),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.redAccent,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Text(
+                                                incomingMailCount > 9
+                                                    ? '9+'
+                                                    : '$incomingMailCount',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
                                           ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(
-                                    width: 40,
-                                  ), // Space for buttons
-                                ],
-                              ),
-                            ),
-                            // Edit button (top right corner)
-                            if (_isAdmin)
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _editMember(index),
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: primary.withOpacity(0.18),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: primary.withOpacity(0.45),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.edit,
-                                        color: primary,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
                                 ),
                               ),
-                            // Mail button (bottom right corner)
-                            if (hasEmail)
+                            if (showContactEmail)
                               Positioned(
-                                bottom: 8,
-                                right: 8,
+                                bottom: 7,
+                                right: 9,
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () => _showContactForm(index),
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(12),
                                     child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: accent.withOpacity(0.18),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: accent.withOpacity(0.45),
-                                        ),
-                                      ),
+                                      width: actionTapSize,
+                                      height: actionTapSize,
+                                      alignment: Alignment.center,
                                       child: Icon(
                                         Icons.email_outlined,
                                         color: accent,
-                                        size: 16,
+                                        size: actionIconSize,
                                       ),
                                     ),
                                   ),

@@ -665,17 +665,20 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
       id: hostUserId,
       name: hostName.isNotEmpty ? hostName : 'Host / Coach',
     );
-    final threadId = await ChatService.createDirectChat(member);
+    final eventTitle = (event.title ?? '').trim();
+    final threadId = await ChatService.createDirectChat(
+      member,
+      contextTitle: eventTitle,
+      contextDate: event.dateTime,
+    );
     if (!mounted) return;
 
-    final eventTitle = (event.title ?? '').trim();
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChatRoomPage(
           threadId: threadId,
-          title: eventTitle.isNotEmpty
-              ? '$eventTitle • ${member.name}'
-              : member.name,
+          title: member.name,
+          subtitle: ChatService.formatThreadContext(eventTitle, event.dateTime),
         ),
       ),
     );

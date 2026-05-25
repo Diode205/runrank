@@ -37,6 +37,110 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       ? const [Color(0xFF8E1D24), Color(0xFF200608)]
       : const [Color(0xFF0057B7), Color(0xFFFFD300)];
 
+  bool _isClubSecretaryRole(String role) {
+    final lower = role.trim().toLowerCase();
+    if (!lower.contains('secretary')) return false;
+    return !lower.contains('membership') &&
+        !lower.contains('minutes') &&
+        !lower.contains('kit');
+  }
+
+  bool _isSameClub(String? left, String? right) {
+    final a = NotificationService.canonicalClubName(left).trim().toLowerCase();
+    final b = NotificationService.canonicalClubName(right).trim().toLowerCase();
+    if (a.isEmpty || b.isEmpty) return false;
+    if (a == b) return true;
+    final compactA = _compactForMatch(a);
+    final compactB = _compactForMatch(b);
+    if (compactA == compactB) return true;
+    return (compactA.contains('nrr') &&
+            compactB.contains('norwichroadrunners')) ||
+        (compactB.contains('nrr') && compactA.contains('norwichroadrunners')) ||
+        (compactA.contains('nnbr') &&
+            compactB.contains('northnorfolkbeachrunners')) ||
+        (compactB.contains('nnbr') &&
+            compactA.contains('northnorfolkbeachrunners'));
+  }
+
+  String _compactForMatch(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _nameLooksLike(String? profileName, String? committeeName) {
+    final profile = _compactForMatch(profileName ?? '');
+    final committee = _compactForMatch(committeeName ?? '');
+    if (profile.isEmpty || committee.isEmpty) return false;
+    if (profile == committee) return true;
+    if (profile.contains(committee) || committee.contains(profile)) {
+      return true;
+    }
+
+    final profileParts = (profileName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    final committeeParts = (committeeName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    if (profileParts.isEmpty || committeeParts.isEmpty) return false;
+    return committeeParts.difference(profileParts).isEmpty;
+  }
+
+  Future<String?> _resolveSecretaryUserId({
+    required SupabaseClient client,
+    required Map<String, dynamic>? secretaryRow,
+    required String clubName,
+  }) async {
+    final directUserId = secretaryRow?['user_id']?.toString().trim();
+    if (directUserId != null && directUserId.isNotEmpty) {
+      return directUserId;
+    }
+
+    final email = secretaryRow?['email']?.toString().trim();
+    final name = secretaryRow?['name']?.toString().trim();
+    if ((email == null || email.isEmpty) && (name == null || name.isEmpty)) {
+      return null;
+    }
+
+    try {
+      final rows = await client
+          .from('user_profiles')
+          .select('id, full_name, email, club')
+          .not('club', 'is', null);
+      final profiles = [
+        for (final row in rows) Map<String, dynamic>.from(row as Map),
+      ];
+      final sameClubProfiles = profiles
+          .where((row) => _isSameClub(row['club'] as String?, clubName))
+          .toList();
+      final candidates = sameClubProfiles.isNotEmpty
+          ? sameClubProfiles
+          : profiles;
+
+      for (final map in candidates) {
+        final rowEmail = map['email']?.toString().trim().toLowerCase();
+        if (email != null &&
+            email.isNotEmpty &&
+            rowEmail == email.toLowerCase()) {
+          return map['id']?.toString().trim();
+        }
+      }
+
+      for (final map in sameClubProfiles) {
+        if (_nameLooksLike(map['full_name']?.toString(), name)) {
+          return map['id']?.toString().trim();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resolving secretary user id: $e');
+    }
+
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -175,16 +279,19 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       try {
         final committeeRows = await client
             .from('committee_roles')
-            .select('role, name, email, user_id')
-            .eq('club', clubName);
+            .select('role, name, email, user_id, club, display_order')
+            .not('club', 'is', null)
+            .order('display_order', ascending: true);
 
         for (final row in committeeRows) {
+          if (!_isSameClub(row['club'] as String?, clubName)) continue;
           final roleRaw = (row['role'] as String?) ?? '';
-          final roleLower = roleRaw.toLowerCase();
-
-          if (roleLower.contains('secretary') &&
-              !roleLower.contains('membership')) {
+          if (_isClubSecretaryRole(roleRaw)) {
             secretaryRow ??= row;
+            if (roleRaw.trim().toLowerCase() == 'club secretary') {
+              secretaryRow = row;
+              break;
+            }
           }
         }
       } catch (e) {
@@ -200,16 +307,24 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           'Please process this deletion within seven (7) days of the request date in line with club policy. '
           'After this 7-day window there is no additional grace period and the member will no longer be able to log in.';
 
-      final secretaryUserId = secretaryRow?['user_id']?.toString().trim();
-      if (secretaryUserId == null ||
-          secretaryUserId.isEmpty ||
-          secretaryUserId == user.id) {
+      final secretaryUserId = await _resolveSecretaryUserId(
+        client: client,
+        secretaryRow: secretaryRow,
+        clubName: clubName,
+      );
+      if (secretaryUserId == null || secretaryUserId.isEmpty) {
+        await NotificationService.notifyClubAdminsInClub(
+          clubName: clubName,
+          title: 'Account deletion requested',
+          body:
+              '$notificationBody Club Secretary role details exist, but the app could not link that row to a member profile, so this has been sent to club admins for action.',
+          route: 'club_committee',
+          excludeUserId: user.id,
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'No Club Secretary user is configured yet to receive deletion requests.',
-            ),
+            content: Text('Your request has been sent to club admins.'),
           ),
         );
         return;

@@ -36,6 +36,9 @@ class ChatMessage {
 class ChatThread {
   final String id;
   final String title;
+  final String? subtitle;
+  final String? contextTitle;
+  final DateTime? contextDate;
   final bool isGroup;
   final String? createdBy;
   final DateTime updatedAt;
@@ -47,6 +50,9 @@ class ChatThread {
   const ChatThread({
     required this.id,
     required this.title,
+    required this.subtitle,
+    required this.contextTitle,
+    required this.contextDate,
     required this.isGroup,
     required this.createdBy,
     required this.updatedAt,
@@ -114,22 +120,16 @@ class ChatService {
     if (user == null || club == null || club.isEmpty) return const [];
 
     final trimmed = query.trim();
-    final rows = trimmed.isEmpty
-        ? await _supabase
-              .from('user_profiles')
-              .select('id, full_name, avatar_url')
-              .eq('club', club)
-              .neq('id', user.id)
-              .order('full_name')
-              .limit(40)
-        : await _supabase
-              .from('user_profiles')
-              .select('id, full_name, avatar_url')
-              .eq('club', club)
-              .neq('id', user.id)
-              .ilike('full_name', '%$trimmed%')
-              .order('full_name')
-              .limit(40);
+    if (trimmed.isEmpty) return const [];
+
+    final rows = await _supabase
+        .from('user_profiles')
+        .select('id, full_name, avatar_url')
+        .eq('club', club)
+        .neq('id', user.id)
+        .ilike('full_name', '%$trimmed%')
+        .order('full_name')
+        .limit(40);
     return [
       for (final row in rows as List)
         ChatMember(
@@ -170,7 +170,9 @@ class ChatService {
 
     final threadRows = await _supabase
         .from('chat_threads')
-        .select('id, title, is_group, created_by, updated_at')
+        .select(
+          'id, title, context_title, context_date, is_group, created_by, updated_at',
+        )
         .inFilter('id', threadIds)
         .order('updated_at', ascending: false);
 
@@ -244,16 +246,22 @@ class ChatService {
         ChatMember(id: id, name: names[id] ?? 'Member', avatarUrl: avatars[id]),
     ];
     final explicitTitle = (row['title'] as String?)?.trim();
+    final contextTitle = (row['context_title'] as String?)?.trim();
+    final contextDate = _date(row['context_date']);
     final title = isGroup
         ? (explicitTitle?.isNotEmpty == true ? explicitTitle! : 'Group chat')
         : participants
               .where((p) => p.id != currentUserId)
               .map((p) => p.name)
               .join(', ');
+    final contextSubtitle = _contextSubtitle(contextTitle, contextDate);
 
     return ChatThread(
       id: row['id'] as String,
       title: title.isEmpty ? 'Chat' : title,
+      subtitle: contextSubtitle,
+      contextTitle: contextTitle?.isNotEmpty == true ? contextTitle : null,
+      contextDate: contextDate,
       isGroup: isGroup,
       createdBy: row['created_by'] as String?,
       updatedAt: _date(row['updated_at']) ?? DateTime.now(),
@@ -264,7 +272,42 @@ class ChatService {
     );
   }
 
-  static Future<String> createDirectChat(ChatMember member) async {
+  static String? _contextSubtitle(String? title, DateTime? date) {
+    final cleanTitle = title?.trim();
+    final hasTitle = cleanTitle != null && cleanTitle.isNotEmpty;
+    if (!hasTitle && date == null) return null;
+    if (date == null) return cleanTitle;
+    final dateText = '${date.day} ${_monthName(date.month)} ${date.year}';
+    return hasTitle ? '$cleanTitle • $dateText' : dateText;
+  }
+
+  static String? formatThreadContext(String? title, DateTime? date) {
+    return _contextSubtitle(title, date);
+  }
+
+  static String _monthName(int month) {
+    const names = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return names[(month - 1).clamp(0, 11)];
+  }
+
+  static Future<String> createDirectChat(
+    ChatMember member, {
+    String? contextTitle,
+    DateTime? contextDate,
+  }) async {
     final user = _supabase.auth.currentUser;
     final club = await _currentClubKey();
     if (user == null || club == null || club.isEmpty) {
@@ -275,10 +318,22 @@ class ChatService {
       ...await listThreads(),
       ...await listThreads(archived: true),
     ];
+    final cleanContextTitle = contextTitle?.trim();
+    final contextDateOnly = contextDate == null
+        ? null
+        : DateTime(contextDate.year, contextDate.month, contextDate.day);
     for (final thread in threads) {
+      final sameContextTitle =
+          (thread.contextTitle ?? '') == (cleanContextTitle ?? '');
+      final sameContextDate =
+          thread.contextDate?.year == contextDateOnly?.year &&
+          thread.contextDate?.month == contextDateOnly?.month &&
+          thread.contextDate?.day == contextDateOnly?.day;
       if (!thread.isGroup &&
           thread.participants.any((p) => p.id == member.id) &&
-          thread.participants.any((p) => p.id == user.id)) {
+          thread.participants.any((p) => p.id == user.id) &&
+          sameContextTitle &&
+          sameContextDate) {
         await unarchiveThread(thread.id);
         return thread.id;
       }
@@ -286,7 +341,15 @@ class ChatService {
 
     final thread = await _supabase
         .from('chat_threads')
-        .insert({'club': club, 'is_group': false, 'created_by': user.id})
+        .insert({
+          'club': club,
+          'is_group': false,
+          'created_by': user.id,
+          if (cleanContextTitle != null && cleanContextTitle.isNotEmpty)
+            'context_title': cleanContextTitle,
+          if (contextDateOnly != null)
+            'context_date': contextDateOnly.toIso8601String().split('T').first,
+        })
         .select('id')
         .single();
     final threadId = thread['id'] as String;
