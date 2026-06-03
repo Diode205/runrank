@@ -765,7 +765,15 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     Map<String, int>? supportRoleCounts,
   }) {
     return InkWell(
-      onTap: count > 0 ? onTap : null,
+      onTap: count > 0 && onTap != null
+          ? () {
+              if (!canViewEventResponseLists) {
+                showResponseListRestrictedMessage();
+                return;
+              }
+              onTap();
+            }
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -834,7 +842,15 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
   Widget _supportCounterChip(String role, String icon, int count) {
     return InkWell(
-      onTap: count > 0 ? () => _showSupportersByRole(role) : null,
+      onTap: count > 0
+          ? () {
+              if (!canViewEventResponseLists) {
+                showResponseListRestrictedMessage();
+                return;
+              }
+              _showSupportersByRole(role);
+            }
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         decoration: BoxDecoration(
@@ -1072,6 +1088,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _showSupportersByRole(String role) async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     // Filter from in-memory responses to include anyone who selected this role.
     final filtered = <Map<String, dynamic>>[];
     for (final e in supporters) {
@@ -1262,6 +1283,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _showRelayRunningList() async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     // Build in-memory view of runners with names, stages, and pace.
     final ids = runners
         .map((e) => e["user_id"] as String?)
@@ -1439,6 +1465,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _showMarshalList() async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     final ids = volunteers
         .map((e) => e["user_id"] as String?)
         .whereType<String>()
@@ -1525,6 +1556,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _showSupportList() async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     final ids = supporters
         .map((e) => e["user_id"] as String?)
         .whereType<String>()

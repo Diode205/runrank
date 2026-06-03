@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AttendeeListPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class AttendeeListPage extends StatefulWidget {
 
 class _AttendeeListPageState extends State<AttendeeListPage> {
   bool _loading = true;
+  bool _canView = false;
   List<Map<String, dynamic>> _attendees = [];
 
   @override
@@ -32,15 +34,48 @@ class _AttendeeListPageState extends State<AttendeeListPage> {
 
   Future<void> _loadAttendees() async {
     setState(() => _loading = true);
+    final canView = await _canCurrentUserViewList();
+    if (!canView) {
+      if (!mounted) return;
+      setState(() {
+        _canView = false;
+        _attendees = [];
+        _loading = false;
+      });
+      return;
+    }
+
     final attendees = await getRespondersWithNames(
       eventId: widget.eventId,
       responseType: widget.responseType,
     );
     if (!mounted) return;
     setState(() {
+      _canView = true;
       _attendees = attendees;
       _loading = false;
     });
+  }
+
+  Future<bool> _canCurrentUserViewList() async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    try {
+      final event = await supabase
+          .from('club_events')
+          .select('created_by, host_user_id')
+          .eq('id', widget.eventId)
+          .maybeSingle();
+      if (event?['created_by'] == userId || event?['host_user_id'] == userId) {
+        return true;
+      }
+      return await UserService.isAdmin();
+    } catch (e) {
+      debugPrint('Error checking attendee list permissions: $e');
+      return false;
+    }
   }
 
   String _formatExpectedTimeSeconds(int seconds) {
@@ -61,6 +96,17 @@ class _AttendeeListPageState extends State<AttendeeListPage> {
       appBar: AppBar(title: Text(widget.title)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : !_canView
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Response lists are visible only to admins and this event host.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.black54),
+                ),
+              ),
+            )
           : _attendees.isEmpty
           ? const Center(
               child: Text(
@@ -138,7 +184,7 @@ Future<List<Map<String, dynamic>>> getRespondersWithNames({
         },
     ];
   } catch (e) {
-    print('❌ Error fetching responders with names: $e');
+    debugPrint('Error fetching responders with names: $e');
     return [];
   }
 }

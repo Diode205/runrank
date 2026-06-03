@@ -12,6 +12,7 @@ import 'package:runrank/chat/chat_room_page.dart';
 import 'package:runrank/models/club_event.dart';
 import 'package:runrank/services/chat_service.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:runrank/services/user_service.dart';
 
 // Prevent repeated Supabase error spam if the comments table is absent.
 bool _baseCommentsTableMissing = false;
@@ -53,6 +54,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
 
   // Viewer club name (NNBR, NRR, etc.) for per-club UI tweaks.
   String? viewerClubName;
+  bool canViewEventResponseLists = false;
 
   ClubEvent get event;
 
@@ -106,6 +108,8 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
   Future<void> loadResponses() async {
     loading = true;
     if (mounted) setState(() {});
+
+    canViewEventResponseLists = await _canCurrentUserViewEventResponseLists();
 
     // Only count members from the viewer's club so
     // the "Unanswered" tally is per-club, not global.
@@ -225,6 +229,33 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     loading = false;
     if (!mounted) return;
     setState(() {});
+  }
+
+  Future<bool> _canCurrentUserViewEventResponseLists() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    if (event.createdBy == userId || event.hostUserId == userId) {
+      return true;
+    }
+
+    try {
+      return await UserService.isAdmin();
+    } catch (e) {
+      debugPrint('EventDetailsBase: error checking admin visibility: $e');
+      return false;
+    }
+  }
+
+  void showResponseListRestrictedMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Response lists are visible only to admins and this event host.',
+        ),
+      ),
+    );
   }
 
   Future<void> loadComments({bool showLoading = true}) async {

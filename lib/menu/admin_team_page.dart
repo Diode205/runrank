@@ -2,8 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/club_config_service.dart';
+import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -60,7 +60,6 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
   bool _committeeLoaded = false;
   bool _committeeEditMode = false;
   ClubConfig? _clubConfig;
-  final Map<String, List<String>> _committeeMailNotificationIdsByRole = {};
 
   final List<Map<String, dynamic>> _committee = [];
 
@@ -101,7 +100,6 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     super.initState();
     _loadAdmin();
     _loadClubConfig();
-    _loadCommitteeMailNotifications();
   }
 
   @override
@@ -209,78 +207,6 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
         _adminClub = null;
         _committeeLoaded = true;
       });
-    }
-  }
-
-  String _roleKey(String? role) {
-    return (role ?? '').trim().toLowerCase();
-  }
-
-  Future<void> _loadCommitteeMailNotifications() async {
-    final currentUser = _supabase.auth.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      final rows = await _supabase
-          .from('notifications')
-          .select('id, body')
-          .eq('user_id', currentUser.id)
-          .eq('is_read', false)
-          .eq('title', 'Committee email opened')
-          .ilike('body', '%[route:club_committee]%');
-
-      final idsByRole = <String, List<String>>{};
-      for (final row in rows as List) {
-        final map = row as Map;
-        final id = map['id']?.toString();
-        final body = map['body']?.toString() ?? '';
-        if (id == null || id.isEmpty) continue;
-
-        final match = RegExp(
-          r'role as ([^.]+)\.',
-          caseSensitive: false,
-        ).firstMatch(body);
-        final role = _roleKey(match?.group(1));
-        if (role.isEmpty) continue;
-        idsByRole.putIfAbsent(role, () => <String>[]).add(id);
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _committeeMailNotificationIdsByRole
-          ..clear()
-          ..addAll(idsByRole);
-      });
-    } catch (e) {
-      debugPrint('Error loading committee mail notifications: $e');
-    }
-  }
-
-  Future<void> _openMailAppForRole(String role) async {
-    final ids = _committeeMailNotificationIdsByRole[_roleKey(role)] ?? const [];
-    if (ids.isNotEmpty) {
-      try {
-        await _supabase
-            .from('notifications')
-            .update({'is_read': true})
-            .inFilter('id', ids);
-        await NotificationService.refreshUnreadCount();
-      } catch (e) {
-        debugPrint('Error marking committee mail notifications read: $e');
-      }
-      if (mounted) {
-        setState(() {
-          _committeeMailNotificationIdsByRole.remove(_roleKey(role));
-        });
-      }
-    }
-
-    final mailUri = Uri(scheme: 'mailto');
-    if (!await launchUrl(mailUri, mode: LaunchMode.externalApplication) &&
-        mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No email app available')));
     }
   }
 
@@ -1052,6 +978,14 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
     String? errorText;
 
     String _initials(String name) {
+      final lower = name.toLowerCase();
+      if (lower.contains('north norfolk beach runners') ||
+          lower.contains('nnbr')) {
+        return 'NNBR';
+      }
+      if (lower.contains('norwich road runners') || lower.contains('nrr')) {
+        return 'NRR';
+      }
       final buffer = StringBuffer();
       for (final raw in name.split(' ')) {
         final letters = raw.replaceAll(RegExp(r'[^A-Za-z]'), '').trim();
@@ -2133,44 +2067,6 @@ This code can be used once and will expire in 7 days.
         : 'RunRank club committee enquiry';
     final bodyHeader = name.isNotEmpty ? 'Dear $name,' : 'Dear club official,';
 
-    // Create a notification for the specific admin role holder
-    // so their committee email icon can glow when there are
-    // unread contact requests.
-    final rawUserId = member['userId'];
-    final userId = rawUserId?.toString().trim();
-    if (userId != null && userId.isNotEmpty) {
-      try {
-        String senderName = 'A club member';
-        String senderEmail = '';
-        final currentUser = _supabase.auth.currentUser;
-        if (currentUser != null) {
-          final profile = await _supabase
-              .from('user_profiles')
-              .select('full_name, email')
-              .eq('id', currentUser.id)
-              .maybeSingle();
-          final profileName = profile?['full_name']?.toString().trim();
-          final profileEmail = profile?['email']?.toString().trim();
-          if (profileName != null && profileName.isNotEmpty) {
-            senderName = profileName;
-          }
-          if (profileEmail != null && profileEmail.isNotEmpty) {
-            senderEmail = ' ($profileEmail)';
-          }
-        }
-
-        await NotificationService.notifyUser(
-          userId: userId,
-          title: 'Committee email opened',
-          body:
-              '$senderName$senderEmail has opened an email draft to you for your role as $role.',
-          route: 'club_committee',
-        );
-      } catch (e) {
-        debugPrint('Error creating committee email notification: $e');
-      }
-    }
-
     await _launchEmail(to: email, subject: subject, body: '$bodyHeader\n\n');
   }
 
@@ -2352,12 +2248,6 @@ This code can be used once and will expire in 7 days.
                       final isRoleHolder =
                           currentUserId != null &&
                           currentUserId == member['userId']?.toString();
-                      final incomingMailCount =
-                          _committeeMailNotificationIdsByRole[_roleKey(role)]
-                              ?.length ??
-                          0;
-                      final hasIncomingMail =
-                          isRoleHolder && incomingMailCount > 0;
                       final showContactEmail = hasEmail && !isRoleHolder;
 
                       return Container(
@@ -2467,79 +2357,6 @@ This code can be used once and will expire in 7 days.
                                         color: primary,
                                         size: actionIconSize,
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            if (isRoleHolder)
-                              Positioned(
-                                bottom: 7,
-                                right: 9,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: hasIncomingMail
-                                        ? () => _openMailAppForRole(role)
-                                        : null,
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        Container(
-                                          width: actionTapSize,
-                                          height: actionTapSize,
-                                          alignment: Alignment.center,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            boxShadow: hasIncomingMail
-                                                ? [
-                                                    BoxShadow(
-                                                      color: Colors.greenAccent
-                                                          .withValues(
-                                                            alpha: 0.45,
-                                                          ),
-                                                      blurRadius: 14,
-                                                      spreadRadius: 1,
-                                                    ),
-                                                  ]
-                                                : null,
-                                          ),
-                                          child: Icon(
-                                            Icons.mark_email_unread_outlined,
-                                            color: hasIncomingMail
-                                                ? Colors.greenAccent
-                                                : Colors.white54,
-                                            size: actionIconSize,
-                                          ),
-                                        ),
-                                        if (hasIncomingMail)
-                                          Positioned(
-                                            right: -2,
-                                            top: -2,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(3),
-                                              constraints: const BoxConstraints(
-                                                minWidth: 17,
-                                                minHeight: 17,
-                                              ),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.redAccent,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Text(
-                                                incomingMailCount > 9
-                                                    ? '9+'
-                                                    : '$incomingMailCount',
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
                                     ),
                                   ),
                                 ),

@@ -19,6 +19,7 @@ class _ChatListPageState extends State<ChatListPage> {
   Timer? _refreshTimer;
   Color _accent = UserService.clubPrimaryColor(UserService.cachedClubName);
   bool _showArchived = false;
+  DateTime? _lastLoadErrorSnackAt;
 
   @override
   void initState() {
@@ -57,10 +58,28 @@ class _ChatListPageState extends State<ChatListPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not load chats: $e')));
+      if (!silent) {
+        _showLoadErrorSnack();
+      }
     }
+  }
+
+  void _showLoadErrorSnack() {
+    final now = DateTime.now();
+    final lastShown = _lastLoadErrorSnackAt;
+    if (lastShown != null && now.difference(lastShown).inSeconds < 20) {
+      return;
+    }
+    _lastLoadErrorSnackAt = now;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not refresh chats. Please check your connection.',
+          ),
+        ),
+      );
   }
 
   Future<void> _openThread(ChatThread thread) async {

@@ -576,15 +576,17 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     bool showExpectedTime = false,
   }) {
     return InkWell(
-      onTap: count > 0
+      onTap: count > 0 && responseType != null
           ? () {
-              if (responseType != null) {
-                _showParticipantsByType(
-                  label,
-                  responseType,
-                  showExpectedTime: showExpectedTime,
-                );
+              if (!canViewEventResponseLists) {
+                showResponseListRestrictedMessage();
+                return;
               }
+              _showParticipantsByType(
+                label,
+                responseType,
+                showExpectedTime: showExpectedTime,
+              );
             }
           : null,
       child: Container(
@@ -748,6 +750,11 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
     String responseType, {
     bool showExpectedTime = false,
   }) async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     final attendees = await getRespondersWithNames(
       eventId: widget.event.id,
       responseType: responseType,

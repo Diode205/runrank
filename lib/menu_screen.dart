@@ -64,6 +64,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   final ImagePicker _picker = ImagePicker();
 
   bool _loading = false;
+  bool _loggingOut = false;
   bool _isAdmin = false;
   String? _fullName;
   String? _email;
@@ -298,6 +299,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         _email = profile?['email'] as String?;
         _ukaNumber = profile?['uka_number'] as String?;
         _club = profile?['club'] as String?;
+        UserService.cacheClubName(_club);
         _avatarUrl = profile?['avatar_url'] as String?;
         _memberSince = parsedMemberSince;
         _membershipType = profile?['membership_type'] as String?;
@@ -318,6 +320,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    if (_loggingOut) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -993,15 +1002,20 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        onPressed: () async {
-          await AuthService.logout();
-          if (!mounted) return;
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (_) => false,
-          );
-        },
+        onPressed: _loggingOut
+            ? null
+            : () async {
+                final navigator = Navigator.of(context);
+                setState(() => _loggingOut = true);
+                UserService.clearCachedClubName();
+
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+
+                await AuthService.logout();
+              },
         icon: const Icon(Icons.logout, color: Colors.white),
         label: const Text(
           'Log Out',

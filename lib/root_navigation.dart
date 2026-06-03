@@ -6,7 +6,9 @@ import 'package:runrank/posts_feed_facebook.dart';
 import 'package:runrank/notifications_screen.dart';
 import 'package:runrank/menu_screen.dart';
 import 'package:runrank/chat/chat_list_page.dart';
+import 'package:runrank/menu/membership_page.dart';
 import 'package:runrank/services/chat_service.dart';
+import 'package:runrank/services/membership_renewal_reminder_service.dart';
 import 'package:runrank/services/notification_service.dart';
 import 'package:runrank/services/user_service.dart';
 
@@ -26,6 +28,8 @@ class _RootNavigationState extends State<RootNavigation>
   int _chatUnreadCount = 0;
   int _clubHubRefreshToken = 0;
   Color _chatAccent = UserService.clubPrimaryColor(UserService.cachedClubName);
+  MembershipRenewalReminderStatus _renewalReminderStatus =
+      MembershipRenewalReminderStatus.inactive();
 
   // Track which tabs have been visited to load them lazily
   final List<bool> _activatedTabs = [true, false, false, false, false];
@@ -36,6 +40,7 @@ class _RootNavigationState extends State<RootNavigation>
   Timer? _eventPollTimer;
   Timer? _postPollTimer;
   Timer? _chatPollTimer;
+  Timer? _renewalReminderPollTimer;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -58,6 +63,7 @@ class _RootNavigationState extends State<RootNavigation>
     _loadInitialPostActivityCount();
     _loadInitialChatUnreadCount();
     _loadChatAccent();
+    _loadRenewalReminderStatus();
 
     _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
       count,
@@ -110,6 +116,11 @@ class _RootNavigationState extends State<RootNavigation>
       }
     });
 
+    _renewalReminderPollTimer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => _loadRenewalReminderStatus(),
+    );
+
     // Watch for event activity (unseen events) to highlight Club Hub
     _eventActivitySubscription = NotificationService.watchEventActivityStream()
         .listen((count) {
@@ -140,6 +151,7 @@ class _RootNavigationState extends State<RootNavigation>
     _eventPollTimer?.cancel();
     _postPollTimer?.cancel();
     _chatPollTimer?.cancel();
+    _renewalReminderPollTimer?.cancel();
     super.dispose();
   }
 
@@ -166,11 +178,53 @@ class _RootNavigationState extends State<RootNavigation>
     if (mounted) setState(() => _chatUnreadCount = count);
   }
 
+  Future<void> _loadRenewalReminderStatus() async {
+    final status = await MembershipRenewalReminderService.status();
+    if (!mounted) return;
+    setState(() => _renewalReminderStatus = status);
+  }
+
   Future<void> _openChat() async {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const ChatListPage()));
     _loadInitialChatUnreadCount();
+  }
+
+  Future<void> _openRenewalReminder() async {
+    final status = _renewalReminderStatus;
+    final daysText = status.daysRemaining == 1
+        ? '1 day'
+        : '${status.daysRemaining} days';
+
+    final openMembership = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Membership renewal'),
+          content: Text(
+            'Your club membership renewal is still outstanding. There are $daysText left before the England Athletics renewal window closes on 30 June.\n\nOnce the Membership Secretary marks you renewed, this reminder will disappear.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open Membership'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (openMembership == true && mounted) {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const MembershipPage()));
+      _loadRenewalReminderStatus();
+    }
   }
 
   void _onItemTapped(int index) {
@@ -218,7 +272,16 @@ class _RootNavigationState extends State<RootNavigation>
             bottom: 20,
             child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 78),
-              child: _buildFloatingChatButton(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_renewalReminderStatus.isActive) ...[
+                    _buildRenewalCountdownButton(_renewalReminderStatus),
+                    const SizedBox(height: 12),
+                  ],
+                  _buildFloatingChatButton(),
+                ],
+              ),
             ),
           ),
         ],
@@ -341,6 +404,45 @@ class _RootNavigationState extends State<RootNavigation>
                 ),
               ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRenewalCountdownButton(MembershipRenewalReminderStatus status) {
+    const color = Color(0xFFFFC107);
+    final digitColor = status.daysRemaining < 10
+        ? Colors.redAccent.shade700
+        : Colors.black;
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.55),
+                blurRadius: _glowAnimation.value + 10,
+                spreadRadius: _glowAnimation.value * 0.4,
+              ),
+            ],
+          ),
+          child: FloatingActionButton.small(
+            heroTag: 'membership_renewal_countdown',
+            backgroundColor: color.withValues(alpha: 0.92),
+            foregroundColor: Colors.black,
+            tooltip: 'Membership renewal reminder',
+            onPressed: _openRenewalReminder,
+            child: Text(
+              status.daysRemaining.toString(),
+              style: TextStyle(
+                color: digitColor,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+          ),
         );
       },
     );

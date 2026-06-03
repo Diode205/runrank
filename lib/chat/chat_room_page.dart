@@ -28,8 +28,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   List<ChatMember> _participants = const [];
   bool _loading = true;
   bool _sending = false;
+  ChatMessage? _editingMessage;
   Timer? _refreshTimer;
   Color _accent = UserService.clubPrimaryColor(UserService.cachedClubName);
+  DateTime? _lastLoadErrorSnackAt;
 
   @override
   void initState() {
@@ -83,10 +85,28 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not load chat: $e')));
+      if (!silent) {
+        _showLoadErrorSnack();
+      }
     }
+  }
+
+  void _showLoadErrorSnack() {
+    final now = DateTime.now();
+    final lastShown = _lastLoadErrorSnackAt;
+    if (lastShown != null && now.difference(lastShown).inSeconds < 20) {
+      return;
+    }
+    _lastLoadErrorSnackAt = now;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not refresh chat. Please check your connection.',
+          ),
+        ),
+      );
   }
 
   void _scrollToBottom() {
@@ -105,11 +125,108 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await ChatService.sendMessage(widget.threadId, text);
+      final editingMessage = _editingMessage;
+      if (editingMessage != null) {
+        await ChatService.editMessage(editingMessage.id, text);
+      } else {
+        await ChatService.sendMessage(widget.threadId, text);
+      }
       _messageCtrl.clear();
+      _editingMessage = null;
       await _loadMessages();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              _editingMessage == null
+                  ? 'Could not send message. Please check your connection and try again.'
+                  : 'Could not edit message. Please check your connection and try again.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  void _startEditing(ChatMessage message) {
+    setState(() {
+      _editingMessage = message;
+      _messageCtrl.text = message.body;
+      _messageCtrl.selection = TextSelection.collapsed(
+        offset: _messageCtrl.text.length,
+      );
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessage = null;
+      _messageCtrl.clear();
+    });
+  }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    try {
+      await ChatService.deleteMessage(message.id);
+      if (_editingMessage?.id == message.id) {
+        _editingMessage = null;
+        _messageCtrl.clear();
+      }
+      await _loadMessages();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not delete message. Please check your connection and try again.',
+            ),
+          ),
+        );
+    }
+  }
+
+  Future<void> _showMessageActions(ChatMessage message) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF101418),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit_rounded, color: _accent),
+              title: const Text('Edit', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.of(context).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.redAccent,
+              ),
+              title: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () => Navigator.of(context).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'edit') {
+      _startEditing(message);
+    } else if (action == 'delete') {
+      await _deleteMessage(message);
     }
   }
 
@@ -225,10 +342,16 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             name: message.senderName,
                             avatarUrl: message.senderAvatarUrl,
                           );
-                      return _MessageBubble(
-                        message: message,
-                        accent: _accent,
-                        sender: sender,
+                      return GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onLongPress: message.isMine
+                            ? () => _showMessageActions(message)
+                            : null,
+                        child: _MessageBubble(
+                          message: message,
+                          accent: _accent,
+                          sender: sender,
+                        ),
                       );
                     },
                   ),
@@ -241,37 +364,86 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 color: Color(0xFF101214),
                 border: Border(top: BorderSide(color: Colors.white12)),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageCtrl,
-                      minLines: 1,
-                      maxLines: 4,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Message...',
-                        hintStyle: const TextStyle(color: Colors.white38),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.06),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                  if (_editingMessage != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _accent.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _accent.withValues(alpha: 0.45),
                         ),
                       ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_rounded, color: _accent, size: 18),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Editing message',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Cancel edit',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _cancelEditing,
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FloatingActionButton.small(
-                    heroTag: 'send_chat_message',
-                    backgroundColor: _accent.withValues(alpha: 0.78),
-                    foregroundColor: UserService.readableOn(_accent),
-                    onPressed: _sending ? null : _send,
-                    child: const Icon(Icons.send_rounded),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageCtrl,
+                          minLines: 1,
+                          maxLines: 4,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Message...',
+                            hintStyle: const TextStyle(color: Colors.white38),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.06),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'send_chat_message',
+                        backgroundColor: _accent.withValues(alpha: 0.78),
+                        foregroundColor: UserService.readableOn(_accent),
+                        onPressed: _sending ? null : _send,
+                        child: Icon(
+                          _editingMessage == null
+                              ? Icons.send_rounded
+                              : Icons.check_rounded,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -355,7 +527,9 @@ class _MessageBubble extends StatelessWidget {
                 right: mine ? 38 : 0,
               ),
               child: Text(
-                _formatChatTime(message.createdAt),
+                message.editedAt == null
+                    ? _formatChatTime(message.createdAt)
+                    : '${_formatChatTime(message.createdAt)} • edited',
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
             ),

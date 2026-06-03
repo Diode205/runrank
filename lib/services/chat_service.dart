@@ -19,6 +19,7 @@ class ChatMessage {
   final String? senderAvatarUrl;
   final String body;
   final DateTime createdAt;
+  final DateTime? editedAt;
   final bool isMine;
 
   const ChatMessage({
@@ -29,6 +30,7 @@ class ChatMessage {
     required this.senderAvatarUrl,
     required this.body,
     required this.createdAt,
+    required this.editedAt,
     required this.isMine,
   });
 }
@@ -151,7 +153,8 @@ class ChatService {
         .from('chat_participants')
         .select('thread_id, last_read_at')
         .eq('user_id', user.id)
-        .filter('left_at', 'is', null);
+        .filter('left_at', 'is', null)
+        .filter('deleted_at', 'is', null);
     participantQuery = archived
         ? participantQuery.not('archived_at', 'is', null)
         : participantQuery.filter('archived_at', 'is', null);
@@ -314,29 +317,18 @@ class ChatService {
       throw StateError('You must be signed in to start a chat.');
     }
 
-    final threads = [
-      ...await listThreads(),
-      ...await listThreads(archived: true),
-    ];
     final cleanContextTitle = contextTitle?.trim();
     final contextDateOnly = contextDate == null
         ? null
         : DateTime(contextDate.year, contextDate.month, contextDate.day);
-    for (final thread in threads) {
-      final sameContextTitle =
-          (thread.contextTitle ?? '') == (cleanContextTitle ?? '');
-      final sameContextDate =
-          thread.contextDate?.year == contextDateOnly?.year &&
-          thread.contextDate?.month == contextDateOnly?.month &&
-          thread.contextDate?.day == contextDateOnly?.day;
-      if (!thread.isGroup &&
-          thread.participants.any((p) => p.id == member.id) &&
-          thread.participants.any((p) => p.id == user.id) &&
-          sameContextTitle &&
-          sameContextDate) {
-        await unarchiveThread(thread.id);
-        return thread.id;
-      }
+    final existingThreadId = await _findExistingDirectThread(
+      member.id,
+      contextTitle: cleanContextTitle,
+      contextDate: contextDateOnly,
+    );
+    if (existingThreadId != null) {
+      await restoreOwnThread(existingThreadId);
+      return existingThreadId;
     }
 
     final thread = await _supabase
@@ -362,6 +354,76 @@ class ChatService {
       {'thread_id': threadId, 'user_id': member.id},
     ]);
     return threadId;
+  }
+
+  static Future<String?> _findExistingDirectThread(
+    String otherUserId, {
+    String? contextTitle,
+    DateTime? contextDate,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return null;
+
+    final ownRows = await _supabase
+        .from('chat_participants')
+        .select('thread_id')
+        .eq('user_id', user.id)
+        .filter('left_at', 'is', null);
+    final threadIds = [
+      for (final row in ownRows as List) (row as Map)['thread_id'] as String,
+    ];
+    if (threadIds.isEmpty) return null;
+
+    final threadRows = await _supabase
+        .from('chat_threads')
+        .select('id, context_title, context_date')
+        .eq('is_group', false)
+        .inFilter('id', threadIds)
+        .order('updated_at', ascending: false);
+    if ((threadRows as List).isEmpty) return null;
+
+    final directThreadIds = [
+      for (final row in threadRows) (row as Map)['id'] as String,
+    ];
+    final participantRows = await _supabase
+        .from('chat_participants')
+        .select('thread_id, user_id, left_at')
+        .inFilter('thread_id', directThreadIds)
+        .filter('left_at', 'is', null);
+
+    final participantsByThread = <String, Set<String>>{};
+    for (final row in participantRows as List) {
+      final map = row as Map;
+      participantsByThread
+          .putIfAbsent(map['thread_id'] as String, () => <String>{})
+          .add(map['user_id'] as String);
+    }
+
+    for (final row in threadRows) {
+      final map = row as Map;
+      final threadId = map['id'] as String;
+      final participants = participantsByThread[threadId] ?? const <String>{};
+      if (participants.length != 2 ||
+          !participants.contains(user.id) ||
+          !participants.contains(otherUserId)) {
+        continue;
+      }
+
+      final rowContextTitle = (map['context_title'] as String?)?.trim() ?? '';
+      final rowContextDate = _date(map['context_date']);
+      final expectedContextTitle = contextTitle?.trim() ?? '';
+      final sameContextTitle = rowContextTitle == expectedContextTitle;
+      final sameContextDate =
+          rowContextDate?.year == contextDate?.year &&
+          rowContextDate?.month == contextDate?.month &&
+          rowContextDate?.day == contextDate?.day;
+
+      if (sameContextTitle && sameContextDate) {
+        return threadId;
+      }
+    }
+
+    return null;
   }
 
   static Future<List<ChatMember>> threadParticipants(String threadId) async {
@@ -440,7 +502,7 @@ class ChatService {
 
     final rows = await _supabase
         .from('chat_messages')
-        .select('id, thread_id, sender_id, body, created_at')
+        .select('id, thread_id, sender_id, body, created_at, edited_at')
         .eq('thread_id', threadId)
         .filter('deleted_at', 'is', null)
         .order('created_at');
@@ -461,6 +523,7 @@ class ChatService {
           senderAvatarUrl: avatars[row['sender_id']],
           body: row['body'] as String,
           createdAt: _date(row['created_at']) ?? DateTime.now(),
+          editedAt: _date(row['edited_at']),
           isMine: row['sender_id'] == user.id,
         ),
     ];
@@ -483,10 +546,32 @@ class ChatService {
         .eq('id', threadId);
     await _supabase
         .from('chat_participants')
-        .update({'archived_at': null})
+        .update({'archived_at': null, 'deleted_at': null})
         .eq('thread_id', threadId)
         .filter('left_at', 'is', null);
     await markRead(threadId);
+  }
+
+  static Future<void> editMessage(String messageId, String body) async {
+    final user = _supabase.auth.currentUser;
+    final text = body.trim();
+    if (user == null || text.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    await _supabase
+        .from('chat_messages')
+        .update({'body': text, 'edited_at': now})
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
+  }
+
+  static Future<void> deleteMessage(String messageId) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    await _supabase
+        .from('chat_messages')
+        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
   }
 
   static Future<void> markRead(String threadId) async {
@@ -530,11 +615,15 @@ class ChatService {
   }
 
   static Future<void> unarchiveThread(String threadId) async {
+    await restoreOwnThread(threadId);
+  }
+
+  static Future<void> restoreOwnThread(String threadId) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
     await _supabase
         .from('chat_participants')
-        .update({'archived_at': null})
+        .update({'archived_at': null, 'deleted_at': null})
         .eq('thread_id', threadId)
         .eq('user_id', user.id);
   }
@@ -551,9 +640,13 @@ class ChatService {
   }
 
   static Future<void> deleteOwnThread(String threadId) async {
-    await _supabase.rpc(
-      'delete_chat_thread',
-      params: {'target_thread_id': threadId},
-    );
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    final now = DateTime.now().toIso8601String();
+    await _supabase
+        .from('chat_participants')
+        .update({'deleted_at': now, 'archived_at': null})
+        .eq('thread_id', threadId)
+        .eq('user_id', user.id);
   }
 }

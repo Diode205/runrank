@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:runrank/menu/athletics_portal_power10_page.dart';
 import 'package:runrank/menu/rnr_ekiden_eaccl_page.dart';
 import 'package:runrank/services/membership_tier_config_service.dart';
 import 'package:runrank/services/payment_service.dart';
@@ -226,10 +227,12 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
   DateTime _membershipYearStart([DateTime? date]) {
     final value = date ?? DateTime.now();
-    final mayFirst = DateTime(value.year, 5, 1);
-    return !DateTime(value.year, value.month, value.day).isBefore(mayFirst)
-        ? mayFirst
-        : DateTime(value.year - 1, 5, 1);
+    final today = DateTime(value.year, value.month, value.day);
+    final renewalWindowStart = DateTime(value.year, 4, 1);
+    if (!today.isBefore(renewalWindowStart)) {
+      return DateTime(value.year, 5, 1);
+    }
+    return DateTime(value.year - 1, 5, 1);
   }
 
   DateTime _membershipYearEnd(DateTime yearStart) {
@@ -310,18 +313,49 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     bool paymentCompleted = false,
   }) async {
     final statusText = _membershipStatusLabel(tierName);
-    final body = paymentCompleted
-        ? 'I have completed a Stripe payment for my $statusText club membership renewal. '
-              'May I therefore request that the UK Athletics registration order is now raised and confirmed.'
-        : 'I intend to renew my club membership on a $statusText status. '
-              'May I therefore request to please raise an order through the UK Athletic to complete my registration and the payment required.';
+    final user = _client.auth.currentUser;
+    String memberName = user?.userMetadata?['full_name']?.toString() ?? '';
+    String memberEmail = user?.email ?? '';
+    String ukaNumber = '';
+
+    if (user != null) {
+      try {
+        final profile = await _client
+            .from('user_profiles')
+            .select('full_name, email, uka_number')
+            .eq('id', user.id)
+            .maybeSingle();
+        memberName = (profile?['full_name'] ?? memberName).toString().trim();
+        memberEmail = (profile?['email'] ?? memberEmail).toString().trim();
+        ukaNumber = (profile?['uka_number'] ?? '').toString().trim();
+      } catch (e) {
+        debugPrint('Unable to load membership email profile details: $e');
+      }
+    }
+
+    final bodyBuffer = StringBuffer(
+      paymentCompleted
+          ? 'I have completed a Stripe payment for my $statusText club membership renewal. '
+                'May I therefore request that the UK Athletics registration order is now raised and confirmed.'
+          : 'I intend to renew my club membership on a $statusText status. '
+                'May I therefore request to please raise an order through UK Athletics to complete my registration and the payment required.',
+    );
+    bodyBuffer.writeln();
+    bodyBuffer.writeln();
+    bodyBuffer.writeln('Member details:');
+    if (memberName.isNotEmpty) bodyBuffer.writeln('Name: $memberName');
+    if (memberEmail.isNotEmpty) {
+      bodyBuffer.writeln('Registered app email: $memberEmail');
+    }
+    if (ukaNumber.isNotEmpty) bodyBuffer.writeln('UKA number: $ukaNumber');
+    bodyBuffer.writeln('Membership type requested: $statusText');
 
     final subject = Uri.encodeComponent(
       paymentCompleted
           ? 'Membership Payment Completed'
           : 'Raise Membership Order',
     );
-    final encodedBody = Uri.encodeComponent(body);
+    final encodedBody = Uri.encodeComponent(bodyBuffer.toString());
     final uri = Uri.parse(
       'mailto:$membershipSecretaryEmail?subject=$subject&body=$encodedBody',
     );
@@ -982,9 +1016,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                 WidgetSpan(
                   alignment: PlaceholderAlignment.middle,
                   child: GestureDetector(
-                    onTap: _launchEnglandAthleticsRegistration,
+                    onTap: _openAthleticsPortalPage,
                     child: Text(
-                      _isNrrClub ? 'UK Athletic' : 'England Athletics',
+                      _isNrrClub ? 'UK Athletics' : 'England Athletics',
                       style: TextStyle(
                         fontSize: 13,
                         color: _clubSecondaryColor,
@@ -1859,17 +1893,11 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     }();
   }
 
-  Future<void> _launchEnglandAthleticsRegistration() async {
-    final uri = Uri.parse(
-      'https://www.englandathletics.org/take-part/athlete-registration/',
+  void _openAthleticsPortalPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AthleticsPortalPower10Page()),
     );
-
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open England Athletics link.')),
-      );
-    }
   }
 
   Future<void> _launchAthleticsNorfolk() async {

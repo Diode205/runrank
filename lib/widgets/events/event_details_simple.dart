@@ -529,11 +529,13 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     String? responseType,
   }) {
     return InkWell(
-      onTap: count > 0
+      onTap: count > 0 && responseType != null
           ? () {
-              if (responseType != null) {
-                _showParticipantsByType(label, responseType);
+              if (!canViewEventResponseLists) {
+                showResponseListRestrictedMessage();
+                return;
               }
+              _showParticipantsByType(label, responseType);
             }
           : null,
       child: Container(
@@ -599,6 +601,11 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     String title,
     String responseType,
   ) async {
+    if (!canViewEventResponseLists) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
     final attendees = await getRespondersWithNames(
       eventId: widget.event.id,
       responseType: responseType,
