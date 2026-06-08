@@ -31,6 +31,117 @@ class UserService {
     return row != null && row['is_admin'] == true;
   }
 
+  static String _compactForMatch(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  static bool _nameLooksLike(String? profileName, String? committeeName) {
+    final profile = _compactForMatch(profileName ?? '');
+    final committee = _compactForMatch(committeeName ?? '');
+    if (profile.isEmpty || committee.isEmpty) return false;
+    if (profile == committee) return true;
+    if (profile.contains(committee) || committee.contains(profile)) {
+      return true;
+    }
+
+    final profileParts = (profileName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    final committeeParts = (committeeName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    if (profileParts.isEmpty || committeeParts.isEmpty) return false;
+    return committeeParts.difference(profileParts).isEmpty;
+  }
+
+  static Future<bool> isAppOwner() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final ownerRow = await _client
+          .from('app_owner_user_ids')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      return ownerRow != null;
+    } catch (e) {
+      debugPrint('App owner access check failed: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> hasCommitteeRoleAccess({
+    required List<String> roleIncludes,
+    List<String> roleExcludes = const [],
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+    if (await isAppOwner()) return true;
+
+    try {
+      final profile = await _client
+          .from('user_profiles')
+          .select('id, full_name, email, club')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final clubName = (profile?['club'] as String?)?.trim();
+      if (clubName == null || clubName.isEmpty) return false;
+
+      final profileEmail =
+          (profile?['email'] as String?)?.trim().toLowerCase() ??
+          user.email?.trim().toLowerCase();
+      final profileName = (profile?['full_name'] as String?)?.trim();
+
+      final rows = await _client
+          .from('committee_roles')
+          .select('role, name, email, user_id, club')
+          .eq('club', clubName);
+
+      for (final raw in rows as List) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final role = ((row['role'] as String?) ?? '').trim().toLowerCase();
+        final hasAllIncludes = roleIncludes.every(
+          (value) => role.contains(value.trim().toLowerCase()),
+        );
+        final hasAnyExcludes = roleExcludes.any(
+          (value) => role.contains(value.trim().toLowerCase()),
+        );
+        if (!hasAllIncludes || hasAnyExcludes) continue;
+
+        final directUserId = row['user_id']?.toString().trim();
+        if (directUserId != null &&
+            directUserId.isNotEmpty &&
+            directUserId == user.id) {
+          return true;
+        }
+
+        final roleEmail = (row['email'] as String?)?.trim().toLowerCase();
+        if (profileEmail != null &&
+            profileEmail.isNotEmpty &&
+            roleEmail != null &&
+            roleEmail.isNotEmpty &&
+            profileEmail == roleEmail) {
+          return true;
+        }
+
+        final roleName = (row['name'] as String?)?.trim();
+        if (_nameLooksLike(profileName, roleName)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Committee role access check failed: $e');
+    }
+
+    return false;
+  }
+
   static Future<bool> isBlocked({
     BuildContext? context,
     bool showMessage = true,

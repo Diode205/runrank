@@ -24,7 +24,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   Future<List<KitProduct>>? _secondProducts;
   Future<List<KitProduct>>? _thirdProducts;
 
-  bool _isAdmin = false;
+  bool _canManageKit = false;
   String? _clubName = UserService.cachedClubName;
 
   late List<_KitTabDefinition> _activeTabs;
@@ -131,6 +131,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   Future<void> _loadData() async {
     try {
       final isAdmin = await UserService.isAdmin();
+      final canManageKit =
+          isAdmin ||
+          await UserService.hasCommitteeRoleAccess(roleIncludes: const ['kit']);
       final clubName = await UserService.currentClubName();
 
       final lower = (clubName ?? '').trim().toLowerCase();
@@ -154,7 +157,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
       if (!mounted) return;
 
       setState(() {
-        _isAdmin = isAdmin;
+        _canManageKit = canManageKit;
         _clubName = clubName;
         _activeTabs = isNrrClub ? _nrrTabs : _nnbrTabs;
         _firstProducts = first;
@@ -201,7 +204,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
   }
 
   void _showEditStockDialog(KitProduct product) {
-    if (!_isAdmin) return;
+    if (!_canManageKit) return;
 
     final controllers = <String, TextEditingController>{};
     for (final entry in product.stock.entries) {
@@ -533,9 +536,9 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                           ),
                         ),
                 ),
-                if (_isAdmin)
+                if (_canManageKit)
                   Tooltip(
-                    message: 'Admin: Long-press to edit stock and prices',
+                    message: 'Long-press to edit stock and prices',
                     child: Icon(
                       Icons.edit,
                       color: accent.withValues(alpha: 0.7),
@@ -971,7 +974,7 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
               : Colors.red.withValues(alpha: 0.3));
 
     return GestureDetector(
-      onLongPress: _isAdmin ? () => _showEditStockDialog(product) : null,
+      onLongPress: _canManageKit ? () => _showEditStockDialog(product) : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 18),
         decoration: BoxDecoration(

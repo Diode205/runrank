@@ -86,6 +86,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   // Admin flag
   bool _isAdmin = false;
+  bool _canAccessSecretaryVault = false;
   bool _archivingVaultReports = false;
 
   // Top 10 snapview state
@@ -270,6 +271,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
       // Club-specific award rules depend on the loaded club, so refresh
       // the overall status once profile data is available.
+      _canAccessSecretaryVault = await _canCurrentUserAccessSecretaryVault();
+      if (mounted) {
+        setState(() {});
+      }
       await _loadCurrentAwardStatus();
     } catch (e) {
       // ignore: avoid_print
@@ -450,10 +455,107 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   Future<void> _initAdminAndStatus() async {
     _isAdmin = await UserService.isAdmin();
+    _canAccessSecretaryVault = await _canCurrentUserAccessSecretaryVault();
     if (mounted) {
       setState(() {});
     }
     await _loadCurrentAwardStatus();
+  }
+
+  bool _isClubSecretaryRole(String role) {
+    final lower = role.trim().toLowerCase();
+    if (!lower.contains('secretary')) return false;
+    return !lower.contains('membership') &&
+        !lower.contains('minutes') &&
+        !lower.contains('kit');
+  }
+
+  String _compactForMatch(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _nameLooksLike(String? profileName, String? committeeName) {
+    final profile = _compactForMatch(profileName ?? '');
+    final committee = _compactForMatch(committeeName ?? '');
+    if (profile.isEmpty || committee.isEmpty) return false;
+    if (profile == committee) return true;
+    if (profile.contains(committee) || committee.contains(profile)) {
+      return true;
+    }
+
+    final profileParts = (profileName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    final committeeParts = (committeeName ?? '')
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((part) => part.length > 1)
+        .toSet();
+    if (profileParts.isEmpty || committeeParts.isEmpty) return false;
+    return committeeParts.difference(profileParts).isEmpty;
+  }
+
+  Future<bool> _canCurrentUserAccessSecretaryVault() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      if (await UserService.isAppOwner()) return true;
+
+      final profile = await client
+          .from('user_profiles')
+          .select('id, full_name, email, club')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final profileEmail =
+          (profile?['email'] as String?)?.trim().toLowerCase() ??
+          user.email?.trim().toLowerCase();
+      final profileName = (profile?['full_name'] as String?)?.trim();
+
+      final clubName =
+          (profile?['club'] as String?)?.trim() ?? _clubName?.trim();
+      if (clubName == null || clubName.isEmpty) return false;
+
+      final rows = await client
+          .from('committee_roles')
+          .select('role, name, email, user_id, club')
+          .eq('club', clubName);
+
+      for (final raw in rows as List) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final role = (row['role'] as String?)?.trim() ?? '';
+        if (!_isClubSecretaryRole(role)) continue;
+
+        final directUserId = row['user_id']?.toString().trim();
+        if (directUserId != null &&
+            directUserId.isNotEmpty &&
+            directUserId == user.id) {
+          return true;
+        }
+
+        final secretaryEmail = (row['email'] as String?)?.trim().toLowerCase();
+        if (profileEmail != null &&
+            profileEmail.isNotEmpty &&
+            secretaryEmail != null &&
+            secretaryEmail.isNotEmpty &&
+            profileEmail == secretaryEmail) {
+          return true;
+        }
+
+        final secretaryName = (row['name'] as String?)?.trim();
+        if (_nameLooksLike(profileName, secretaryName)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Secretary vault access check failed: $e');
+    }
+
+    return false;
   }
 
   Future<void> _loadCurrentAwardStatus() async {
@@ -2192,7 +2294,9 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   Future<void> _archivePreviousMonthVaultReports() async {
     if (_archivingVaultReports) return;
     final clubName = _clubName?.trim();
-    if (!_isAdmin || clubName == null || clubName.isEmpty) return;
+    if (!_canAccessSecretaryVault || clubName == null || clubName.isEmpty) {
+      return;
+    }
 
     _archivingVaultReports = true;
     try {
@@ -2716,7 +2820,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
   }
 
   Widget _buildAdminAwardsSection() {
-    if (!_isAdmin) return const SizedBox.shrink();
+    if (!_canAccessSecretaryVault) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 16),
@@ -2751,7 +2855,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           ),
           const SizedBox(height: 10),
           const Text(
-            'Admin-only reports. Monthly Vault reports are saved after month end.',
+            'Secretary reports. Monthly Vault reports are saved after month end.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),

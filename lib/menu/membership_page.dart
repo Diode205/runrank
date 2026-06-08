@@ -27,7 +27,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   static const _educationGreen = Color(0xFF2E8B57);
 
   bool _loading = true;
-  bool _isAdmin = false;
+  bool _canManageMembership = false;
   String? _memberSince;
   String? _membershipType;
   String? _clubName;
@@ -127,7 +127,9 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
   Future<void> _showEditAmountDialog(String tierName) async {
     final clubName = _clubName;
-    if (!_isAdmin || clubName == null || clubName.trim().isEmpty) return;
+    if (!_canManageMembership || clubName == null || clubName.trim().isEmpty) {
+      return;
+    }
 
     final controller = TextEditingController(
       text: (_amountPenceForTier(tierName) / 100).toStringAsFixed(2),
@@ -513,9 +515,14 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
 
   Future<void> _initAdmin() async {
     final isAdmin = await UserService.isAdmin();
+    final canManageMembership =
+        isAdmin ||
+        await UserService.hasCommitteeRoleAccess(
+          roleIncludes: const ['membership', 'secretary'],
+        );
     if (!mounted) return;
     setState(() {
-      _isAdmin = isAdmin;
+      _canManageMembership = canManageMembership;
     });
   }
 
@@ -888,7 +895,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                       color: color,
                     ),
                   ),
-                  if (_isAdmin)
+                  if (_canManageMembership)
                     TextButton.icon(
                       onPressed: () => _showEditAmountDialog(tierName),
                       icon: const Icon(Icons.edit_outlined, size: 14),
@@ -995,10 +1002,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   ),
                 ),
               ),
-              if (_isAdmin)
+              if (_canManageMembership)
                 IconButton(
                   icon: const Icon(Icons.list_alt, color: Colors.white70),
-                  tooltip: 'View active membership report (admin only)',
+                  tooltip: 'View active membership report',
                   onPressed: _showMembershipStatusReport,
                 ),
             ],
@@ -1187,7 +1194,7 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
             ),
           ],
           const SizedBox(height: 12),
-          if (_isAdmin)
+          if (_canManageMembership)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

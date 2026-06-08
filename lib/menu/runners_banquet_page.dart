@@ -178,6 +178,107 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       _partnerQuantity * _partnerPriceCents +
       _otherQuantity * _otherPriceCents;
 
+  bool get _isNrrClub {
+    final club = (_clubName ?? '').trim().toLowerCase();
+    return club == 'nrr' ||
+        club == 'norwich-road-runners' ||
+        club.contains('norwich road runners');
+  }
+
+  Future<bool> _saveCurrentBooking({
+    required String? memberMealChoice,
+    required String? partnerMealChoice,
+    required List<String?> otherMealChoices,
+    required List<String?> otherSpecialRequirements,
+  }) async {
+    final effectiveEventId = _configEventId ?? widget.eventId;
+    final clubName = _clubName;
+    if (clubName == null || clubName.trim().isEmpty) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to determine your club.')),
+      );
+      return false;
+    }
+
+    String? cleanSpecial(String text) {
+      final trimmed = text.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    await RunnersBanquetService.clearMyReservationsForEvent(
+      eventId: effectiveEventId,
+      clubName: clubName,
+    );
+
+    final eventId = effectiveEventId;
+
+    bool ok = true;
+    if (memberMealChoice != null && _memberQuantity > 0) {
+      ok = await RunnersBanquetService.addReservation(
+        eventId: eventId,
+        clubName: clubName,
+        optionLabel: memberMealChoice,
+        quantity: _memberQuantity,
+        specialRequirements: cleanSpecial(
+          _memberSpecialRequirementsController.text,
+        ),
+      );
+    }
+    if (ok && partnerMealChoice != null && _partnerQuantity > 0) {
+      ok = await RunnersBanquetService.addReservation(
+        eventId: eventId,
+        clubName: clubName,
+        optionLabel: partnerMealChoice,
+        quantity: _partnerQuantity,
+        specialRequirements: cleanSpecial(
+          _partnerSpecialRequirementsController.text,
+        ),
+      );
+    }
+    for (var i = 0; ok && i < otherMealChoices.length; i++) {
+      final otherMealChoice = otherMealChoices[i];
+      if (otherMealChoice == null) continue;
+      ok = await RunnersBanquetService.addReservation(
+        eventId: eventId,
+        clubName: clubName,
+        optionLabel: otherMealChoice,
+        quantity: 1,
+        specialRequirements: otherSpecialRequirements[i],
+      );
+    }
+
+    if (!ok) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save your banquet order.')),
+      );
+      return false;
+    }
+
+    if (_isAdmin) {
+      final summary = await RunnersBanquetService.getAdminSummary(
+        clubName: clubName,
+      );
+      if (mounted) {
+        setState(() {
+          _adminSummary = summary;
+        });
+      }
+    }
+
+    final my = await RunnersBanquetService.getMyReservations(
+      clubName: clubName,
+    );
+    if (mounted) {
+      setState(() {
+        _myReservations = my;
+      });
+    }
+
+    return true;
+  }
+
   Future<void> _handleBuyPass() async {
     if (_totalAmountCents <= 0 || _totalQuantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,6 +331,33 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
       return;
     }
 
+    if (_isNrrClub) {
+      final saved = await _saveCurrentBooking(
+        memberMealChoice: memberMealChoice,
+        partnerMealChoice: partnerMealChoice,
+        otherMealChoices: otherMealChoices,
+        otherSpecialRequirements: otherSpecialRequirements,
+      );
+      if (!saved || !mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Payment unavailable'),
+          content: const Text(
+            'Online payment is not available for this banquet yet. Your meal order has been saved and is available to admins.\n\nPlease contact admin for the available payment options required.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final metadata = <String, dynamic>{
       'context': 'runners_banquet',
       'club': _clubName ?? '',
@@ -261,61 +389,12 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
 
     if (!paid || !mounted) return;
 
-    final effectiveEventId = _configEventId ?? widget.eventId;
-    final clubName = _clubName;
-    if (clubName == null || clubName.trim().isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to determine your club.')),
-      );
-      return;
-    }
-
-    // Clear any existing reservations for this user for this banquet
-    // so that a new purchase replaces their previous choices.
-    await RunnersBanquetService.clearMyReservationsForEvent(
-      eventId: effectiveEventId,
-      clubName: clubName,
+    final ok = await _saveCurrentBooking(
+      memberMealChoice: memberMealChoice,
+      partnerMealChoice: partnerMealChoice,
+      otherMealChoices: otherMealChoices,
+      otherSpecialRequirements: otherSpecialRequirements,
     );
-
-    // Record reservation rows per ticket type so admins see
-    // counts per meal option.
-    final eventId = effectiveEventId;
-
-    bool ok = true;
-    if (memberMealChoice != null && _memberQuantity > 0) {
-      ok = await RunnersBanquetService.addReservation(
-        eventId: eventId,
-        clubName: clubName,
-        optionLabel: memberMealChoice,
-        quantity: _memberQuantity,
-        specialRequirements: cleanSpecial(
-          _memberSpecialRequirementsController.text,
-        ),
-      );
-    }
-    if (ok && partnerMealChoice != null && _partnerQuantity > 0) {
-      ok = await RunnersBanquetService.addReservation(
-        eventId: eventId,
-        clubName: clubName,
-        optionLabel: partnerMealChoice,
-        quantity: _partnerQuantity,
-        specialRequirements: cleanSpecial(
-          _partnerSpecialRequirementsController.text,
-        ),
-      );
-    }
-    for (var i = 0; ok && i < otherMealChoices.length; i++) {
-      final otherMealChoice = otherMealChoices[i];
-      if (otherMealChoice == null) continue;
-      ok = await RunnersBanquetService.addReservation(
-        eventId: eventId,
-        clubName: clubName,
-        optionLabel: otherMealChoice,
-        quantity: 1,
-        specialRequirements: otherSpecialRequirements[i],
-      );
-    }
 
     if (!ok) {
       if (!mounted) return;
@@ -327,27 +406,6 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
         ),
       );
       return;
-    }
-
-    if (_isAdmin) {
-      final summary = await RunnersBanquetService.getAdminSummary(
-        clubName: clubName,
-      );
-      if (mounted) {
-        setState(() {
-          _adminSummary = summary;
-        });
-      }
-    }
-
-    // Refresh the current user's booking summary (confirmation box).
-    final my = await RunnersBanquetService.getMyReservations(
-      clubName: clubName,
-    );
-    if (mounted) {
-      setState(() {
-        _myReservations = my;
-      });
     }
     if (!mounted) return;
 
@@ -1063,10 +1121,12 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _handleBuyPass,
-                  icon: const Icon(Icons.lock_outline),
-                  label: const Text(
-                    'Purchase Pass',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  icon: Icon(
+                    _isNrrClub ? Icons.restaurant_menu : Icons.lock_outline,
+                  ),
+                  label: Text(
+                    _isNrrClub ? 'Submit Order' : 'Purchase Pass',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1081,9 +1141,11 @@ class _RunnersBanquetPageState extends State<RunnersBanquetPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Payments are handled securely via Stripe, the same as your membership.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
+              Text(
+                _isNrrClub
+                    ? 'Online payment is temporarily unavailable. Your meal order will be saved for admin to confirm payment options.'
+                    : 'Payments are handled securely via Stripe, the same as your membership.',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ],
