@@ -73,6 +73,12 @@ class AuthService {
     }.where((value) => value.isNotEmpty).toList(growable: false);
   }
 
+  static bool _isYcrrClub(String? club) {
+    final normalized = club?.trim().toLowerCase() ?? '';
+    return normalized == 'ycrr' ||
+        normalized.contains('your club road runners');
+  }
+
   // -------------------------------------------------------
   // CHECK LOGIN STATUS
   // -------------------------------------------------------
@@ -144,6 +150,7 @@ class AuthService {
       final userId = user.id;
       // ignore: avoid_print
       print("✅ USER CREATED: $userId");
+      final isYcrrDemoAdmin = _isYcrrClub(club);
 
       // 2) Insert profile row (matches table EXACTLY)
       await _supabase.from('user_profiles').insert({
@@ -160,8 +167,10 @@ class AuthService {
         "emergency_contact_relation": emergencyContactRelation,
         "emergency_details_consent": emergencyDetailsConsent,
         "medical_notes": medicalNotes,
-        "is_admin": false,
-        "admin_since": null,
+        "is_admin": isYcrrDemoAdmin,
+        "admin_since": isYcrrDemoAdmin
+            ? DateTime.now().toIso8601String()
+            : null,
         "member_since": memberSince,
       });
 

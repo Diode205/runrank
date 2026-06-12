@@ -65,7 +65,10 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
 
   bool _isNrrClubName(String clubName) {
     final lower = clubName.trim().toLowerCase();
-    return lower == 'nrr' || lower.contains('norwich road runners');
+    return lower == 'nrr' ||
+        lower.contains('norwich road runners') ||
+        lower == 'ycrr' ||
+        lower.contains('your club road runners');
   }
 
   List<Map<String, dynamic>> _buildCommitteeTemplate(String clubName) {
@@ -985,6 +988,9 @@ class _AdministrativeTeamPageState extends State<AdministrativeTeamPage> {
       }
       if (lower.contains('norwich road runners') || lower.contains('nrr')) {
         return 'NRR';
+      }
+      if (lower.contains('your club road runners') || lower.contains('ycrr')) {
+        return 'YCRR';
       }
       final buffer = StringBuffer();
       for (final raw in name.split(' ')) {

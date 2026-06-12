@@ -18,6 +18,8 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       'https://docs.google.com/document/d/e/2PACX-1vSTrQ3pEMf5sGX1EItOjY4U72Am2R0ORxdJFzzEy2U2zNXDc1WFFo7Qp-JuTLctrwuwG6eMQAEyMdf7/pub';
   static const String _termsOfUseUrl =
       'https://docs.google.com/document/d/e/2PACX-1vQWuKHlmIfJWxZiyr-sT2pXhGaU4zTAGFL3G1Cm_keLnja76E6eXzkUYFyPkyR4rL95JftlQK63FV8N/pub';
+  static const String _supportRequestsUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vQpOnmEK_rm4jHIQ2-6BD_y8t4Y_Quz-EyDMFUTjtEH7oXtQLt8nqq78mffj-vI41RA-B4q_rJH2vdW/pub';
 
   String _version = '';
   String? _clubName;
@@ -171,6 +173,15 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   Future<void> _openTermsOfUse() async {
     final uri = Uri.parse(_termsOfUseUrl);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
+  }
+
+  Future<void> _openSupportRequests() async {
+    final uri = Uri.parse(_supportRequestsUrl);
     await launchUrl(
       uri,
       mode: LaunchMode.inAppWebView,
@@ -610,18 +621,42 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
               side: BorderSide(color: primary, width: 1),
             ),
             child: ListTile(
-              leading: const Icon(Icons.help_outline, color: Colors.white),
+              leading: const Icon(
+                Icons.support_agent_outlined,
+                color: Colors.white,
+              ),
               title: const Text(
-                'Help & Feedback',
+                'Help & Support',
                 style: TextStyle(color: Colors.white),
               ),
               subtitle: const Text(
-                'Contact Developer Dios Fernandez',
+                'App feedback and build requests',
+                style: TextStyle(color: Colors.white70),
+              ),
+              onTap: _openSupportRequests,
+              trailing: const Icon(Icons.open_in_new, color: Colors.white70),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFF0F111A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: primary, width: 1),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.help_outline, color: Colors.white),
+              title: const Text(
+                'Contact Developer',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'eMail Dios Fernandez',
                 style: TextStyle(color: Colors.white70),
               ),
               onTap: () => _launchEmail(
                 to: 'runrankapp@gmail.com',
-                subject: 'RunRank feedback',
+                subject: 'Feedback, Help, Support & Requests',
               ),
               trailing: const Icon(Icons.open_in_new, color: Colors.white70),
             ),

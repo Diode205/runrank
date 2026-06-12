@@ -84,34 +84,49 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
+  bool get _isYcrrClub {
+    final club = (_club ?? '').trim().toLowerCase();
+    return club == 'ycrr' || club.contains('your club road runners');
+  }
+
   Color get _clubPrimaryColor => _club == null
       ? const Color(0xFF3A3A3A)
       : _isNrrClub
       ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
       : const Color(0xFFFFD300);
 
   Color get _clubSecondaryColor => _club == null
       ? Colors.white70
       : _isNrrClub
       ? Colors.white
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
       : const Color(0xFF0057B7);
 
   Color get _quickEditBackgroundColor => _club == null
       ? const Color(0xFF111111)
       : _isNrrClub
       ? const Color(0xFF140708)
+      : _isYcrrClub
+      ? const Color(0xFF10140F)
       : const Color(0xFF0F111A);
 
   Color get _quickEditFieldFillColor => _club == null
       ? const Color(0xFF1A1A1A)
       : _isNrrClub
       ? const Color(0xFF211012)
+      : _isYcrrClub
+      ? const Color(0xFF162319)
       : const Color(0xFF161B26);
 
   List<Color> get _quickEditHeaderGradient => _club == null
       ? const [Color(0xFF2A2A2A), Color(0xFF101010)]
       : _isNrrClub
       ? const [Color(0xFF7B1620), Color(0xFF200608)]
+      : _isYcrrClub
+      ? const [Color(0xFF16803A), Color(0xFFFFD300)]
       : const [Color(0xFF0057B7), Color(0xFFFFD300)];
 
   @override
@@ -395,7 +410,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                 ),
                 _menuTile(
                   icon: Icons.flag,
-                  title: _isNrrClub
+                  title: (_isNrrClub || _isYcrrClub)
                       ? 'Signature Races'
                       : 'Signature & Handicap Races',
                   subtitle: 'Management & Participations',
@@ -412,6 +427,10 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   title: 'Kit & Merchandise',
                   subtitle: 'Order Vests, Shorts, Hoodies & More',
                   onTap: () {
+                    if (_isYcrrClub) {
+                      _showDemoUnavailableMessage('Kit & Merchandise');
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -425,6 +444,12 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
                   title: 'Inspirational Running Awards',
                   subtitle: 'Nominate, Vote, and Comments',
                   onTap: () {
+                    if (_isYcrrClub) {
+                      _showDemoUnavailableMessage(
+                        'Inspirational Running Awards',
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -934,6 +959,14 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString().padLeft(4, '0');
     return '$day/$month/$year';
+  }
+
+  void _showDemoUnavailableMessage(String featureName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$featureName can be connected for a live club build.'),
+      ),
+    );
   }
 
   Widget _menuTile({

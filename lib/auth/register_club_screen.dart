@@ -52,6 +52,7 @@ class _RegisterClubScreenState extends State<RegisterClubScreen> {
             "Norwich Road Runners",
             "Runners-next-the-Sea",
             "Wymondham Athletic Club",
+            "Your Club Road Runners",
           ]);
         _loading = false;
       });

@@ -82,6 +82,11 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
     return lower == 'nrr' || lower.contains('norwich road runners');
   }
 
+  bool get _isYcrrClub {
+    final lower = (_clubName ?? '').trim().toLowerCase();
+    return lower == 'ycrr' || lower.contains('your club road runners');
+  }
+
   bool get _clubResolved => (_clubName ?? '').trim().isNotEmpty;
 
   List<_GovernanceDoc> get _docs => !_clubResolved
@@ -96,66 +101,88 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
       ? 'Club Governance'
       : _isNrrClub
       ? 'NRR Governance'
+      : _isYcrrClub
+      ? 'YCRR Governance'
       : 'Club Governance';
 
   String get _heroSubtitle => !_clubResolved
       ? 'Access club policies, notices and essential forms.'
       : _isNrrClub
       ? 'Access Norwich Road Runners governance documents and core club policies.'
+      : _isYcrrClub
+      ? 'Sample governance documents can be connected for a live club build.'
       : 'Access club policies, notices and essential forms.';
 
   String get _heroImage => !_clubResolved
       ? 'assets/images/rank_logo.png'
       : _isNrrClub
       ? 'assets/images/nrrgov2.png'
+      : _isYcrrClub
+      ? 'assets/images/yourclublogo.png'
       : 'assets/images/nnbrdocs.png';
 
   Color get _backgroundColor => !_clubResolved
       ? const Color(0xFF101010)
       : _isNrrClub
       ? const Color(0xFF140708)
+      : _isYcrrClub
+      ? const Color(0xFF10140F)
       : Colors.black;
 
   Color get _surfaceColor => !_clubResolved
       ? Colors.white.withOpacity(0.04)
       : _isNrrClub
       ? const Color(0xFF241112)
+      : _isYcrrClub
+      ? const Color(0xFF10140F)
       : Colors.white.withOpacity(0.04);
 
   Color get _borderColor => !_clubResolved
       ? Colors.white12
       : _isNrrClub
       ? const Color(0x66D32F2F)
+      : _isYcrrClub
+      ? const Color(0x6616803A)
       : Colors.white12;
 
   Color get _accentColor => !_clubResolved
       ? Colors.white70
       : _isNrrClub
       ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
       : const Color.fromRGBO(235, 246, 26, 1);
 
   Color get _secondaryAccentColor => !_clubResolved
       ? Colors.white
       : _isNrrClub
       ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
       : const Color.fromRGBO(39, 203, 236, 1);
 
   Color get _iconBackgroundColor => !_clubResolved
       ? Colors.white.withOpacity(0.08)
       : _isNrrClub
       ? const Color(0x29D32F2F)
+      : _isYcrrClub
+      ? const Color(0x2916803A)
       : const Color(0xFF0055FF).withOpacity(0.15);
 
   Color get _iconColor => !_clubResolved
       ? Colors.white70
       : _isNrrClub
       ? Colors.white
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
       : const Color(0xFF56D3FF);
 
   List<Color> get _heroGradientColors => !_clubResolved
       ? const [Color(0xCC181818), Colors.transparent, Color(0xCC181818)]
       : _isNrrClub
       ? const [Color(0xE6D32F2F), Color(0xB3140708), Color(0xE6140708)]
+      : _isYcrrClub
+      ? const [Color(0xCC16803A), Colors.transparent, Color(0xCC10140F)]
       : const [Color(0xCC0A0C14), Colors.transparent, Color(0xCC0A0C14)];
 
   Future<void> _openLink(String url, BuildContext context) async {
@@ -189,7 +216,7 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
               children: [
                 _hero(),
                 const SizedBox(height: 20),
-                if (!_isNrrClub) ...[
+                if (!_isNrrClub && !_isYcrrClub) ...[
                   _DocTile(
                     title: 'Expenses Claim Form',
                     backgroundColor: _surfaceColor,

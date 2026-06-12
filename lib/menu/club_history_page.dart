@@ -22,79 +22,106 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
-  Color get _primaryColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+  bool get _isYcrrClub {
+    final club = _clubName?.trim().toLowerCase() ?? '';
+    return club == 'ycrr' || club.contains('your club road runners');
+  }
 
-  Color get _secondaryColor =>
-      _isNrrClub ? Colors.white : const Color(0xFF0057B7);
+  Color get _primaryColor => _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
+      : const Color(0xFFF5C542);
+
+  Color get _secondaryColor => _isNrrClub
+      ? Colors.white
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
+      : const Color(0xFF0057B7);
 
   Color get _cardBorderColor => _isNrrClub ? _primaryColor : _secondaryColor;
 
-  List<_HistorySection> get _sections => _isNrrClub
-      ? const [
-          _HistorySection(
-            title: 'The Early Group',
-            content:
-                'Ray Lindsey, Mark Futter and Stephen Sadd were running together in 1982 under the banner of Fitt Signs. They were joined by Stephen Dixon in mid 1982 and definitely by the Fakenham 10 mile race on 11 July 1982.',
-          ),
-          _HistorySection(
-            title: 'Midnight Runners',
-            content:
-                'For a brief period they ran under the banner of Midnight Runners and the results from the second Norfolk Marathon in September 1983 show that the Midnight Runners came fourth non-affiliated team: S. Dixon 3:27:04, M. Futter 3:27:06, R. Lindsay 3:31:56 and S. Sadd 4:01:58.',
-          ),
-          _HistorySection(
-            title: 'The Wider Group Forms',
-            content:
-                'At the same time as this, but independently, Michael Betts had started running and, as he lived in the same road as Richard Sales in Thurling Plain, they started running together. They too ran the second Norfolk Marathon, where Richard Sales recorded 3:02:42 and Mick Betts 3:08:58, and it was there that they first met the others. It was also there that Mick Betts met up again with Ivan Loades, who he had known in childhood, and Ivan ran 3:12:33.',
-          ),
-          _HistorySection(
-            title: 'Becoming Norwich Road Runners',
-            content:
-                'The six of us, Mick Betts, Stephen Dixon, Mike Futter, Ray Lindsey, Ivan Loades and Richard Sales, met more regularly. Later, in order to attract more members and keep our best runners, we made a group decision to change the name from Midnight Runners to Norwich Road Runners.',
-          ),
-          _HistorySection(
-            title: 'Founding Members',
-            content:
-                'The club therefore has six founding members: Mick Betts, Stephen Dixon, Mike Futter, Ray Lindsey, Ivan Loades and Richard Sales. This took place in late 1983 to early 1984, with the first printed record being the second Ipswich Marathon on 9 September 1984, although it is possible we ran under the club name earlier in 1984.',
-          ),
-          _HistorySection(
-            title: 'Affiliation And Growth',
-            content:
-                'The club was growing and so we started running from The Crome Recreation Centre on Crome Road, now demolished, and later in 1985 the club became affiliated, with Mick Betts becoming the first club secretary. The rest, as they say, is history.',
-          ),
-        ]
-      : const [
-          _HistorySection(
-            title: 'The Beginning',
-            content:
-                'The Club began in the mid eighties with an informal group running out of Cromer and East Runton, before settling on Cromer as its base if for no other reason than it was, and still is, a superb place to launch yourself into the North Sea on Boxing Day, a tradition which has grown to the massive event which it is today, raising thousands of pounds for mainly local charities and other good causes.',
-          ),
-          _HistorySection(
-            title: 'Early Days',
-            content:
-                'From a focussed racing group of just one tenth of the Club\'s current membership, with not a female member in sight, we\'ve grown steadily into a running club for all ages and abilities. Our income was frugal, to say the least, coming from modest subs augmented by income from our Holt 5 annual Road Race, later to become a 7 miler for a time before changing again into the 10K it is today.',
-          ),
-          _HistorySection(
-            title: 'Growth & Evolution',
-            content:
-                'Like many things in this life, you can\'t keep a good thing down - the Club grew, and grew while keeping its friendliness. We gained our first two lady members, one of whom was to wed the only Club coach we had (Graham Davidson), a female section was to appear, proving only too ready to give the men a real run for their money whilst also making us into a far less chauvinistic membership and a more balanced and agreeable organisation.',
-          ),
-          _HistorySection(
-            title: 'Today',
-            content:
-                'Today you find one of the best established, and certainly one of the county\'s finest running clubs where you\'ll find a genuine welcome as a new member whatever your level of interest or involvement!',
-          ),
-        ];
+  List<_HistorySection> get _sections {
+    if (_isYcrrClub) {
+      return const [
+        _HistorySection(
+          title: 'Club History',
+          content: 'brief history of your club here',
+        ),
+      ];
+    }
 
-  String get _headline => _isNrrClub
+    return _isNrrClub
+        ? const [
+            _HistorySection(
+              title: 'The Early Group',
+              content:
+                  'Ray Lindsey, Mark Futter and Stephen Sadd were running together in 1982 under the banner of Fitt Signs. They were joined by Stephen Dixon in mid 1982 and definitely by the Fakenham 10 mile race on 11 July 1982.',
+            ),
+            _HistorySection(
+              title: 'Midnight Runners',
+              content:
+                  'For a brief period they ran under the banner of Midnight Runners and the results from the second Norfolk Marathon in September 1983 show that the Midnight Runners came fourth non-affiliated team: S. Dixon 3:27:04, M. Futter 3:27:06, R. Lindsay 3:31:56 and S. Sadd 4:01:58.',
+            ),
+            _HistorySection(
+              title: 'The Wider Group Forms',
+              content:
+                  'At the same time as this, but independently, Michael Betts had started running and, as he lived in the same road as Richard Sales in Thurling Plain, they started running together. They too ran the second Norfolk Marathon, where Richard Sales recorded 3:02:42 and Mick Betts 3:08:58, and it was there that they first met the others. It was also there that Mick Betts met up again with Ivan Loades, who he had known in childhood, and Ivan ran 3:12:33.',
+            ),
+            _HistorySection(
+              title: 'Becoming Norwich Road Runners',
+              content:
+                  'The six of us, Mick Betts, Stephen Dixon, Mike Futter, Ray Lindsey, Ivan Loades and Richard Sales, met more regularly. Later, in order to attract more members and keep our best runners, we made a group decision to change the name from Midnight Runners to Norwich Road Runners.',
+            ),
+            _HistorySection(
+              title: 'Founding Members',
+              content:
+                  'The club therefore has six founding members: Mick Betts, Stephen Dixon, Mike Futter, Ray Lindsey, Ivan Loades and Richard Sales. This took place in late 1983 to early 1984, with the first printed record being the second Ipswich Marathon on 9 September 1984, although it is possible we ran under the club name earlier in 1984.',
+            ),
+            _HistorySection(
+              title: 'Affiliation And Growth',
+              content:
+                  'The club was growing and so we started running from The Crome Recreation Centre on Crome Road, now demolished, and later in 1985 the club became affiliated, with Mick Betts becoming the first club secretary. The rest, as they say, is history.',
+            ),
+          ]
+        : const [
+            _HistorySection(
+              title: 'The Beginning',
+              content:
+                  'The Club began in the mid eighties with an informal group running out of Cromer and East Runton, before settling on Cromer as its base if for no other reason than it was, and still is, a superb place to launch yourself into the North Sea on Boxing Day, a tradition which has grown to the massive event which it is today, raising thousands of pounds for mainly local charities and other good causes.',
+            ),
+            _HistorySection(
+              title: 'Early Days',
+              content:
+                  'From a focussed racing group of just one tenth of the Club\'s current membership, with not a female member in sight, we\'ve grown steadily into a running club for all ages and abilities. Our income was frugal, to say the least, coming from modest subs augmented by income from our Holt 5 annual Road Race, later to become a 7 miler for a time before changing again into the 10K it is today.',
+            ),
+            _HistorySection(
+              title: 'Growth & Evolution',
+              content:
+                  'Like many things in this life, you can\'t keep a good thing down - the Club grew, and grew while keeping its friendliness. We gained our first two lady members, one of whom was to wed the only Club coach we had (Graham Davidson), a female section was to appear, proving only too ready to give the men a real run for their money whilst also making us into a far less chauvinistic membership and a more balanced and agreeable organisation.',
+            ),
+            _HistorySection(
+              title: 'Today',
+              content:
+                  'Today you find one of the best established, and certainly one of the county\'s finest running clubs where you\'ll find a genuine welcome as a new member whatever your level of interest or involvement!',
+            ),
+          ];
+  }
+
+  String get _headline => _isYcrrClub
+      ? 'Brief History Of\nYour Club'
+      : _isNrrClub
       ? 'Brief History Of The\nRoad Runners'
       : 'Brief History of the\nBlue and Yellows';
 
-  String get _footerText => _isNrrClub
+  String get _footerText => _isYcrrClub
+      ? 'Club founders photo here'
+      : _isNrrClub
       ? 'Founding history of Norwich Road Runners'
       : 'By Noel Spruce';
 
-  IconData get _footerIcon => _isNrrClub ? Icons.groups : Icons.person;
+  IconData get _footerIcon =>
+      (_isNrrClub || _isYcrrClub) ? Icons.groups : Icons.person;
 
   @override
   void initState() {
@@ -149,9 +176,14 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                             width: double.infinity,
                             child: _HistoryPhotoCarousel(
                               key: ValueKey(
-                                _isNrrClub ? 'nrr-history' : 'nnbr-history',
+                                _isYcrrClub
+                                    ? 'ycrr-history'
+                                    : _isNrrClub
+                                    ? 'nrr-history'
+                                    : 'nnbr-history',
                               ),
                               isNrrClub: _isNrrClub,
+                              isYcrrClub: _isYcrrClub,
                               borderColor: _cardBorderColor,
                             ),
                           ),
@@ -317,10 +349,12 @@ class _HistoryPhotoCarousel extends StatefulWidget {
   const _HistoryPhotoCarousel({
     super.key,
     required this.isNrrClub,
+    required this.isYcrrClub,
     required this.borderColor,
   });
 
   final bool isNrrClub;
+  final bool isYcrrClub;
   final Color borderColor;
 
   @override
@@ -331,7 +365,9 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
   int _currentPage = 0;
   Timer? _carouselTimer;
 
-  List<String> get _imagePaths => widget.isNrrClub
+  List<String> get _imagePaths => widget.isYcrrClub
+      ? const []
+      : widget.isNrrClub
       ? const [
           'assets/images/nrrhistory.png',
           'assets/images/nrr11.png',
@@ -356,7 +392,8 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
   @override
   void didUpdateWidget(covariant _HistoryPhotoCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isNrrClub != widget.isNrrClub) {
+    if (oldWidget.isNrrClub != widget.isNrrClub ||
+        oldWidget.isYcrrClub != widget.isYcrrClub) {
       setState(() => _currentPage = 0);
     }
   }
@@ -369,6 +406,30 @@ class _HistoryPhotoCarouselState extends State<_HistoryPhotoCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isYcrrClub) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF10140F),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: widget.borderColor, width: 2),
+        ),
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Club founders photo here',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),

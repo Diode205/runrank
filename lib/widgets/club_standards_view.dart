@@ -262,6 +262,15 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               'assets/images/pic10.png',
               'assets/images/pic11.png',
             ];
+          } else if (lowerClub == 'ycrr' ||
+              lowerClub.contains('your club road runners')) {
+            _carouselImages = const [
+              'assets/images/ycrr1.png',
+              'assets/images/ycrr2.png',
+              'assets/images/ycrr3.png',
+              'assets/images/ycrr4.png',
+              'assets/images/ycrr5.png',
+            ];
           } else {
             // Other clubs get a neutral carousel until bespoke images exist
             _carouselImages = ['assets/images/rank_logo.png'];
@@ -351,6 +360,14 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           'Awards will be presented at the Annual Awards evening.';
     }
 
+    if (club == 'ycrr' || club.contains('your club road runners')) {
+      return 'YCRR Club Standards are shown here as a sample club setup, using the same calculation structure as a full club build.\n\n'
+          'Only races run on or after your club membership date qualify for the award.\n\n'
+          'Qualifying races are typically UKA licensed events and official club handicaps. Parkruns and training runs do not count.\n\n'
+          'A runner may achieve different standards in all categories during the year but only the lowest category will be awarded.\n\n'
+          'Awards are usually presented at the Annual Awards evening.';
+    }
+
     // Generic wording while club is loading / for unknown clubs
     return 'Club Standards require members to achieve qualifying performances '
         'over key distances within a calendar year to earn an award.\n\n'
@@ -371,6 +388,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       return 'https://www.northnorfolkbeachrunners.com/club-standards';
     }
 
+    if (club == 'ycrr' || club.contains('your club road runners')) {
+      return '';
+    }
+
     // Neutral default link if club is unknown/loading
     return 'https://norwichroadrunners.co.uk/club-standards-1';
   }
@@ -384,6 +405,10 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
     if (club.contains('north norfolk beach runners')) {
       return 'View full club standards on NNBR website';
+    }
+
+    if (club == 'ycrr' || club.contains('your club road runners')) {
+      return 'View full clubstands on YCRR website';
     }
 
     return 'View full club standards on club website';
@@ -1460,7 +1485,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               child: Text(isExpanded ? 'Show Less' : 'Read More...'),
             ),
           ],
-          if (url != null) ...[
+          if (url != null && url.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () => _launchUrl(url),
@@ -3744,10 +3769,14 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                           final isNNBR = club.contains(
                             'north norfolk beach runners',
                           );
+                          final isYCRR =
+                              club == 'ycrr' ||
+                              club.contains('your club road runners');
 
                           // While club is unknown/loading, don't show a club hero at all
                           // to avoid a noticeable flash before the club-specific UI.
-                          if (_clubName == null || (!isNRR && !isNNBR)) {
+                          if (_clubName == null ||
+                              (!isNRR && !isNNBR && !isYCRR)) {
                             return const SizedBox.shrink();
                           }
 
@@ -3764,6 +3793,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                             child: Image.asset(
                               isNRR
                                   ? 'assets/images/NRRmain.png'
+                                  : isYCRR
+                                  ? 'assets/images/yourclublogo.png'
                                   : 'assets/images/nnbr_cover.png',
                               width: double.infinity,
                               height: double.infinity,

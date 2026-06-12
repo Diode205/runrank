@@ -29,6 +29,7 @@ class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
     'Norwich Road Runners': 'NRR2026',
     'Runners-next-the-Sea': 'RNTS2026',
     'Wymondham Athletic Club': 'WAC2026',
+    'Your Club Road Runners': 'YCRR2026',
   };
 
   @override

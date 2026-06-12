@@ -6,16 +6,6 @@
     <!-- Network access for Supabase, Firebase, Stripe, web views and external links -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Photo and Video access (Android 13+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-
-    <!-- Storage (Android 12 and below) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission 
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-
     <application
         android:label="RunRank"
         android:name="${applicationName}"

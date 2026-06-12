@@ -24,7 +24,13 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
+  bool get _isYcrrClub {
+    final club = (_clubName ?? '').trim().toLowerCase();
+    return club == 'ycrr' || club.contains('your club road runners');
+  }
+
   final Map<String, String> _raceDates = {
+    'ycrr_sample_5k': 'TBD',
     'wroxham': 'TBD',
     'broadland_1': 'TBD',
     'broadland_2': 'TBD',
@@ -67,6 +73,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     final prefs = await SharedPreferences.getInstance();
     bool changed = false;
     for (final key in [
+      'ycrr_sample_5k',
       'wroxham',
       'broadland_1',
       'broadland_2',
@@ -102,6 +109,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
     try {
       final client = Supabase.instance.client;
       final keys = [
+        'ycrr_sample_5k',
         'wroxham',
         'broadland_1',
         'broadland_2',
@@ -189,6 +197,15 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
   }
 
   Future<void> _openLink(String url) async {
+    if (url.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Link to be added for this club build')),
+        );
+      }
+      return;
+    }
+
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
@@ -490,7 +507,9 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          _isNrrClub ? 'Signature Races' : 'Signature and Handicap Races',
+          (_isNrrClub || _isYcrrClub)
+              ? 'Signature Races'
+              : 'Signature and Handicap Races',
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -593,8 +612,36 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
       ),
     ];
 
+    final ycrrRaces = [
+      _RaceInfo(
+        keyId: 'ycrr_sample_5k',
+        title: 'YCRR Sample 5K',
+        overview:
+            'A sample race card showing how a club signature race can be presented inside RunRank.',
+        location: 'Your Club Race HQ',
+        date: _raceDates['ycrr_sample_5k']!,
+        registration: 'Registration details can be added here.',
+        raceStart: 'Race start 19:00',
+        specialNote: 'Sample club event',
+        specialNoteUrl: null,
+        ticketsUrl: '',
+        resultsUrl: '',
+        mapUrl: '',
+        facilities:
+            'Parking, toilets, race-day instructions, and club notes can be added here.',
+        useClubColors: false,
+        eventType: 'Race',
+        initialRaceName: 'YCRR Sample 5K',
+        initialTime: const TimeOfDay(hour: 19, minute: 0),
+        venueName: 'Your Club Race HQ',
+        venueAddress: 'Sample venue',
+      ),
+    ];
+
     final races = _isNrrClub
         ? nrrRaces
+        : _isYcrrClub
+        ? ycrrRaces
         : [
             _RaceInfo(
               keyId: 'holt',
@@ -684,7 +731,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
             onOpen: _openLink,
           ),
         ),
-      if (!_isNrrClub)
+      if (!_isNrrClub && !_isYcrrClub)
         Padding(
           padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
           child: _HandicapCard(
@@ -697,7 +744,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         ),
     ];
 
-    final initialPage = widget.showHandicapFirst && !_isNrrClub
+    final initialPage = widget.showHandicapFirst && !_isNrrClub && !_isYcrrClub
         ? pages.length - 1
         : 0;
 

@@ -24,11 +24,15 @@ class UserService {
 
     final row = await _client
         .from('user_profiles')
-        .select('is_admin')
+        .select('is_admin, club')
         .eq('id', user.id)
         .maybeSingle();
 
-    return row != null && row['is_admin'] == true;
+    final club = (row?['club'] as String?)?.trim().toLowerCase() ?? '';
+    final isYcrrDemo =
+        club == 'ycrr' || club.contains('your club road runners');
+
+    return row != null && (row['is_admin'] == true || isYcrrDemo);
   }
 
   static String _compactForMatch(String value) {
@@ -191,6 +195,7 @@ class UserService {
 
   /// Shared brand gradient for club UI chrome.
   /// - Norwich Road Runners -> red + white (with 30% alpha)
+  /// - Your Club Road Runners -> yellow + green
   /// - All other clubs (incl. NNBR) -> NNBR yellow + blue
   static List<Color> clubBrandGradient(String? clubName) {
     final lower = clubName?.toLowerCase() ?? '';
@@ -201,6 +206,9 @@ class UserService {
       // Match app_clubs migration: primary '#D32F2F' (strong red), accent '#FFFFFF' (white)
       return const [Color(0x4DD32F2F), Color(0x4DFFFFFF)];
     }
+    if (lower == 'ycrr' || lower.contains('your club road runners')) {
+      return const [Color(0x4DFFD300), Color(0x4D16803A)];
+    }
 
     // Default NNBR-style yellow/blue
     return const [Color(0x4DFFD300), Color(0x4D0057B7)];
@@ -210,6 +218,9 @@ class UserService {
     final lower = clubName?.toLowerCase() ?? '';
     if (lower.contains('norwich road runners')) {
       return const Color(0xFFD32F2F);
+    }
+    if (lower == 'ycrr' || lower.contains('your club road runners')) {
+      return const Color(0xFFFFD300);
     }
     if (lower.isEmpty) {
       return const Color(0xFF6B7280);
