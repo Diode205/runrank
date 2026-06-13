@@ -630,6 +630,7 @@ class _RacesEacclPageState extends State<RacesEacclPage> {
         facilities:
             'Parking, toilets, race-day instructions, and club notes can be added here.',
         useClubColors: false,
+        useYcrrColors: true,
         eventType: 'Race',
         initialRaceName: 'YCRR Sample 5K',
         initialTime: const TimeOfDay(hour: 19, minute: 0),
@@ -774,6 +775,7 @@ class _RaceInfo {
   final String mapUrl;
   final String facilities;
   final bool useClubColors;
+  final bool useYcrrColors;
   final String eventType;
   final String? initialRaceName;
   final TimeOfDay? initialTime;
@@ -799,6 +801,7 @@ class _RaceInfo {
     required this.mapUrl,
     required this.facilities,
     this.useClubColors = false,
+    this.useYcrrColors = false,
     this.eventType = 'Race',
     this.initialRaceName,
     this.initialTime,
@@ -1688,27 +1691,40 @@ class _RaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final useClubColors = info.useClubColors;
+    final useYcrrColors = info.useYcrrColors;
     final hasSeriesDates = info.seriesDates.isNotEmpty;
     final cardGradient = useClubColors
         ? const [Color(0xFF161A21), Color(0xFF0D1016)]
+        : useYcrrColors
+        ? const [Color(0xFF0B2214), Color(0xFF10180F)]
         : const [Color(0xFF141A24), Color(0xFF0D0F18)];
     // Use a neutral border for the outer card so that
     // NRR race pages match the NNBR race styling.
     const borderColor = Color(0xFF1F2A3A);
     final detailBorderColor = useClubColors
         ? const Color(0x52FFFFFF)
+        : useYcrrColors
+        ? const Color(0x6616803A)
         : Colors.white12;
     final detailSurfaceColor = useClubColors
         ? const Color(0xFF11151C)
+        : useYcrrColors
+        ? const Color(0xFF102617)
         : Colors.white.withOpacity(0.04);
     final accentColor = useClubColors
         ? const Color(0xFFD32F2F)
+        : useYcrrColors
+        ? const Color(0xFFFFD300)
         : const Color(0xFFFFD700);
     final specialNoteGradient = useClubColors
         ? const [Color(0xFF1A1E26), Color(0xFF11141B)]
+        : useYcrrColors
+        ? const [Color(0xFF12391F), Color(0xFF0F1E13)]
         : const [Color(0xFF1E3A5F), Color(0xFF0F1E3A)];
     final specialNoteColor = useClubColors
         ? Colors.white
+        : useYcrrColors
+        ? const Color(0xFFFFD300)
         : const Color(0xFF4A90E2);
 
     return Container(
@@ -2023,6 +2039,8 @@ class _RaceCard extends StatelessWidget {
                     onPressed: () => onOpen(info.resultsUrl),
                     color: useClubColors
                         ? const Color(0xFFD32F2F)
+                        : useYcrrColors
+                        ? const Color(0xFFFFD300)
                         : const Color(0xFFFFD700),
                     textColor: useClubColors ? Colors.white : Colors.black,
                   ),
@@ -2035,6 +2053,8 @@ class _RaceCard extends StatelessWidget {
                     onPressed: () => onOpen(info.mapUrl),
                     color: useClubColors
                         ? const Color(0xFF232830)
+                        : useYcrrColors
+                        ? const Color(0xFF16803A)
                         : const Color(0xFF1E88E5),
                   ),
                 ),
@@ -2060,6 +2080,8 @@ class _RaceCard extends StatelessWidget {
         return 'assets/images/worstead5m.png';
       case 'chase':
         return 'assets/images/chasetrain.jpg';
+      case 'ycrr_sample_5k':
+        return 'assets/images/ycrr1.png';
       default:
         return 'assets/images/eaccl.jpg';
     }

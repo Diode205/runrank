@@ -85,8 +85,11 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   }
 
   bool get _isYcrrClub {
-    final club = (_club ?? '').trim().toLowerCase();
-    return club == 'ycrr' || club.contains('your club road runners');
+    final club = (_club ?? '').trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return club == 'ycrr' || club.contains('yourclubroadrunners');
   }
 
   Color get _clubPrimaryColor => _club == null

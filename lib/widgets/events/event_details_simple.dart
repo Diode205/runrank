@@ -492,7 +492,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => setState(() => myResponse = null),
-                child: const Text("Edit Participation"),
+                child: const Text("Change Response"),
               ),
             ],
           ),

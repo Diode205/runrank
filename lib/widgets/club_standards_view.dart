@@ -262,8 +262,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               'assets/images/pic10.png',
               'assets/images/pic11.png',
             ];
-          } else if (lowerClub == 'ycrr' ||
-              lowerClub.contains('your club road runners')) {
+          } else if (_isYcrrClubName(lowerClub)) {
             _carouselImages = const [
               'assets/images/ycrr1.png',
               'assets/images/ycrr2.png',
@@ -360,7 +359,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
           'Awards will be presented at the Annual Awards evening.';
     }
 
-    if (club == 'ycrr' || club.contains('your club road runners')) {
+    if (_isYcrrClubName(club)) {
       return 'YCRR Club Standards are shown here as a sample club setup, using the same calculation structure as a full club build.\n\n'
           'Only races run on or after your club membership date qualify for the award.\n\n'
           'Qualifying races are typically UKA licensed events and official club handicaps. Parkruns and training runs do not count.\n\n'
@@ -388,7 +387,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       return 'https://www.northnorfolkbeachrunners.com/club-standards';
     }
 
-    if (club == 'ycrr' || club.contains('your club road runners')) {
+    if (_isYcrrClubName(club)) {
       return '';
     }
 
@@ -407,7 +406,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       return 'View full club standards on NNBR website';
     }
 
-    if (club == 'ycrr' || club.contains('your club road runners')) {
+    if (_isYcrrClubName(club)) {
       return 'View full clubstands on YCRR website';
     }
 
@@ -419,6 +418,16 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
 
   bool _isNnbrClub() =>
       (_clubName ?? '').toLowerCase().contains('north norfolk beach runners');
+
+  bool _isYcrrClubName(String? clubName) {
+    final compact = (clubName ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
+  }
+
+  bool _isYcrrClub() => _isYcrrClubName(_clubName);
 
   Color get _vaultSheetColor {
     if (_isNrrClub()) return const Color(0xFF2A0808);
@@ -458,16 +467,20 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
     );
   }
 
-  double _topClubPhotoHeight(BuildContext context, {required bool isNrr}) {
+  double _topClubPhotoHeight(
+    BuildContext context, {
+    required bool isNrr,
+    bool isYcrr = false,
+  }) {
     final width = MediaQuery.sizeOf(context).width;
-    final ratio = isNrr ? 0.49 : 0.36;
+    final ratio = isNrr ? 0.49 : (isYcrr ? 0.47 : 0.36);
     final isPhone = width < 700;
     final minHeight = isPhone
-        ? (isNrr ? 165.0 : 130.0)
-        : (isNrr ? 230.0 : 170.0);
+        ? (isNrr ? 165.0 : (isYcrr ? 160.0 : 130.0))
+        : (isNrr ? 230.0 : (isYcrr ? 250.0 : 170.0));
     final maxHeight = isPhone
-        ? (isNrr ? 240.0 : 190.0)
-        : (isNrr ? 620.0 : 420.0);
+        ? (isNrr ? 240.0 : (isYcrr ? 220.0 : 190.0))
+        : (isNrr ? 620.0 : (isYcrr ? 520.0 : 420.0));
     return (width * ratio).clamp(minHeight, maxHeight);
   }
 
@@ -544,6 +557,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
       final clubName =
           (profile?['club'] as String?)?.trim() ?? _clubName?.trim();
       if (clubName == null || clubName.isEmpty) return false;
+      if (_isYcrrClubName(clubName)) return true;
 
       final rows = await client
           .from('committee_roles')
@@ -3761,7 +3775,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   // TOP CLUB PHOTO (static)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
                       child: Builder(
                         builder: (context) {
                           final club = (_clubName ?? '').toLowerCase();
@@ -3769,9 +3783,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                           final isNNBR = club.contains(
                             'north norfolk beach runners',
                           );
-                          final isYCRR =
-                              club == 'ycrr' ||
-                              club.contains('your club road runners');
+                          final isYCRR = _isYcrrClubName(club);
 
                           // While club is unknown/loading, don't show a club hero at all
                           // to avoid a noticeable flash before the club-specific UI.
@@ -3783,23 +3795,37 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                           // Common container with rounded corners & clipping so
                           // both clubs get visibly rounded images.
                           return Container(
-                            height: _topClubPhotoHeight(context, isNrr: isNRR),
+                            height: _topClubPhotoHeight(
+                              context,
+                              isNrr: isNRR,
+                              isYcrr: isYCRR,
+                            ),
                             width: double.infinity,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
                               color: Colors.black,
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: Image.asset(
-                              isNRR
-                                  ? 'assets/images/NRRmain.png'
-                                  : isYCRR
-                                  ? 'assets/images/yourclublogo.png'
-                                  : 'assets/images/nnbr_cover.png',
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.center,
+                            child: Padding(
+                              padding: isYCRR
+                                  ? const EdgeInsets.symmetric(horizontal: 2)
+                                  : EdgeInsets.zero,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  isYCRR ? 24 : 0,
+                                ),
+                                child: Image.asset(
+                                  isNRR
+                                      ? 'assets/images/NRRmain.png'
+                                      : isYCRR
+                                      ? 'assets/images/yourclublogo1.png'
+                                      : 'assets/images/nnbr_cover.png',
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.center,
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -3810,7 +3836,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                   // INPUT FORM
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -3901,6 +3927,7 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
               final isNRR =
                   _clubName != null &&
                   _clubName!.toLowerCase().contains('norwich road runners');
+              final isYCRR = _isYcrrClub();
 
               return Row(
                 children: [
@@ -3989,6 +4016,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isNRR
                                   ? Colors.white
+                                  : isYCRR
+                                  ? const Color(0xFF16803A)
                                   : const Color(0xFF0D47A1),
                               foregroundColor: isNRR
                                   ? Colors.black
@@ -3999,6 +4028,8 @@ class _ClubStandardsViewState extends State<ClubStandardsView>
                                 side: BorderSide(
                                   color: isNRR
                                       ? Colors.black87
+                                      : isYCRR
+                                      ? const Color(0xFFFFD300)
                                       : Colors.white70,
                                   width: 1.3,
                                 ),

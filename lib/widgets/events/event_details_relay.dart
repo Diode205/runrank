@@ -28,6 +28,8 @@ class RelayEventDetailsPage extends StatefulWidget {
 
 class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     with EventDetailsBaseMixin<RelayEventDetailsPage> {
+  bool _isChangingResponse = false;
+
   // Relay-specific stages
   final List<Map<String, dynamic>> relayStages = [
     {'stage': 1, 'distance': '16.32 miles', 'details': 'Start to Kings Lynn'},
@@ -566,6 +568,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
     if (hasResponse) {
       final responseType = myResponse!["response_type"] as String?;
+      final showResponseControls =
+          canViewEventResponseLists || _isChangingResponse;
       return Container(
         margin: const EdgeInsets.only(top: 16),
         decoration: BoxDecoration(
@@ -622,10 +626,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                           ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: () => _deleteRole('type'),
-                      child: const Text('❌', style: TextStyle(fontSize: 18)),
-                    ),
+                    if (showResponseControls)
+                      GestureDetector(
+                        onTap: () => _deleteRole('type'),
+                        child: const Text('❌', style: TextStyle(fontSize: 18)),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -654,10 +659,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                         ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: () => _deleteRole('roles'),
-                      child: const Text('❌', style: TextStyle(fontSize: 18)),
-                    ),
+                    if (showResponseControls)
+                      GestureDetector(
+                        onTap: () => _deleteRole('roles'),
+                        child: const Text('❌', style: TextStyle(fontSize: 18)),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -674,14 +680,15 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => _deleteRole('type'),
-                      child: const Text('❌', style: TextStyle(fontSize: 18)),
-                    ),
+                    if (showResponseControls)
+                      GestureDetector(
+                        onTap: () => _deleteRole('type'),
+                        child: const Text('❌', style: TextStyle(fontSize: 18)),
+                      ),
                   ],
                 ),
               ],
-              if (!_usesRunningOnlyFlow) ...[
+              if (showResponseControls && !_usesRunningOnlyFlow) ...[
                 const SizedBox(height: 12),
                 Center(
                   child: FilledButton.icon(
@@ -689,6 +696,36 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                     icon: const Icon(Icons.add),
                     label: const Text("Add Role"),
                   ),
+                ),
+              ],
+              if (!canViewEventResponseLists) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: _isChangingResponse
+                      ? Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            if (_usesRunningOnlyFlow)
+                              FilledButton.icon(
+                                onPressed: showRelayRunningDialog,
+                                icon: const Icon(Icons.edit),
+                                label: const Text('Update Response'),
+                              ),
+                            OutlinedButton(
+                              onPressed: () =>
+                                  setState(() => _isChangingResponse = false),
+                              child: const Text('Done'),
+                            ),
+                          ],
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () =>
+                              setState(() => _isChangingResponse = true),
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Change Response'),
+                        ),
                 ),
               ],
             ],
@@ -736,7 +773,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
             // Marshal button
             FilledButton(
               onPressed: canMarshal
-                  ? () => submitResponse(type: "volunteer")
+                  ? () => _submitRelayResponse(type: "volunteer")
                   : () => ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -962,12 +999,29 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
 
     // Update response after deletion
     if (mounted) {
-      submitResponse(
+      _submitRelayResponse(
         type: myResponse?["response_type"] ?? "unavailable",
         relayStages: myRelayStages.isNotEmpty ? myRelayStages : null,
         relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
         predictedPace: myPredictedPace,
       );
+    }
+  }
+
+  Future<void> _submitRelayResponse({
+    required String type,
+    List<int>? relayStages,
+    List<String>? relayRoles,
+    int? predictedPace,
+  }) async {
+    await submitResponse(
+      type: type,
+      relayStages: relayStages,
+      relayRoles: relayRoles,
+      predictedPace: predictedPace,
+    );
+    if (mounted) {
+      setState(() => _isChangingResponse = false);
     }
   }
 
@@ -1014,7 +1068,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     if (choice == 'running') {
       await showRelayRunningDialog();
     } else if (choice == 'marshal') {
-      await submitResponse(type: "volunteer");
+      await _submitRelayResponse(type: "volunteer");
     } else if (choice == 'support') {
       await showRelaySupportingDialog();
     }
@@ -1025,7 +1079,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       myRelayStages = [];
       myPredictedPace = null;
       myPredictedFinishHHMMSS = null;
-      await submitResponse(type: "run");
+      await _submitRelayResponse(type: "run");
       return;
     }
 
@@ -1060,7 +1114,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         myPredictedPace = paceSeconds;
       }
 
-      submitResponse(
+      _submitRelayResponse(
         type: "run",
         relayStages: myRelayStages,
         relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
@@ -1078,7 +1132,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     );
     if (roles != null && roles.isNotEmpty) {
       myRelayRoles = roles;
-      submitResponse(
+      _submitRelayResponse(
         type: "support",
         relayRoles: myRelayRoles,
         relayStages: myRelayStages.isNotEmpty ? myRelayStages : null,

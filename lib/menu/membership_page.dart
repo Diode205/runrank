@@ -102,13 +102,28 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
     return normalized == 'norwich road runners' || normalized == 'nrr';
   }
 
+  bool get _isYcrrClub {
+    final compact = (_clubName ?? '').trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
+  }
+
   bool get _showDigitalMembershipBackup =>
       _isNrrClub && PaymentService.nrrMembershipPaymentsEnabled;
 
-  Color get _clubPrimaryColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : _nnbrYellow;
+  Color get _clubPrimaryColor => _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
+      : _nnbrYellow;
 
-  Color get _clubSecondaryColor => _isNrrClub ? Colors.white : _nnbrBlue;
+  Color get _clubSecondaryColor => _isNrrClub
+      ? Colors.white
+      : _isYcrrClub
+      ? _nnbrYellow
+      : _nnbrBlue;
 
   Map<String, int> get _defaultTierAmounts => _isNrrClub
       ? const {'1st Claim': 4200, '2nd Claim': 2300}
@@ -634,25 +649,29 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   Widget _buildMembershipBadge(String type, Color color) {
     if (!_isNrrClub) {
       String assetPath;
-      switch (type) {
-        case '1st Claim':
-          assetPath = 'assets/images/firstclaim.png';
-          break;
-        case '2nd Claim':
-          assetPath = 'assets/images/secondclaim.png';
-          break;
-        case 'Social':
-          assetPath = 'assets/images/socialclaim.png';
-          break;
-        case 'Full-Time Education':
-          assetPath = 'assets/images/fulleduc.png';
-          break;
-        default:
-          assetPath = 'assets/images/nnbr_logo.png';
+      if (_isYcrrClub) {
+        assetPath = 'assets/images/yourclublogo1.png';
+      } else {
+        switch (type) {
+          case '1st Claim':
+            assetPath = 'assets/images/firstclaim.png';
+            break;
+          case '2nd Claim':
+            assetPath = 'assets/images/secondclaim.png';
+            break;
+          case 'Social':
+            assetPath = 'assets/images/socialclaim.png';
+            break;
+          case 'Full-Time Education':
+            assetPath = 'assets/images/fulleduc.png';
+            break;
+          default:
+            assetPath = 'assets/images/nnbr_logo.png';
+        }
       }
 
       return Container(
-        width: 74,
+        width: _isYcrrClub ? 92 : 74,
         height: 74,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -666,7 +685,10 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.asset(assetPath, fit: BoxFit.contain),
+          child: Image.asset(
+            assetPath,
+            fit: _isYcrrClub ? BoxFit.cover : BoxFit.contain,
+          ),
         ),
       );
     }
@@ -736,8 +758,12 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
   }
 
   Widget _buildMembershipTiers() {
-    final firstClaimColor = _isNrrClub ? _clubPrimaryColor : _nnbrYellow;
-    final secondClaimColor = _isNrrClub ? _clubSecondaryColor : _nnbrBlue;
+    final firstClaimColor = _isNrrClub || _isYcrrClub
+        ? _clubPrimaryColor
+        : _nnbrYellow;
+    final secondClaimColor = _isNrrClub || _isYcrrClub
+        ? _clubSecondaryColor
+        : _nnbrBlue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,6 +1016,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                   child: Text(
                     _isNrrClub
                         ? "About NRR Membership"
+                        : _isYcrrClub
+                        ? "About YCRR Membership"
                         : "About NNBR Membership",
                     style: TextStyle(
                       fontSize: 16,
@@ -1018,6 +1046,8 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
                 TextSpan(
                   text: _isNrrClub
                       ? 'Your Norwich Road Runners Membership includes access to all of the clubs training and road running sessions, use of the facilities, affiliation with UK Athletics (£19) with a discount on entering races.\n\nFor more information visit '
+                      : _isYcrrClub
+                      ? 'YCRR membership is shown here as a sample club setup, keeping members connected to training, racing, social events and member activities across the year.\n\nFor more information visit '
                       : 'NNBR membership keeps you connected to club training, racing, social events and member activities across the year.\n\nFor more information visit ',
                 ),
                 WidgetSpan(
@@ -1175,20 +1205,26 @@ class _MembershipPageState extends State<MembershipPage> with RouteAware {
               textAlign: TextAlign.center,
             ),
           ] else ...[
-            const Text(
-              'NNBR membership offers four membership types so runners, social members and students can choose the option that fits them best.',
+            Text(
+              _isYcrrClub
+                  ? 'YCRR membership offers sample membership types so prospective clubs can see how member renewals and options appear in the app.'
+                  : 'NNBR membership offers four membership types so runners, social members and students can choose the option that fits them best.',
               style: TextStyle(fontSize: 13, color: Colors.white70),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Choose First Claim, Second Claim, Social or Full-Time Education membership depending on your current athletics status and how you want to take part in club life.',
+            Text(
+              _isYcrrClub
+                  ? 'Clubs can adapt these options to their own membership structure, payment process and renewal workflow.'
+                  : 'Choose First Claim, Second Claim, Social or Full-Time Education membership depending on your current athletics status and how you want to take part in club life.',
               style: TextStyle(fontSize: 13, color: Colors.white70),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Membership supports training, racing, club communications and social events throughout the year.',
+            Text(
+              _isYcrrClub
+                  ? 'Membership pages can support club communications, renewals, reports and member administration throughout the year.'
+                  : 'Membership supports training, racing, club communications and social events throughout the year.',
               style: TextStyle(fontSize: 13, color: Colors.white70),
               textAlign: TextAlign.center,
             ),

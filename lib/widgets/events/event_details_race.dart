@@ -466,7 +466,7 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
                 children: [
                   OutlinedButton(
                     onPressed: () => setState(() => myResponse = null),
-                    child: const Text("Edit"),
+                    child: const Text("Change Response"),
                   ),
                   const SizedBox(width: 12),
                   TextButton(

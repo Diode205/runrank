@@ -118,7 +118,7 @@ class _PoliciesFormsNoticesPageState extends State<PoliciesFormsNoticesPage> {
       : _isNrrClub
       ? 'assets/images/nrrgov2.png'
       : _isYcrrClub
-      ? 'assets/images/yourclublogo.png'
+      ? 'assets/images/yourclublogo1.png'
       : 'assets/images/nnbrdocs.png';
 
   Color get _backgroundColor => !_clubResolved

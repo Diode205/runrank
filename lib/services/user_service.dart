@@ -18,6 +18,14 @@ class UserService {
     _cachedClubName = null;
   }
 
+  static bool _isYcrrClubName(String? clubName) {
+    final compact = (clubName ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
+  }
+
   static Future<bool> isAdmin() async {
     final user = _client.auth.currentUser;
     if (user == null) return false;
@@ -28,9 +36,8 @@ class UserService {
         .eq('id', user.id)
         .maybeSingle();
 
-    final club = (row?['club'] as String?)?.trim().toLowerCase() ?? '';
-    final isYcrrDemo =
-        club == 'ycrr' || club.contains('your club road runners');
+    final club = row?['club'] as String?;
+    final isYcrrDemo = _isYcrrClubName(club);
 
     return row != null && (row['is_admin'] == true || isYcrrDemo);
   }
@@ -96,6 +103,7 @@ class UserService {
 
       final clubName = (profile?['club'] as String?)?.trim();
       if (clubName == null || clubName.isEmpty) return false;
+      if (_isYcrrClubName(clubName)) return true;
 
       final profileEmail =
           (profile?['email'] as String?)?.trim().toLowerCase() ??
@@ -206,7 +214,7 @@ class UserService {
       // Match app_clubs migration: primary '#D32F2F' (strong red), accent '#FFFFFF' (white)
       return const [Color(0x4DD32F2F), Color(0x4DFFFFFF)];
     }
-    if (lower == 'ycrr' || lower.contains('your club road runners')) {
+    if (_isYcrrClubName(lower)) {
       return const [Color(0x4DFFD300), Color(0x4D16803A)];
     }
 
@@ -219,7 +227,7 @@ class UserService {
     if (lower.contains('norwich road runners')) {
       return const Color(0xFFD32F2F);
     }
-    if (lower == 'ycrr' || lower.contains('your club road runners')) {
+    if (_isYcrrClubName(lower)) {
       return const Color(0xFFFFD300);
     }
     if (lower.isEmpty) {

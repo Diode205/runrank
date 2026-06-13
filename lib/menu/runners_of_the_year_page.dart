@@ -31,16 +31,28 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
     return lower == 'nrr' || lower.contains('norwich road runners');
   }
 
+  bool get _isYcrrClub {
+    final compact = (_clubName ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
+  }
+
   List<Color> get _appBarGradient => !_clubResolved
       ? const [Color(0xFF1B1B1B), Color(0xFF080808)]
       : _isNrrClub
       ? const [Color(0xFF000000), Color(0xFF6E1118)]
+      : _isYcrrClub
+      ? const [Color(0xFF041207), Color(0xFF16803A)]
       : UserService.clubBrandGradient(_clubName);
 
   List<Color> get _pageBackgroundGradient => !_clubResolved
       ? const [Color(0xFF050505), Color(0xFF121212), Color(0xFF000000)]
       : _isNrrClub
       ? const [Color(0xFF050505), Color(0xFF19090C), Color(0xFF000000)]
+      : _isYcrrClub
+      ? const [Color(0xFF020803), Color(0xFF0B2412), Color(0xFF000000)]
       : UserService.clubBrandGradient(
           _clubName,
         ).map((c) => c.withValues(alpha: 0.1)).toList();
@@ -49,12 +61,16 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
       ? 'assets/images/rank_logo.png'
       : _isNrrClub
       ? 'assets/images/nrraward.png'
+      : _isYcrrClub
+      ? 'assets/images/ycrr3.png'
       : 'assets/images/awards.png';
 
   List<Color> get _heroRibbonGradient => !_clubResolved
       ? const [Color(0xFF2C2C2C), Color(0xFF121212)]
       : _isNrrClub
       ? const [Color(0xFFB71C1C), Color(0xFF111111)]
+      : _isYcrrClub
+      ? const [Color(0xFF16803A), Color(0xFFFFD300)]
       : const [blue, yellow];
 
   List<Color> get _heroShadeGradient => _isNrrClub
@@ -65,12 +81,16 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
       ? const Color(0xFF121212)
       : _isNrrClub
       ? const Color(0xFF101010)
+      : _isYcrrClub
+      ? const Color(0xFF0E1E13)
       : const Color(0xFF0F111A);
 
   Color get _pageBorderColor => !_clubResolved
       ? const Color(0x663A3A3A)
       : _isNrrClub
       ? const Color(0x66D32F2F)
+      : _isYcrrClub
+      ? const Color(0x9916803A)
       : yellow;
 
   Color get _titleAccentColor => Colors.white;
@@ -79,19 +99,33 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
       ? Colors.white70
       : _isNrrClub
       ? Colors.white70
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
       : const Color.fromRGBO(30, 145, 233, 0.702);
 
-  Color get _addButtonColor =>
-      !_clubResolved ? Colors.white70 : (_isNrrClub ? Colors.white : yellow);
+  Color get _addButtonColor => !_clubResolved
+      ? Colors.white70
+      : (_isNrrClub
+            ? Colors.white
+            : _isYcrrClub
+            ? const Color(0xFFFFD300)
+            : yellow);
 
   Color get _tabStripColor => !_clubResolved
       ? const Color(0xFF111111)
       : _isNrrClub
       ? const Color(0xFF050505)
+      : _isYcrrClub
+      ? const Color(0xFF06140B)
       : const Color(0xFF0F111A);
 
-  Color get _tabSelectedColor =>
-      !_clubResolved ? const Color(0xFF4A4A4A) : (_isNrrClub ? nrrRed : yellow);
+  Color get _tabSelectedColor => !_clubResolved
+      ? const Color(0xFF4A4A4A)
+      : (_isNrrClub
+            ? nrrRed
+            : _isYcrrClub
+            ? const Color(0xFF16803A)
+            : yellow);
 
   Color get _tabUnselectedColor => !_clubResolved
       ? Colors.white24
@@ -749,6 +783,8 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
                                   style: TextStyle(
                                     color: _isNrrClub
                                         ? Colors.white
+                                        : _isYcrrClub
+                                        ? const Color(0xFF041207)
                                         : Colors.black,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
@@ -825,6 +861,8 @@ class _RunnersOfTheYearPageState extends State<RunnersOfTheYearPage>
             gradient: LinearGradient(
               colors: _isNrrClub
                   ? const [Color(0xFF181818), Color(0xFF080808)]
+                  : _isYcrrClub
+                  ? const [Color(0xFF102617), Color(0xFF07140B)]
                   : const [Color(0xFF141722), Color(0xFF0F111A)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,

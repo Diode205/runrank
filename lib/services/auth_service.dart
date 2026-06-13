@@ -74,9 +74,11 @@ class AuthService {
   }
 
   static bool _isYcrrClub(String? club) {
-    final normalized = club?.trim().toLowerCase() ?? '';
-    return normalized == 'ycrr' ||
-        normalized.contains('your club road runners');
+    final compact = (club ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
   }
 
   // -------------------------------------------------------

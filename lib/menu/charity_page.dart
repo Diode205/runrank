@@ -51,35 +51,55 @@ class _CharityPageState extends State<CharityPage> {
     return lower == 'nrr' || lower.contains('norwich road runners');
   }
 
+  bool get _isYcrrClub {
+    final compact = (_clubName ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
+  }
+
   List<Color> get _brandGradient => UserService.clubBrandGradient(_clubName);
 
   Color get _backgroundColor => _clubName == null
       ? const Color(0xFF101010)
       : _isNrrClub
       ? const Color(0xFF140708)
+      : _isYcrrClub
+      ? const Color(0xFF06140B)
       : const Color(0xFF07121F);
 
   Color get _surfaceColor => _clubName == null
       ? const Color(0xFF1A1A1A)
       : _isNrrClub
       ? const Color(0xFF241112)
+      : _isYcrrClub
+      ? const Color(0xFF102617)
       : const Color(0xFF0F111A);
 
   Color get _primaryColor => _clubName == null
       ? const Color(0xFF3A3A3A)
       : _isNrrClub
       ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
       : const Color(0xFF0057B7);
 
   Color get _accentColor => _clubName == null
       ? Colors.white70
       : (_isNrrClub ? Colors.white : const Color(0xFFFFD300));
 
-  Color get _borderColor =>
-      _isNrrClub ? const Color(0x66D32F2F) : const Color(0x66FFD300);
+  Color get _borderColor => _isNrrClub
+      ? const Color(0x66D32F2F)
+      : _isYcrrClub
+      ? const Color(0x6616803A)
+      : const Color(0x66FFD300);
 
-  Color get _overlayLabelColor =>
-      _isNrrClub ? const Color(0xFFF5D7D7) : const Color(0xFFE8F1FF);
+  Color get _overlayLabelColor => _isNrrClub
+      ? const Color(0xFFF5D7D7)
+      : _isYcrrClub
+      ? const Color(0xFFFFF2A8)
+      : const Color(0xFFE8F1FF);
 
   String _formatCurrency(dynamic amount) {
     final value = amount is num
