@@ -125,6 +125,12 @@ class _LoginScreenState extends State<LoginScreen> {
               },
               child: const Text("Migrate an Account"),
             ),
+            const SizedBox(height: 12),
+            const Text(
+              'By logging in, you agree to RunRank Terms of Use. RunRank has zero tolerance for objectionable content, harassment, abusive behaviour, or misuse of member data. Members can report objectionable posts and block abusive users.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
           ],
         ),
       ),

@@ -594,7 +594,7 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Text(
-                  'By using RunRank, you agree to use the app responsibly and comply with your club\'s code of conduct. Do not misuse features, attempt to access other users\' data, or violate local laws.',
+                  'By using RunRank, you agree to use the app responsibly and comply with your club\'s code of conduct. RunRank has zero tolerance for objectionable content, harassment, abusive behaviour, or misuse of member data. Members can report objectionable posts and block abusive users, and club admins are notified to review reports within 24 hours. Do not misuse features, attempt to access other users\' data, or violate local laws.',
                   style: TextStyle(color: Colors.white70),
                 ),
               ),

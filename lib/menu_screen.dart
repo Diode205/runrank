@@ -69,7 +69,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
   String? _fullName;
   String? _email;
   String? _ukaNumber;
-  String? _club = UserService.cachedClubName;
+  String? _club;
   String? _avatarUrl;
   DateTime? _memberSince;
   String? _membershipType;

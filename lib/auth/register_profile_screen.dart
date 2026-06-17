@@ -25,6 +25,8 @@ class RegisterProfileScreen extends StatefulWidget {
 class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   static const String _appPrivacyUrl =
       'https://docs.google.com/document/d/e/2PACX-1vSTrQ3pEMf5sGX1EItOjY4U72Am2R0ORxdJFzzEy2U2zNXDc1WFFo7Qp-JuTLctrwuwG6eMQAEyMdf7/pub';
+  static const String _appTermsUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vQWuKHlmIfJWxZiyr-sT2pXhGaU4zTAGFL3G1Cm_keLnja76E6eXzkUYFyPkyR4rL95JftlQK63FV8N/pub';
 
   final email = TextEditingController();
   final name = TextEditingController();
@@ -347,7 +349,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
               value: agreeAppPolicy,
               onChanged: (v) => setState(() => agreeAppPolicy = v ?? false),
               title: const Text(
-                "I agree to RunRank's app Privacy Policy",
+                "I agree to RunRank's app Privacy Policy and Terms of Use",
                 style: TextStyle(fontSize: 13),
               ),
               controlAffinity: ListTileControlAffinity.leading,
@@ -492,21 +494,35 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             _bullet('No run tracking, no ads, no analytics'),
             _bullet('Payments are processed securely by Stripe'),
             _bullet('Photos and posts are published only after admin approval'),
+            _bullet(
+              'RunRank has zero tolerance for objectionable content, harassment, abusive behaviour, or misuse of member data',
+            ),
+            _bullet(
+              'Members can report objectionable posts and block abusive users; club admins are notified and expected to review reports within 24 hours',
+            ),
             _bullet('You can delete your profile at any time'),
             _bullet(
               'Club admins may remove profiles for inactive or unpaid memberships',
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 2,
               children: [
                 TextButton(
                   onPressed: _openAppPrivacy,
                   child: const Text(
-                    'View Full App Privacy Policy',
+                    'View Full RunRank Privacy',
                     style: TextStyle(color: Colors.amber),
                   ),
                 ),
-                const Spacer(),
+                TextButton(
+                  onPressed: _openAppTerms,
+                  child: const Text(
+                    'View RunRank Terms of Use',
+                    style: TextStyle(color: Colors.amber),
+                  ),
+                ),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -519,7 +535,7 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                     );
                   },
                   child: const Text(
-                    'Read more',
+                    'View Club Policies & Governance',
                     style: TextStyle(color: Colors.amber),
                   ),
                 ),
@@ -555,6 +571,14 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
   Future<void> _openAppPrivacy() async {
     await launchUrl(
       Uri.parse(_appPrivacyUrl),
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
+  }
+
+  Future<void> _openAppTerms() async {
+    await launchUrl(
+      Uri.parse(_appTermsUrl),
       mode: LaunchMode.inAppWebView,
       webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
     );

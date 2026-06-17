@@ -25,7 +25,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   bool loading = true;
   bool isAdmin = false;
 
-  String? _clubName = UserService.cachedClubName;
+  String? _clubName;
 
   RealtimeChannel? _postChannel;
   RealtimeChannel? _postReactionsChannel;
@@ -161,8 +161,28 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           _clubName = clubName;
         });
       }
+      UserService.cacheClubName(clubName);
     } catch (e) {
       debugPrint('Error checking admin status: $e');
+    }
+  }
+
+  Future<Set<String>?> _resolveCurrentClubUserIds() async {
+    final clubName = _clubName ?? UserService.cachedClubName;
+    if (clubName == null || clubName.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final ids = await NotificationService.userIdsForClub(clubName);
+      final currentUserId = supabase.auth.currentUser?.id;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        ids.add(currentUserId);
+      }
+      return ids.isEmpty ? null : ids;
+    } catch (e) {
+      debugPrint('PostsFeedFacebook: error loading club user ids: $e');
+      return null;
     }
   }
 
@@ -171,26 +191,15 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       final now = DateTime.now().toIso8601String();
       final user = supabase.auth.currentUser;
 
-      // For non-admins, don't load anything until we've resolved
-      // their club; otherwise the initial load after app start can
-      // briefly show posts from all clubs.
-      if (!isAdmin) {
-        final clubNameCheck = _clubName;
-        if (clubNameCheck == null || clubNameCheck.isEmpty) {
-          return;
+      final clubUserIds = await _resolveCurrentClubUserIds();
+      if (clubUserIds == null || clubUserIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            posts = [];
+            loading = false;
+          });
         }
-      }
-
-      // Resolve club user IDs for current club; if none, fall back to
-      // legacy behaviour (no club filter).
-      Set<String> clubUserIds = {};
-      final clubName = _clubName;
-      if (clubName != null && clubName.isNotEmpty) {
-        try {
-          clubUserIds = await NotificationService.userIdsForClub(clubName);
-        } catch (e) {
-          debugPrint('PostsFeedFacebook: error loading club user ids: $e');
-        }
+        return;
       }
 
       var query = supabase
@@ -202,18 +211,12 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           ''')
           .gte('expiry_date', now);
 
-      // Non-admins: restrict to approved posts from this club, plus
-      // their own posts regardless of club if necessary.
       if (!isAdmin) {
-        query = query.eq('is_approved', true);
-        if (clubUserIds.isNotEmpty) {
-          query = query.inFilter('author_id', clubUserIds.toList());
-        }
+        query = query
+            .eq('is_approved', true)
+            .inFilter('author_id', clubUserIds.toList());
       } else {
-        // Admins: restrict to this club's posts when clubUserIds is set.
-        if (clubUserIds.isNotEmpty) {
-          query = query.inFilter('author_id', clubUserIds.toList());
-        }
+        query = query.inFilter('author_id', clubUserIds.toList());
       }
 
       final response = await query.order('created_at', ascending: false);
@@ -685,12 +688,30 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
   }
 
   Future<void> _approvePost(String id) async {
+    final post = await supabase
+        .from('club_posts')
+        .select('author_id, title')
+        .eq('id', id)
+        .maybeSingle();
+
     await supabase
         .from('club_posts')
         .update({'is_approved': true})
         .eq('id', id);
 
-    _loadPosts();
+    final authorId = post?['author_id'] as String?;
+    final title = (post?['title'] ?? 'Post').toString();
+    if (authorId != null) {
+      await NotificationService.notifyUser(
+        userId: authorId,
+        title: 'Post Approved',
+        body:
+            'Your post "$title" has been approved and is now visible to club members.',
+        route: 'posts',
+      );
+    }
+
+    await _loadPosts();
   }
 
   Future<void> _rejectPost(String id) async {
@@ -700,11 +721,11 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Reject Post'),
+          title: const Text('Deny Post'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Please provide a reason for rejecting this post:'),
+              const Text('Please provide a reason for denying this post:'),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
@@ -712,7 +733,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: 'Reason for rejection',
+                  hintText: 'Reason for denial',
                 ),
               ),
             ],
@@ -729,7 +750,7 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
                 }
                 Navigator.pop(context, true);
               },
-              child: const Text('Send'),
+              child: const Text('Deny'),
             ),
           ],
         );
@@ -848,12 +869,24 @@ class _PostCard extends StatelessWidget {
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.check, color: Colors.green),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.greenAccent,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('Approve'),
                         onPressed: onApprove,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.red),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        icon: const Icon(Icons.cancel, size: 18),
+                        label: const Text('Deny'),
                         onPressed: onReject,
                       ),
                     ],
@@ -861,11 +894,13 @@ class _PostCard extends StatelessWidget {
                 : null,
           ),
           if (isPending)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                'Pending approval (only visible to you)',
-                style: TextStyle(
+                isAdmin
+                    ? 'Pending approval'
+                    : 'Pending approval (only visible to you)',
+                style: const TextStyle(
                   color: Colors.amber,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

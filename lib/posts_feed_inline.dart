@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/admin/create_post_page.dart';
 import 'package:runrank/services/user_service.dart';
@@ -20,10 +21,11 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
   bool isAdmin = false;
-  String? _clubName = UserService.cachedClubName;
+  String? _clubName;
   RealtimeChannel? _postChannel;
   RealtimeChannel? _postReactionsChannel;
   RealtimeChannel? _postCommentsChannel;
+  final Set<String> _blockedAuthorIds = <String>{};
 
   // Track expanded states per post
   final Map<String, bool> _expandedReactions = {};
@@ -53,9 +55,25 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   @override
   void initState() {
     super.initState();
+    _loadBlockedAuthors();
     _setupRealtime();
-    _checkAdminStatus();
-    _loadPosts();
+    _initPosts();
+  }
+
+  Future<void> _initPosts() async {
+    await _checkAdminStatus();
+    await _loadPosts();
+  }
+
+  Future<void> _loadBlockedAuthors() async {
+    final prefs = await SharedPreferences.getInstance();
+    final blocked = prefs.getStringList('blocked_post_author_ids') ?? [];
+    if (!mounted) return;
+    setState(() {
+      _blockedAuthorIds
+        ..clear()
+        ..addAll(blocked);
+    });
   }
 
   void _setupRealtime() {
@@ -136,9 +154,29 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
           isAdmin = profile['is_admin'] ?? false;
           _clubName = clubName;
         });
+        UserService.cacheClubName(clubName);
       }
     } catch (e) {
       debugPrint('Error checking admin status: $e');
+    }
+  }
+
+  Future<Set<String>?> _resolveCurrentClubUserIds() async {
+    final clubName = _clubName ?? UserService.cachedClubName;
+    if (clubName == null || clubName.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final ids = await NotificationService.userIdsForClub(clubName);
+      final currentUserId = supabase.auth.currentUser?.id;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        ids.add(currentUserId);
+      }
+      return ids.isEmpty ? null : ids;
+    } catch (e) {
+      debugPrint('PostsFeedInline: error loading club user ids: $e');
+      return null;
     }
   }
 
@@ -308,6 +346,16 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
     try {
       final now = DateTime.now().toIso8601String();
       final user = supabase.auth.currentUser;
+      final clubUserIds = await _resolveCurrentClubUserIds();
+      if (clubUserIds == null || clubUserIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            posts = [];
+            loading = false;
+          });
+        }
+        return;
+      }
 
       List data;
       if (isAdmin) {
@@ -317,6 +365,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
               '*, user_profiles!club_posts_author_id_fkey(full_name, avatar_url, membership_type), club_post_attachments(*)',
             )
             .gte('expiry_date', now)
+            .inFilter('author_id', clubUserIds.toList())
             .order('created_at', ascending: false);
       } else if (user != null) {
         final approved = await supabase
@@ -326,6 +375,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
             )
             .gte('expiry_date', now)
             .eq('is_approved', true)
+            .inFilter('author_id', clubUserIds.toList())
             .order('created_at', ascending: false);
 
         final mine = await supabase
@@ -354,8 +404,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
       }
 
       if (mounted) {
+        final visiblePosts = List<Map<String, dynamic>>.from(data).where((row) {
+          final authorId = row['author_id']?.toString();
+          return authorId == null || !_blockedAuthorIds.contains(authorId);
+        }).toList();
         setState(() {
-          posts = List<Map<String, dynamic>>.from(data);
+          posts = visiblePosts;
           loading = false;
         });
       }
@@ -378,6 +432,12 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
   Future<void> _approvePost(String postId) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
+      final post = await supabase
+          .from('club_posts')
+          .select('author_id, title')
+          .eq('id', postId)
+          .maybeSingle();
+
       await supabase
           .from('club_posts')
           .update({
@@ -385,9 +445,24 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', postId);
+
+      final authorId = post?['author_id'] as String?;
+      final title = (post?['title'] ?? 'Post').toString();
+      if (authorId != null) {
+        await NotificationService.notifyUser(
+          userId: authorId,
+          title: 'Post Approved',
+          body:
+              'Your post "$title" has been approved and is now visible to club members.',
+          route: 'posts',
+        );
+      }
+
       await _loadPosts();
       if (mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text('Post approved')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Post approved and author notified')),
+        );
       }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -403,11 +478,11 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Reject Post'),
+          title: const Text('Deny Post'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Please provide a reason for rejecting this post:'),
+              const Text('Please provide a reason for denying this post:'),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
@@ -415,7 +490,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: 'Reason for rejection',
+                  hintText: 'Reason for denial',
                 ),
               ),
             ],
@@ -432,7 +507,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                 }
                 Navigator.pop(context, true);
               },
-              child: const Text('Send'),
+              child: const Text('Deny'),
             ),
           ],
         );
@@ -477,6 +552,122 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  Future<void> _notifyAdminsAboutPostIssue({
+    required Map<String, dynamic> post,
+    required String title,
+    required String reason,
+  }) async {
+    final clubName = _clubName ?? UserService.cachedClubName ?? '';
+    if (clubName.trim().isEmpty) return;
+
+    final postTitle = (post['title'] ?? 'Untitled post').toString();
+    final reporter = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('id', supabase.auth.currentUser?.id ?? '')
+        .maybeSingle();
+    final reporterName = (reporter?['full_name'] ?? 'A club member').toString();
+    await NotificationService.notifyClubAdminsInClub(
+      clubName: clubName,
+      title: title,
+      body:
+          '$reporterName flagged "$postTitle". Reason: $reason. Please review within 24 hours.',
+      route: 'posts',
+      excludeUserId: supabase.auth.currentUser?.id,
+    );
+  }
+
+  Future<void> _reportPost(Map<String, dynamic> post) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Post'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Tell admins what is objectionable or abusive',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final reason = reasonController.text.trim().isEmpty
+        ? 'No reason provided'
+        : reasonController.text.trim();
+    await _notifyAdminsAboutPostIssue(
+      post: post,
+      title: 'Post Reported',
+      reason: reason,
+    );
+    if (mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Post reported to club admins')),
+      );
+    }
+  }
+
+  Future<void> _blockPostAuthor(Map<String, dynamic> post) async {
+    final authorId = post['author_id']?.toString();
+    if (authorId == null || authorId == supabase.auth.currentUser?.id) return;
+
+    final authorName = post['user_profiles']?['full_name'] ?? 'this member';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Block $authorName?'),
+        content: const Text(
+          'Posts from this member will be removed from your feed immediately. Club admins will be notified to review the concern.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    _blockedAuthorIds.add(authorId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      'blocked_post_author_ids',
+      _blockedAuthorIds.toList(),
+    );
+    await _notifyAdminsAboutPostIssue(
+      post: post,
+      title: 'User Blocked',
+      reason: '$authorName was blocked from a member feed',
+    );
+    if (!mounted) return;
+    setState(() {
+      posts.removeWhere((row) => row['author_id']?.toString() == authorId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$authorName has been blocked from your feed')),
+    );
   }
 
   void _openImageFullscreen(String imageUrl) {
@@ -613,15 +804,16 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                           ?.map((e) => e as Map<String, dynamic>)
                           .toList() ??
                       [];
-                  final contentPreviewUrl =
-                      WebLinkPreviewCard.extractFirstUrl(
-                        post['content'] as String?,
-                      );
+                  final contentPreviewUrl = WebLinkPreviewCard.extractFirstUrl(
+                    post['content'] as String?,
+                  );
                   final displayContent = WebLinkPreviewCard.removeFirstUrl(
                     post['content'] as String?,
                   );
                   final timeAgo = _getTimeAgo(post['created_at']);
                   final isApproved = post['is_approved'] ?? true;
+                  final authorId = post['author_id']?.toString();
+                  final currentUserId = supabase.auth.currentUser?.id;
 
                   return Card(
                     key: ValueKey('post-card-$postId'),
@@ -655,9 +847,7 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                   radius: 20,
                                   backgroundColor: Colors.white12,
                                   backgroundImage: authorAvatarUrl != null
-                                      ? NetworkImage(
-                                          authorAvatarUrl,
-                                        )
+                                      ? NetworkImage(authorAvatarUrl)
                                       : null,
                                   child: authorAvatarUrl == null
                                       ? Text(
@@ -717,29 +907,67 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                 ),
                                 if (isAdmin) ...[
                                   const SizedBox(width: 8),
-                                  IconButton(
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.greenAccent,
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                    ),
                                     icon: const Icon(
                                       Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 24,
+                                      size: 18,
                                     ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
+                                    label: const Text('Approve'),
                                     onPressed: () => _approvePost(postId),
-                                    tooltip: 'Approve',
                                   ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.cancel,
-                                      color: Colors.red,
-                                      size: 24,
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.redAccent,
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
                                     ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.cancel, size: 18),
+                                    label: const Text('Deny'),
                                     onPressed: () => _rejectPost(postId),
-                                    tooltip: 'Reject',
                                   ),
                                 ],
+                              ],
+                              if (authorId != null &&
+                                  authorId != currentUserId) ...[
+                                const SizedBox(width: 4),
+                                PopupMenuButton<String>(
+                                  tooltip: 'Safety actions',
+                                  icon: const Icon(Icons.more_vert),
+                                  onSelected: (value) {
+                                    if (value == 'report') {
+                                      _reportPost(post);
+                                    } else if (value == 'block') {
+                                      _blockPostAuthor(post);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'report',
+                                      child: ListTile(
+                                        dense: true,
+                                        leading: Icon(Icons.flag_outlined),
+                                        title: Text('Report post'),
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'block',
+                                      child: ListTile(
+                                        dense: true,
+                                        leading: Icon(Icons.block),
+                                        title: Text('Block user'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ],
                           ),
@@ -859,30 +1087,32 @@ class _PostsFeedInlineScreenState extends State<PostsFeedInlineScreen> {
                                                 ),
                                               ),
                                           ...links
-                                              .skip(hasInlinePreview &&
-                                                      links.isNotEmpty
-                                                  ? 1
-                                                  : 0)
+                                              .skip(
+                                                hasInlinePreview &&
+                                                        links.isNotEmpty
+                                                    ? 1
+                                                    : 0,
+                                              )
                                               .map(
-                                            (a) => ActionChip(
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                              avatar: const Icon(
-                                                Icons.link,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                a['name'] ?? 'Link',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
+                                                (a) => ActionChip(
+                                                  visualDensity:
+                                                      VisualDensity.compact,
+                                                  avatar: const Icon(
+                                                    Icons.link,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    a['name'] ?? 'Link',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  onPressed: () =>
+                                                      _openAttachmentUrl(
+                                                        a['url'] as String?,
+                                                      ),
                                                 ),
                                               ),
-                                              onPressed: () =>
-                                                  _openAttachmentUrl(
-                                                    a['url'] as String?,
-                                                  ),
-                                            ),
-                                          ),
                                           ...videos
                                               .skip(1)
                                               .map(

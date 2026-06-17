@@ -27,7 +27,7 @@ class _RootNavigationState extends State<RootNavigation>
   int _eventActivityCount = 0;
   int _chatUnreadCount = 0;
   int _clubHubRefreshToken = 0;
-  Color _chatAccent = UserService.clubPrimaryColor(UserService.cachedClubName);
+  Color _chatAccent = const Color(0xFF2E7D32);
   MembershipRenewalReminderStatus _renewalReminderStatus =
       MembershipRenewalReminderStatus.inactive();
 

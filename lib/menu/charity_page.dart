@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:runrank/services/charity_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,7 +14,10 @@ class CharityPage extends StatefulWidget {
 
 class _CharityPageState extends State<CharityPage> {
   static const String _introText =
-      'The club support local charities as part of our service to the community, aligned with our vision and values. Through fundraising, volunteering, and participation in charitable events, we contribute beyond sport, helping strengthen community connections and support causes that matter to our members and the wider public.';
+      'The club supports a chosen charity as part of its service to the community, aligned with its vision and values. This page is for club information only, showing the charity being supported and any club-entered total already raised through races, events, volunteering, and other club activities outside RunRank.';
+
+  static const String _donationNotice =
+      'RunRank does not collect charitable donations, process charity payments, or receive charitable funds. Any amount shown is an informational total entered by club administrators.';
 
   final TextEditingController _websiteController = TextEditingController();
 
@@ -58,6 +62,9 @@ class _CharityPageState extends State<CharityPage> {
     );
     return compact == 'ycrr' || compact.contains('yourclubroadrunners');
   }
+
+  bool get _useAppleSafeCharityPage =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   List<Color> get _brandGradient => UserService.clubBrandGradient(_clubName);
 
@@ -184,7 +191,7 @@ class _CharityPageState extends State<CharityPage> {
                 ? null
                 : () async {
                     await _saveAdminFields();
-                    if (!mounted) return;
+                    if (!dialogContext.mounted) return;
                     Navigator.pop(dialogContext);
                   },
             style: FilledButton.styleFrom(
@@ -208,7 +215,7 @@ class _CharityPageState extends State<CharityPage> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _surfaceColor,
         title: const Text(
-          'Club Donations',
+          'Club-Raised Total',
           style: TextStyle(color: Colors.white),
         ),
         content: TextField(
@@ -216,7 +223,7 @@ class _CharityPageState extends State<CharityPage> {
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: Colors.white),
-          decoration: _inputDecoration('Total Amount Donated (£)'),
+          decoration: _inputDecoration('Total Already Raised (£)'),
         ),
         actions: [
           TextButton(
@@ -238,10 +245,11 @@ class _CharityPageState extends State<CharityPage> {
                 newTotal: newTotal,
               );
 
-              if (!mounted) return;
+              if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Donation total updated')),
+                const SnackBar(content: Text('Club-raised total updated')),
               );
             },
             style: FilledButton.styleFrom(
@@ -305,11 +313,6 @@ class _CharityPageState extends State<CharityPage> {
   Widget _buildContent(Map<String, dynamic>? charity) {
     final websiteUri = _parseUri(charity?['website_url']);
     final totalRaised = _formatCurrency(charity?['total_raised']);
-    final previewController = websiteUri == null
-        ? null
-        : (WebViewController()
-            ..setJavaScriptMode(JavaScriptMode.unrestricted)
-            ..loadRequest(websiteUri));
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -333,15 +336,19 @@ class _CharityPageState extends State<CharityPage> {
             currentAmount: charity?['total_raised'],
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: _buildCard(
-              child: _buildPreviewPanel(
-                websiteUri: websiteUri,
-                previewController: previewController,
-                expandToFill: true,
+          _buildCard(
+            child: const Text(
+              _donationNotice,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                height: 1.45,
+                fontSize: 14,
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          Expanded(child: _buildWebsitePanel(websiteUri)),
         ],
       ),
     );
@@ -358,76 +365,36 @@ class _CharityPageState extends State<CharityPage> {
         disabledForegroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
       ),
-      label: Text('Club Donations  £$totalRaised'),
+      label: Text('Club-Raised Total  £$totalRaised'),
     );
   }
 
-  Widget _buildPreviewPanel({
-    required Uri? websiteUri,
-    required WebViewController? previewController,
-    bool expandToFill = false,
-  }) {
-    final preview = ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: expandToFill ? null : 360,
-        color: Colors.black26,
-        child: websiteUri == null || previewController == null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    'No charity website has been linked yet.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 16,
-                    ),
-                  ),
+  Widget _buildWebsitePanel(Uri? websiteUri) {
+    return _buildCard(
+      child: websiteUri == null
+          ? Center(
+              child: Text(
+                'No charity website has been linked yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
                 ),
-              )
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  WebViewWidget(controller: previewController),
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(999),
-                        onTap: () => _launchExternal(websiteUri),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            'Visit Charity',
-                            style: TextStyle(
-                              color: _overlayLabelColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
-      ),
+            )
+          : _useAppleSafeCharityPage
+          ? _ReadOnlyCharityWebsitePreview(
+              uri: websiteUri,
+              primaryColor: _primaryColor,
+              onVisitWebsite: () => _launchExternal(websiteUri),
+            )
+          : _BrowsableCharityWebsitePreview(
+              uri: websiteUri,
+              primaryColor: _primaryColor,
+              overlayLabelColor: _overlayLabelColor,
+              onVisitWebsite: () => _launchExternal(websiteUri),
+            ),
     );
-
-    if (expandToFill) {
-      return SizedBox.expand(child: preview);
-    }
-
-    return preview;
   }
 
   Widget _buildCard({required Widget child}) {
@@ -445,7 +412,7 @@ class _CharityPageState extends State<CharityPage> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.75)),
+      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
       filled: true,
       fillColor: Colors.black26,
       enabledBorder: OutlineInputBorder(
@@ -455,6 +422,209 @@ class _CharityPageState extends State<CharityPage> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: _accentColor),
+      ),
+    );
+  }
+}
+
+class _ReadOnlyCharityWebsitePreview extends StatefulWidget {
+  const _ReadOnlyCharityWebsitePreview({
+    required this.uri,
+    required this.primaryColor,
+    required this.onVisitWebsite,
+  });
+
+  final Uri uri;
+  final Color primaryColor;
+  final VoidCallback onVisitWebsite;
+
+  @override
+  State<_ReadOnlyCharityWebsitePreview> createState() =>
+      _ReadOnlyCharityWebsitePreviewState();
+}
+
+class _ReadOnlyCharityWebsitePreviewState
+    extends State<_ReadOnlyCharityWebsitePreview> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController();
+    _configureController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReadOnlyCharityWebsitePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uri != widget.uri) {
+      setState(() => _isLoading = true);
+      _controller.loadRequest(widget.uri);
+    }
+  }
+
+  Future<void> _configureController() async {
+    await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await _controller.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (_) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        },
+        onNavigationRequest: (request) {
+          final requested = Uri.tryParse(request.url);
+          if (requested == null) return NavigationDecision.prevent;
+          return NavigationDecision.navigate;
+        },
+      ),
+    );
+    await _controller.loadRequest(widget.uri);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(child: WebViewWidget(controller: _controller)),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.55),
+                    ],
+                    stops: const [0, 0.55, 1],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: 14,
+            child: FilledButton.icon(
+              onPressed: widget.onVisitWebsite,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Visit Website'),
+              style: FilledButton.styleFrom(
+                backgroundColor: widget.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrowsableCharityWebsitePreview extends StatefulWidget {
+  const _BrowsableCharityWebsitePreview({
+    required this.uri,
+    required this.primaryColor,
+    required this.overlayLabelColor,
+    required this.onVisitWebsite,
+  });
+
+  final Uri uri;
+  final Color primaryColor;
+  final Color overlayLabelColor;
+  final VoidCallback onVisitWebsite;
+
+  @override
+  State<_BrowsableCharityWebsitePreview> createState() =>
+      _BrowsableCharityWebsitePreviewState();
+}
+
+class _BrowsableCharityWebsitePreviewState
+    extends State<_BrowsableCharityWebsitePreview> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController();
+    _configureController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BrowsableCharityWebsitePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uri != widget.uri) {
+      setState(() => _isLoading = true);
+      _controller.loadRequest(widget.uri);
+    }
+  }
+
+  Future<void> _configureController() async {
+    await _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await _controller.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (_) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        },
+      ),
+    );
+    await _controller.loadRequest(widget.uri);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: widget.onVisitWebsite,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Visit Website',
+                    style: TextStyle(
+                      color: widget.overlayLabelColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

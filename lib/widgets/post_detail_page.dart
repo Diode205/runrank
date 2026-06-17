@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:runrank/services/notification_service.dart';
@@ -278,9 +279,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', widget.postId);
+      final authorId = post?['author_id'] as String?;
+      final title = (post?['title'] ?? 'Post').toString();
+      if (authorId != null) {
+        await NotificationService.notifyUser(
+          userId: authorId,
+          title: 'Post Approved',
+          body:
+              'Your post "$title" has been approved and is now visible to club members.',
+          route: 'posts',
+        );
+      }
       await _loadPostDetails();
       if (mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text('Post approved')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Post approved and author notified')),
+        );
       }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -296,11 +310,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Reject Post'),
+          title: const Text('Deny Post'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Please provide a reason for rejecting this post:'),
+              const Text('Please provide a reason for denying this post:'),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
@@ -308,7 +322,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: 'Reason for rejection',
+                  hintText: 'Reason for denial',
                 ),
               ),
             ],
@@ -325,7 +339,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                 }
                 Navigator.pop(context, true);
               },
-              child: const Text('Send'),
+              child: const Text('Deny'),
             ),
           ],
         );
@@ -369,6 +383,117 @@ class _PostDetailPageState extends State<PostDetailPage> {
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  Future<void> _notifyAdminsAboutPostIssue({
+    required String title,
+    required String reason,
+  }) async {
+    if (post == null) return;
+    final clubName = _clubName ?? UserService.cachedClubName ?? '';
+    if (clubName.trim().isEmpty) return;
+
+    final reporter = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('id', supabase.auth.currentUser?.id ?? '')
+        .maybeSingle();
+    final reporterName = (reporter?['full_name'] ?? 'A club member').toString();
+    final postTitle = (post?['title'] ?? 'Untitled post').toString();
+
+    await NotificationService.notifyClubAdminsInClub(
+      clubName: clubName,
+      title: title,
+      body:
+          '$reporterName flagged "$postTitle". Reason: $reason. Please review within 24 hours.',
+      route: 'posts',
+      excludeUserId: supabase.auth.currentUser?.id,
+    );
+  }
+
+  Future<void> _reportPost() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Post'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Tell admins what is objectionable or abusive',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final reason = reasonController.text.trim().isEmpty
+        ? 'No reason provided'
+        : reasonController.text.trim();
+    await _notifyAdminsAboutPostIssue(title: 'Post Reported', reason: reason);
+    if (mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Post reported to club admins')),
+      );
+    }
+  }
+
+  Future<void> _blockPostAuthor() async {
+    if (post == null) return;
+    final authorId = post?['author_id']?.toString();
+    if (authorId == null || authorId == supabase.auth.currentUser?.id) return;
+
+    final authorName = post?['user_profiles']?['full_name'] ?? 'this member';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Block $authorName?'),
+        content: const Text(
+          'Posts from this member will be removed from your feed immediately. Club admins will be notified to review the concern.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final blocked = prefs.getStringList('blocked_post_author_ids') ?? [];
+    if (!blocked.contains(authorId)) {
+      blocked.add(authorId);
+      await prefs.setStringList('blocked_post_author_ids', blocked);
+    }
+    await _notifyAdminsAboutPostIssue(
+      title: 'User Blocked',
+      reason: '$authorName was blocked from a member feed',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$authorName has been blocked from your feed')),
+    );
+    Navigator.pop(context);
   }
 
   Future<void> _editPost() async {
@@ -977,17 +1102,49 @@ class _PostDetailPageState extends State<PostDetailPage> {
             ),
           ],
           if (isAdmin && !isApproved) ...[
-            IconButton(
-              tooltip: 'Approve',
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Approve'),
               onPressed: _approvePost,
             ),
-            IconButton(
-              tooltip: 'Reject',
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Deny'),
               onPressed: _rejectPost,
             ),
           ],
+          if (!isAuthor && post != null)
+            PopupMenuButton<String>(
+              tooltip: 'Safety actions',
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'report') {
+                  _reportPost();
+                } else if (value == 'block') {
+                  _blockPostAuthor();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'report',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.flag_outlined),
+                    title: Text('Report post'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'block',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.block),
+                    title: Text('Block user'),
+                  ),
+                ),
+              ],
+            ),
         ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
