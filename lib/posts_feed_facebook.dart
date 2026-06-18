@@ -495,194 +495,206 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadPosts,
-              child: ListView.builder(
-                key: const PageStorageKey<String>('posts_feed_facebook_scroll'),
-                padding: const EdgeInsets.all(12),
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  final post = posts[index];
-                  final postId = post['id'];
-                  final isPending = post['__pending'] == true;
-
-                  // Trigger details load only when item is built
-                  if (!_reactionCounts.containsKey(postId)) {
-                    _loadPostDetails(postId);
-                  }
-
-                  Widget card = _PostCard(
-                    key: ValueKey('post-card-$postId'),
-                    post: post,
-                    isAdmin: isAdmin,
-                    isPending: isPending,
-                    reactionCounts: _reactionCounts[postId] ?? {},
-                    userReactions: _userReactionsByPost[postId] ?? {},
-                    comments: _commentsByPost[postId] ?? [],
-                    showCommentInput: _showCommentInput[postId] ?? false,
-                    commentController: _commentControllers.putIfAbsent(
-                      postId,
-                      () => TextEditingController(),
-                    ),
-                    onToggleReaction: (emoji) => _toggleReaction(postId, emoji),
-                    onCommentToggle: () => setState(
-                      () => _showCommentInput[postId] =
-                          !(_showCommentInput[postId] ?? false),
-                    ),
-                    onSendComment: (text) => _addComment(postId, text),
-                    onApprove: () => _approvePost(postId),
-                    onReject: () => _rejectPost(postId),
-                    membershipColor: _membershipColor(
-                      post['user_profiles']?['membership_type'],
-                    ),
-                    timeAgo: _getTimeAgo(post['created_at']),
-                    onOpenDetail: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PostDetailPage(
-                            postId: postId,
-                            initialClubName: _clubName,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-
-                  // Allow admins and authors to swipe to edit/delete
-                  final currentUser = supabase.auth.currentUser;
-                  final isAuthor =
-                      currentUser != null &&
-                      post['author_id'] == currentUser.id;
-                  final canModify = isAdmin || isAuthor;
-
-                  if (canModify) {
-                    return Dismissible(
-                      key: ValueKey('post-fb-$postId'),
-                      direction: DismissDirection.horizontal,
-                      background: Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+              child: posts.isEmpty
+                  ? const _PostsEmptyState()
+                  : ListView.builder(
+                      key: const PageStorageKey<String>(
+                        'posts_feed_facebook_scroll',
                       ),
-                      secondaryBackground: Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      confirmDismiss: (direction) async {
-                        if (direction == DismissDirection.startToEnd) {
-                          // Edit post (admin or author)
-                          final updated = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => EditPostPage(post: post),
-                            ),
-                          );
-                          if (updated == true) {
-                            await _loadPosts();
-                          }
-                          return false; // keep card on edit
+                      padding: const EdgeInsets.all(12),
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final post = posts[index];
+                        final postId = post['id'];
+                        final isPending = post['__pending'] == true;
+
+                        // Trigger details load only when item is built
+                        if (!_reactionCounts.containsKey(postId)) {
+                          _loadPostDetails(postId);
                         }
 
-                        // Delete confirmation
-                        final shouldDelete =
-                            await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Delete post?'),
-                                content: const Text(
-                                  'This will permanently delete the post.',
+                        Widget card = _PostCard(
+                          key: ValueKey('post-card-$postId'),
+                          post: post,
+                          isAdmin: isAdmin,
+                          isPending: isPending,
+                          reactionCounts: _reactionCounts[postId] ?? {},
+                          userReactions: _userReactionsByPost[postId] ?? {},
+                          comments: _commentsByPost[postId] ?? [],
+                          showCommentInput: _showCommentInput[postId] ?? false,
+                          commentController: _commentControllers.putIfAbsent(
+                            postId,
+                            () => TextEditingController(),
+                          ),
+                          onToggleReaction: (emoji) =>
+                              _toggleReaction(postId, emoji),
+                          onCommentToggle: () => setState(
+                            () => _showCommentInput[postId] =
+                                !(_showCommentInput[postId] ?? false),
+                          ),
+                          onSendComment: (text) => _addComment(postId, text),
+                          onApprove: () => _approvePost(postId),
+                          onReject: () => _rejectPost(postId),
+                          membershipColor: _membershipColor(
+                            post['user_profiles']?['membership_type'],
+                          ),
+                          timeAgo: _getTimeAgo(post['created_at']),
+                          onOpenDetail: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PostDetailPage(
+                                  postId: postId,
+                                  initialClubName: _clubName,
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            ) ??
-                            false;
-
-                        if (!shouldDelete) return false;
-
-                        try {
-                          await supabase
-                              .from('club_posts')
-                              .delete()
-                              .eq('id', postId);
-                          await _loadPosts();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post deleted')),
-                            );
-                          }
-                          return true;
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error deleting post: $e'),
                               ),
                             );
-                          }
-                          await _loadPosts();
-                          return false;
-                        }
-                      },
-                      child: card,
-                    );
-                  }
+                          },
+                        );
 
-                  // For non-admin, non-author viewers, optionally show a
-                  // heading before the first pending post in their list.
-                  if (!isAdmin && isPending) {
-                    final bool isFirstPending =
-                        index == 0 || posts[index - 1]['__pending'] != true;
-                    if (isFirstPending) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
-                            child: Text(
-                              'Pending posts (only visible to you)',
-                              style: TextStyle(
-                                color: Colors.amber,
-                                fontWeight: FontWeight.w600,
+                        // Allow admins and authors to swipe to edit/delete
+                        final currentUser = supabase.auth.currentUser;
+                        final isAuthor =
+                            currentUser != null &&
+                            post['author_id'] == currentUser.id;
+                        final canModify = isAdmin || isAuthor;
+
+                        if (canModify) {
+                          return Dismissible(
+                            key: ValueKey('post-fb-$postId'),
+                            direction: DismissDirection.horizontal,
+                            background: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 28,
                               ),
                             ),
-                          ),
-                          card,
-                        ],
-                      );
-                    }
-                  }
+                            secondaryBackground: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                // Edit post (admin or author)
+                                final updated = await Navigator.push<bool>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditPostPage(post: post),
+                                  ),
+                                );
+                                if (updated == true) {
+                                  await _loadPosts();
+                                }
+                                return false; // keep card on edit
+                              }
 
-                  return card;
-                },
-              ),
+                              // Delete confirmation
+                              final shouldDelete =
+                                  await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Delete post?'),
+                                      content: const Text(
+                                        'This will permanently delete the post.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  ) ??
+                                  false;
+
+                              if (!shouldDelete) return false;
+
+                              try {
+                                await supabase
+                                    .from('club_posts')
+                                    .delete()
+                                    .eq('id', postId);
+                                await _loadPosts();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Post deleted'),
+                                    ),
+                                  );
+                                }
+                                return true;
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error deleting post: $e'),
+                                    ),
+                                  );
+                                }
+                                await _loadPosts();
+                                return false;
+                              }
+                            },
+                            child: card,
+                          );
+                        }
+
+                        // For non-admin, non-author viewers, optionally show a
+                        // heading before the first pending post in their list.
+                        if (!isAdmin && isPending) {
+                          final bool isFirstPending =
+                              index == 0 ||
+                              posts[index - 1]['__pending'] != true;
+                          if (isFirstPending) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
+                                  child: Text(
+                                    'Pending posts (only visible to you)',
+                                    style: TextStyle(
+                                      color: Colors.amber,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                card,
+                              ],
+                            );
+                          }
+                        }
+
+                        return card;
+                      },
+                    ),
             ),
     );
   }
@@ -786,6 +798,46 @@ class _PostsFeedFacebookScreenState extends State<PostsFeedFacebookScreen> {
     }
 
     _loadPosts();
+  }
+}
+
+class _PostsEmptyState extends StatelessWidget {
+  const _PostsEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const PageStorageKey<String>('posts_feed_facebook_empty'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 96),
+      children: [
+        Icon(
+          Icons.article_outlined,
+          size: 58,
+          color: Colors.white.withValues(alpha: 0.5),
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'No club posts yet',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Approved club posts will appear here. Pull down to refresh, or tap + to create a post.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontSize: 16,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
   }
 }
 

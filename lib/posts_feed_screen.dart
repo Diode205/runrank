@@ -390,382 +390,379 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                     ),
                     color: Colors.grey[850],
                     child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => PostDetailPage(
-                                      postId: post['id'],
-                                      initialClubName: _clubName,
-                                    ),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetailPage(
+                                    postId: post['id'],
+                                    initialClubName: _clubName,
                                   ),
-                                ).then((_) => _loadPosts());
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Header with author and time
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(1.6),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: _membershipColor(
-                                                post['user_profiles']?['membership_type']
-                                                    as String?,
-                                              ),
-                                              width: 1.6,
-                                            ),
-                                          ),
-                                          child: CircleAvatar(
-                                            radius: 20,
-                                            backgroundColor: Colors.white12,
-                                            backgroundImage:
-                                                authorAvatarUrl != null
-                                                ? NetworkImage(
-                                                    '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-                                                  )
-                                                : null,
-                                            child: authorAvatarUrl == null
-                                                ? Text(
-                                                    displayAuthor[0]
-                                                        .toUpperCase(),
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  )
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                displayAuthor,
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                timeAgo,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[400],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (!isApproved)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0x33FFD300),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: const Color(0x80FFD300),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'Pending',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-
-                                    // Title
-                                    Text(
-                                      post['title'] ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-
-                                    // Content preview with tappable URLs
-                                    if (displayContent.isNotEmpty)
-                                      LinkifiedText(
-                                        text: displayContent,
-                                        maxLines: 4,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[300],
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                  ],
                                 ),
-                              ),
-                            ),
-
-                            // Attachments inline
-                            if (attachments.isNotEmpty ||
-                                contentPreviewUrl != null) ...[
-                              const SizedBox(height: 12),
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final images = attachments
-                                      .where((a) => a['type'] == 'image')
-                                      .toList();
-                                  final links = attachments
-                                      .where((a) => a['type'] == 'link')
-                                      .toList();
-                                  final firstPreviewUrl =
-                                      links.isNotEmpty
-                                      ? links.first['url'] as String?
-                                      : contentPreviewUrl;
-                                  final hasInlinePreview =
-                                      firstPreviewUrl != null &&
-                                      firstPreviewUrl.isNotEmpty;
-                                  final files = attachments
-                                      .where((a) => a['type'] == 'file')
-                                      .toList();
-                                  final videos = attachments
-                                      .where((a) => a['type'] == 'video')
-                                      .toList();
-
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                              ).then((_) => _loadPosts());
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Header with author and time
+                                  Row(
                                     children: [
-                                      // First image large
-                                      if (images.isNotEmpty)
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          child: Image.network(
-                                            images.first['url'],
-                                            width: double.infinity,
-                                            height: 180,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                Container(
-                                                  height: 180,
-                                                  color: Colors.grey[800],
-                                                  child: Icon(
-                                                    Icons.broken_image,
-                                                    size: 48,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                ),
+                                      Container(
+                                        padding: const EdgeInsets.all(1.6),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: _membershipColor(
+                                              post['user_profiles']?['membership_type']
+                                                  as String?,
+                                            ),
+                                            width: 1.6,
                                           ),
                                         ),
-                                      if (videos.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        InlineVideoPlayer(
-                                          url: videos.first['url'] as String,
-                                        ),
-                                      ],
-                                      if (hasInlinePreview) ...[
-                                        const SizedBox(height: 8),
-                                        WebLinkPreviewCard(
-                                          url: firstPreviewUrl!,
-                                          buttonLabel: 'View Full Page',
-                                          height: 460,
-                                        ),
-                                      ],
-                                      // Rest as small chips
-                                      if (images.length > 1 ||
-                                          links.length > 1 ||
-                                          files.isNotEmpty ||
-                                          videos.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: [
-                                            ...images
-                                                .skip(1)
-                                                .map(
-                                                  (a) => Chip(
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    avatar: const Icon(
-                                                      Icons.image,
-                                                      size: 16,
-                                                    ),
-                                                    label: Text(
-                                                      a['name'] ?? 'Image',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ...links
-                                                .skip(hasInlinePreview &&
-                                                        links.isNotEmpty
-                                                    ? 1
-                                                    : 0)
-                                                .map(
-                                              (a) => Chip(
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                avatar: const Icon(
-                                                  Icons.link,
-                                                  size: 16,
-                                                ),
-                                                label: Text(
-                                                  a['name'] ?? 'Link',
+                                        child: CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.white12,
+                                          backgroundImage:
+                                              authorAvatarUrl != null
+                                              ? NetworkImage(
+                                                  '$authorAvatarUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+                                                )
+                                              : null,
+                                          child: authorAvatarUrl == null
+                                              ? Text(
+                                                  displayAuthor[0]
+                                                      .toUpperCase(),
                                                   style: const TextStyle(
-                                                    fontSize: 12,
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
-                                                ),
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              displayAuthor,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
                                               ),
                                             ),
-                                            ...videos
-                                                .skip(1)
-                                                .map(
-                                                  (a) => ActionChip(
-                                                    avatar: const Icon(
-                                                      Icons.videocam,
-                                                      size: 16,
-                                                    ),
-                                                    label: Text(
-                                                      a['name'] ?? 'Video',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                    onPressed: () async {
-                                                      final url =
-                                                          a['url'] as String?;
-                                                      if (url == null ||
-                                                          url.isEmpty) {
-                                                        return;
-                                                      }
-                                                      try {
-                                                        await launchUrl(
-                                                          Uri.parse(url),
-                                                          mode: LaunchMode
-                                                              .externalApplication,
-                                                        );
-                                                      } catch (_) {}
-                                                    },
-                                                  ),
-                                                ),
-                                            ...files.map(
-                                              (a) => ActionChip(
-                                                avatar: const Icon(
-                                                  Icons.attachment,
-                                                  size: 16,
-                                                ),
-                                                label: Text(
-                                                  a['name'] ?? 'File',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                onPressed: () async {
-                                                  final url =
-                                                      a['url'] as String?;
-                                                  if (url == null ||
-                                                      url.isEmpty) {
-                                                    return;
-                                                  }
-                                                  try {
-                                                    await launchUrl(
-                                                      Uri.parse(url),
-                                                      mode: LaunchMode
-                                                          .externalApplication,
-                                                    );
-                                                  } catch (_) {}
-                                                },
+                                            Text(
+                                              timeAgo,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[400],
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ],
+                                      ),
+                                      if (!isApproved)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0x33FFD300),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            border: Border.all(
+                                              color: const Color(0x80FFD300),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Pending',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
                                     ],
-                                  );
-                                },
-                              ),
-                            ],
-
-                            // Footer with expandable emoji and comments
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                // Expandable emoji button
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: Colors.grey[700]!,
-                                      width: 1,
+                                  const SizedBox(height: 12),
+
+                                  // Title
+                                  Text(
+                                    post['title'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        '👍',
-                                        style: TextStyle(fontSize: 16),
+                                  const SizedBox(height: 6),
+
+                                  // Content preview with tappable URLs
+                                  if (displayContent.isNotEmpty)
+                                    LinkifiedText(
+                                      text: displayContent,
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[300],
+                                        height: 1.4,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.add,
-                                        size: 14,
-                                        color: Colors.grey[400],
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Attachments inline
+                          if (attachments.isNotEmpty ||
+                              contentPreviewUrl != null) ...[
+                            const SizedBox(height: 12),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final images = attachments
+                                    .where((a) => a['type'] == 'image')
+                                    .toList();
+                                final links = attachments
+                                    .where((a) => a['type'] == 'link')
+                                    .toList();
+                                final firstPreviewUrl = links.isNotEmpty
+                                    ? links.first['url'] as String?
+                                    : contentPreviewUrl;
+                                final hasInlinePreview =
+                                    firstPreviewUrl != null &&
+                                    firstPreviewUrl.isNotEmpty;
+                                final files = attachments
+                                    .where((a) => a['type'] == 'file')
+                                    .toList();
+                                final videos = attachments
+                                    .where((a) => a['type'] == 'video')
+                                    .toList();
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // First image large
+                                    if (images.isNotEmpty)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          images.first['url'],
+                                          width: double.infinity,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(
+                                                height: 180,
+                                                color: Colors.grey[800],
+                                                child: Icon(
+                                                  Icons.broken_image,
+                                                  size: 48,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                        ),
+                                      ),
+                                    if (videos.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      InlineVideoPlayer(
+                                        url: videos.first['url'] as String,
                                       ),
                                     ],
-                                  ),
-                                ),
-                                const Spacer(),
-                                // Comment count
-                                Icon(
-                                  Icons.comment_outlined,
-                                  size: 18,
-                                  color: Colors.grey[500],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$commentsCount',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                              ],
+                                    if (hasInlinePreview) ...[
+                                      const SizedBox(height: 8),
+                                      WebLinkPreviewCard(
+                                        url: firstPreviewUrl,
+                                        buttonLabel: 'View Full Page',
+                                        height: 460,
+                                      ),
+                                    ],
+                                    // Rest as small chips
+                                    if (images.length > 1 ||
+                                        links.length > 1 ||
+                                        files.isNotEmpty ||
+                                        videos.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          ...images
+                                              .skip(1)
+                                              .map(
+                                                (a) => Chip(
+                                                  visualDensity:
+                                                      VisualDensity.compact,
+                                                  avatar: const Icon(
+                                                    Icons.image,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    a['name'] ?? 'Image',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ...links
+                                              .skip(
+                                                hasInlinePreview &&
+                                                        links.isNotEmpty
+                                                    ? 1
+                                                    : 0,
+                                              )
+                                              .map(
+                                                (a) => Chip(
+                                                  visualDensity:
+                                                      VisualDensity.compact,
+                                                  avatar: const Icon(
+                                                    Icons.link,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    a['name'] ?? 'Link',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ...videos
+                                              .skip(1)
+                                              .map(
+                                                (a) => ActionChip(
+                                                  avatar: const Icon(
+                                                    Icons.videocam,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    a['name'] ?? 'Video',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  onPressed: () async {
+                                                    final url =
+                                                        a['url'] as String?;
+                                                    if (url == null ||
+                                                        url.isEmpty) {
+                                                      return;
+                                                    }
+                                                    try {
+                                                      await launchUrl(
+                                                        Uri.parse(url),
+                                                        mode: LaunchMode
+                                                            .externalApplication,
+                                                      );
+                                                    } catch (_) {}
+                                                  },
+                                                ),
+                                              ),
+                                          ...files.map(
+                                            (a) => ActionChip(
+                                              avatar: const Icon(
+                                                Icons.attachment,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                a['name'] ?? 'File',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                final url = a['url'] as String?;
+                                                if (url == null ||
+                                                    url.isEmpty) {
+                                                  return;
+                                                }
+                                                try {
+                                                  await launchUrl(
+                                                    Uri.parse(url),
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                } catch (_) {}
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              },
                             ),
                           ],
-                        ),
+
+                          // Footer with expandable emoji and comments
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              // Expandable emoji button
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.grey[700]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '👍',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.add,
+                                      size: 14,
+                                      color: Colors.grey[400],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                              // Comment count
+                              Icon(
+                                Icons.comment_outlined,
+                                size: 18,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$commentsCount',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   );
 

@@ -485,50 +485,58 @@ class _ReadOnlyCharityWebsitePreviewState
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          IgnorePointer(child: WebViewWidget(controller: _controller)),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white12),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.08),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.55),
-                    ],
-                    stops: const [0, 0.55, 1],
+    return Semantics(
+      button: true,
+      label: 'Open charity website',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onVisitWebsite,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              IgnorePointer(child: WebViewWidget(controller: _controller)),
+              if (_isLoading) const Center(child: CircularProgressIndicator()),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white12),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.08),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                        stops: const [0, 0.55, 1],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            right: 14,
-            bottom: 14,
-            child: FilledButton.icon(
-              onPressed: widget.onVisitWebsite,
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Visit Website'),
-              style: FilledButton.styleFrom(
-                backgroundColor: widget.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 18,
+              Positioned(
+                right: 14,
+                bottom: 14,
+                child: FilledButton.icon(
+                  onPressed: widget.onVisitWebsite,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Visit Website'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: widget.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 18,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
