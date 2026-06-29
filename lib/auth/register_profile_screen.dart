@@ -207,7 +207,9 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
             TextField(
               controller: uka,
               readOnly: widget.verifiedUkaNumber?.trim().isNotEmpty == true,
-              decoration: const InputDecoration(labelText: "UKA Member Number"),
+              decoration: const InputDecoration(
+                labelText: "UKA Member Number *",
+              ),
             ),
             if (widget.verifiedInviteId?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 6),
@@ -405,6 +407,17 @@ class _RegisterProfileScreenState extends State<RegisterProfileScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Please select your membership date'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (uka.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please enter your UKA member number',
+                            ),
                           ),
                         );
                         return;

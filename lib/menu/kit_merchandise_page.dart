@@ -1168,10 +1168,10 @@ class _KitMerchandisePageState extends State<KitMerchandisePage>
                   ),
                   label: Text(
                     hasStock
-                        ? (_isNrrClub ? 'Add to Basket' : 'Buy Now')
+                        ? (_isNrrClub ? 'Tap to Choose Size Order' : 'Buy Now')
                         : 'Out of Stock',
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

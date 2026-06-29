@@ -23,14 +23,28 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
   String? _savedUka;
   String? _savedInviteId;
 
+  bool get _canSaveMemberDetails =>
+      _nameController.text.trim().isNotEmpty &&
+      _ukaController.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
+    _nameController.addListener(_refreshSaveAvailability);
+    _ukaController.addListener(_refreshSaveAvailability);
     _restoreSavedMemberDetails();
+  }
+
+  void _refreshSaveAvailability() {
+    if (!_detailsSaved && mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_refreshSaveAvailability);
+    _ukaController.removeListener(_refreshSaveAvailability);
     _nameController.dispose();
     _ukaController.dispose();
     _inviteController.dispose();
@@ -243,8 +257,9 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
               textInputAction: TextInputAction.next,
               readOnly: _detailsSaved,
               decoration: const InputDecoration(
-                labelText: 'UKA athlete number',
+                labelText: 'UKA athlete number *',
                 hintText: 'Enter your UKA number',
+                helperText: 'Required before an invite code can be generated',
               ),
             ),
             const SizedBox(height: 14),
@@ -252,7 +267,9 @@ class _RegisterInviteScreenState extends State<RegisterInviteScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _loading ? null : _saveMemberDetails,
+                  onPressed: _loading || !_canSaveMemberDetails
+                      ? null
+                      : _saveMemberDetails,
                   icon: const Icon(Icons.save_outlined),
                   label: _loading
                       ? const SizedBox(

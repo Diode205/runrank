@@ -34,6 +34,7 @@ class _QuickEditResult {
   const _QuickEditResult({
     required this.fullName,
     required this.email,
+    required this.ukaNumber,
     required this.membershipType,
     required this.memberSince,
     required this.emergencyContactName,
@@ -44,6 +45,7 @@ class _QuickEditResult {
 
   final String? fullName;
   final String? email;
+  final String? ukaNumber;
   final String? membershipType;
   final DateTime? memberSince;
   final String? emergencyContactName;
@@ -176,6 +178,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       builder: (_) => _QuickEditSheet(
         fullName: _fullName,
         email: _email,
+        ukaNumber: _ukaNumber,
         membershipType: _membershipType,
         memberSince: _memberSince,
         emergencyContactName: _emergencyContactName,
@@ -200,6 +203,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
     final updateData = <String, dynamic>{
       'full_name': result.fullName,
       'email': result.email,
+      'uka_number': result.ukaNumber,
       'membership_type': result.membershipType,
       'emergency_contact_name': result.emergencyContactName,
       'emergency_contact_number': result.emergencyContactNumber,
@@ -227,6 +231,7 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
       setState(() {
         _fullName = result.fullName;
         _email = result.email;
+        _ukaNumber = result.ukaNumber;
         _membershipType = result.membershipType;
         _memberSince = result.memberSince;
         _emergencyContactName = result.emergencyContactName;
@@ -1089,6 +1094,7 @@ class _QuickEditSheet extends StatefulWidget {
   const _QuickEditSheet({
     required this.fullName,
     required this.email,
+    required this.ukaNumber,
     required this.membershipType,
     required this.memberSince,
     required this.emergencyContactName,
@@ -1106,6 +1112,7 @@ class _QuickEditSheet extends StatefulWidget {
 
   final String? fullName;
   final String? email;
+  final String? ukaNumber;
   final String? membershipType;
   final DateTime? memberSince;
   final String? emergencyContactName;
@@ -1127,6 +1134,7 @@ class _QuickEditSheet extends StatefulWidget {
 class _QuickEditSheetState extends State<_QuickEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
+  late final TextEditingController _ukaController;
   late final TextEditingController _emergencyNameController;
   late final TextEditingController _emergencyNumberController;
   String? _selectedMembershipType;
@@ -1140,6 +1148,7 @@ class _QuickEditSheetState extends State<_QuickEditSheet> {
     super.initState();
     _nameController = TextEditingController(text: widget.fullName ?? '');
     _emailController = TextEditingController(text: widget.email ?? '');
+    _ukaController = TextEditingController(text: widget.ukaNumber ?? '');
     _emergencyNameController = TextEditingController(
       text: widget.emergencyContactName ?? '',
     );
@@ -1156,6 +1165,7 @@ class _QuickEditSheetState extends State<_QuickEditSheet> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _ukaController.dispose();
     _emergencyNameController.dispose();
     _emergencyNumberController.dispose();
     super.dispose();
@@ -1195,6 +1205,7 @@ class _QuickEditSheetState extends State<_QuickEditSheet> {
   void _submit() {
     final newName = _nameController.text.trim();
     final newEmail = _emailController.text.trim();
+    final newUkaNumber = _ukaController.text.trim();
     final newEmergencyName = _emergencyNameController.text.trim();
     final newEmergencyNumber = _emergencyNumberController.text.trim();
 
@@ -1219,6 +1230,7 @@ class _QuickEditSheetState extends State<_QuickEditSheet> {
       _QuickEditResult(
         fullName: newName.isEmpty ? null : newName,
         email: newEmail.isEmpty ? null : newEmail,
+        ukaNumber: newUkaNumber.isEmpty ? null : newUkaNumber,
         membershipType: _selectedMembershipType,
         memberSince: _selectedMemberSince,
         emergencyContactName: newEmergencyName.isEmpty
@@ -1309,6 +1321,13 @@ class _QuickEditSheetState extends State<_QuickEditSheet> {
                 style: const TextStyle(color: Colors.white),
                 decoration: _inputDecoration('Email'),
                 keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ukaController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('UKA membership number'),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 12),
               const Text(
