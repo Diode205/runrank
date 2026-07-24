@@ -135,13 +135,7 @@ class AuthService {
   }) async {
     try {
       // 1) Create user in Supabase Auth
-      final response = await _supabase.auth.signUp(
-        email: email,
-        password: password,
-        emailRedirectTo: null,
-      );
-
-      final user = response.user;
+      final user = await _createOrRecoverAuthUser(email, password);
 
       if (user == null) {
         // ignore: avoid_print
@@ -197,6 +191,50 @@ class AuthService {
       // ignore: avoid_print
       print("REGISTRATION FAILED: $e");
       return false;
+    }
+  }
+
+  static Future<User?> _createOrRecoverAuthUser(
+    String email,
+    String password,
+  ) async {
+    try {
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: null,
+      );
+      return response.user;
+    } on AuthException catch (e) {
+      final authMessage = '${e.message} $e'.toLowerCase();
+      if (!authMessage.contains('user_already_exists') &&
+          !authMessage.contains('user already registered')) {
+        rethrow;
+      }
+
+      // A profile can be deleted while the Supabase Auth user remains. In that
+      // case, allow the same person to recreate the profile by signing in with
+      // the password they just entered. Do not reuse an account that still has
+      // a live profile row.
+      final signIn = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      final existingUser = signIn.user;
+      if (existingUser == null) return null;
+
+      final existingProfile = await _supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', existingUser.id)
+          .maybeSingle();
+      if (existingProfile != null) {
+        // ignore: avoid_print
+        print('REGISTRATION FAILED: email already has an active profile');
+        return null;
+      }
+
+      return existingUser;
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:runrank/notifications_screen.dart';
 import 'package:runrank/menu_screen.dart';
 import 'package:runrank/chat/chat_list_page.dart';
 import 'package:runrank/menu/membership_page.dart';
+import 'package:runrank/services/auth_service.dart';
 import 'package:runrank/services/chat_service.dart';
 import 'package:runrank/services/membership_renewal_reminder_service.dart';
 import 'package:runrank/services/notification_service.dart';
@@ -41,6 +42,8 @@ class _RootNavigationState extends State<RootNavigation>
   Timer? _postPollTimer;
   Timer? _chatPollTimer;
   Timer? _renewalReminderPollTimer;
+  Timer? _profilePollTimer;
+  bool _signingOutDeletedProfile = false;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
@@ -64,6 +67,7 @@ class _RootNavigationState extends State<RootNavigation>
     _loadInitialChatUnreadCount();
     _loadChatAccent();
     _loadRenewalReminderStatus();
+    _verifyProfileStillExists();
 
     _unreadSubscription = NotificationService.watchUnreadCountStream().listen((
       count,
@@ -120,6 +124,10 @@ class _RootNavigationState extends State<RootNavigation>
       const Duration(minutes: 30),
       (_) => _loadRenewalReminderStatus(),
     );
+    _profilePollTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _verifyProfileStillExists(),
+    );
 
     // Watch for event activity (unseen events) to highlight Club Hub
     _eventActivitySubscription = NotificationService.watchEventActivityStream()
@@ -152,7 +160,19 @@ class _RootNavigationState extends State<RootNavigation>
     _postPollTimer?.cancel();
     _chatPollTimer?.cancel();
     _renewalReminderPollTimer?.cancel();
+    _profilePollTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _verifyProfileStillExists() async {
+    if (_signingOutDeletedProfile) return;
+
+    final exists = await UserService.currentProfileExists();
+    if (!mounted || exists) return;
+
+    _signingOutDeletedProfile = true;
+    UserService.clearCachedClubName();
+    await AuthService.logout();
   }
 
   Future<void> _loadInitialUnreadCount() async {

@@ -295,9 +295,13 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
           )
           .eq('id', user.id)
           .maybeSingle();
+      if (profile == null) {
+        await _logoutMissingProfile();
+        return;
+      }
       final isAdmin = await UserService.isAdmin();
-      final memberSinceRaw = profile?['member_since'];
-      final createdAtRaw = profile?['created_at'];
+      final memberSinceRaw = profile['member_since'];
+      final createdAtRaw = profile['created_at'];
       DateTime? parsedMemberSince = memberSinceRaw is String
           ? DateTime.tryParse(memberSinceRaw)
           : memberSinceRaw is DateTime
@@ -318,27 +322,43 @@ class _MenuScreenState extends State<MenuScreen> with RouteAware {
         } catch (_) {}
       }
       setState(() {
-        _fullName = profile?['full_name'] as String?;
-        _email = profile?['email'] as String?;
-        _ukaNumber = profile?['uka_number'] as String?;
-        _club = profile?['club'] as String?;
+        _fullName = profile['full_name'] as String?;
+        _email = profile['email'] as String?;
+        _ukaNumber = profile['uka_number'] as String?;
+        _club = profile['club'] as String?;
         UserService.cacheClubName(_club);
-        _avatarUrl = profile?['avatar_url'] as String?;
+        _avatarUrl = profile['avatar_url'] as String?;
         _memberSince = parsedMemberSince;
-        _membershipType = profile?['membership_type'] as String?;
-        _emergencyContactName = profile?['emergency_contact_name'] as String?;
+        _membershipType = profile['membership_type'] as String?;
+        _emergencyContactName = profile['emergency_contact_name'] as String?;
         _emergencyContactNumber =
-            profile?['emergency_contact_number'] as String?;
+            profile['emergency_contact_number'] as String?;
         _emergencyContactRelation =
-            profile?['emergency_contact_relation'] as String?;
-        _emergencyDetailsConsent =
-            profile?['emergency_details_consent'] == true;
+            profile['emergency_contact_relation'] as String?;
+        _emergencyDetailsConsent = profile['emergency_details_consent'] == true;
         _isAdmin = isAdmin;
         _loading = false;
       });
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _logoutMissingProfile() async {
+    if (!mounted || _loggingOut) return;
+
+    setState(() {
+      _loggingOut = true;
+      _loading = false;
+    });
+    UserService.clearCachedClubName();
+    await AuthService.logout();
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   @override

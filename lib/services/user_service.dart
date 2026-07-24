@@ -42,6 +42,25 @@ class UserService {
     return row != null && (row['is_admin'] == true || isYcrrDemo);
   }
 
+  static Future<bool> currentProfileExists() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final row = await _client
+          .from('user_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      return row != null;
+    } catch (e) {
+      // Network failures should not sign a valid user out. Treat the profile
+      // as present and let the next successful check decide.
+      debugPrint('Current profile existence check failed: $e');
+      return true;
+    }
+  }
+
   static String _compactForMatch(String value) {
     return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   }

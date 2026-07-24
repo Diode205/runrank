@@ -22,6 +22,8 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       'https://docs.google.com/document/d/e/2PACX-1vRqYFXJRvOrBI_sS2ASHZfeGexD0ED7OHcuBSsQ192zPGRflxRivSU01PMb6CXuWireUIeP34UmzsIi/pub';
   static const String _supportRequestsUrl =
       'https://docs.google.com/document/d/e/2PACX-1vQpOnmEK_rm4jHIQ2-6BD_y8t4Y_Quz-EyDMFUTjtEH7oXtQLt8nqq78mffj-vI41RA-B4q_rJH2vdW/pub';
+  static const String _adminGuidanceUrl =
+      'https://docs.google.com/document/d/e/2PACX-1vQb17AaR_A1fUHBHkhHa8cOOe0KfsQUWnrZA_nOCc3wtXhKLVtAuyPHq33dHnCpRuYq0QqPumQwnkkl/pub';
 
   String _version = '';
   String? _clubName;
@@ -193,6 +195,15 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   Future<void> _openSupportRequests() async {
     final uri = Uri.parse(_supportRequestsUrl);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
+  }
+
+  Future<void> _openAdminGuidance() async {
+    final uri = Uri.parse(_adminGuidanceUrl);
     await launchUrl(
       uri,
       mode: LaunchMode.inAppWebView,
@@ -645,6 +656,30 @@ Designed by runners, for running clubs — RunRank puts your club in your pocket
                 style: TextStyle(color: Colors.white70),
               ),
               onTap: _openSubscriptionAgreement,
+              trailing: const Icon(Icons.open_in_new, color: Colors.white70),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFF0F111A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: primary, width: 1),
+            ),
+            child: ListTile(
+              leading: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: Colors.white,
+              ),
+              title: const Text(
+                'App Admin-Only Guidance',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Functionalities & Controls',
+                style: TextStyle(color: Colors.white70),
+              ),
+              onTap: _openAdminGuidance,
               trailing: const Icon(Icons.open_in_new, color: Colors.white70),
             ),
           ),
