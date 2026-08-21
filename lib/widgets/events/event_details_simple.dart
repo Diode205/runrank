@@ -312,8 +312,9 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
                 ),
                 const SizedBox(height: 20),
 
-                // Special event extras (e.g. Runners Banquet)
-                if (e.eventType.toLowerCase() == 'special_event') ...[
+                // Special event extras (e.g. Runners Banquet) - opt-in per event
+                if (e.eventType.toLowerCase() == 'special_event' &&
+                    e.requiresFoodMenu) ...[
                   Center(
                     child: Text(
                       'Special Event Extras',
@@ -450,6 +451,7 @@ class _SimpleEventDetailsPageState extends State<SimpleEventDetailsPage>
     final isSocial =
         eventType == 'social_run' ||
         eventType == 'parkrun_tourism' ||
+        eventType == 'social_meet' ||
         eventType == 'meet_&_drink' ||
         eventType == 'swim_or_cycle' ||
         eventType == 'others';

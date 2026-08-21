@@ -534,6 +534,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                   child: Text('News Report'),
                                 ),
                                 DropdownMenuItem(
+                                  value: 'Featured Member of the Month',
+                                  child: Text('Featured Member of the Month'),
+                                ),
+                                DropdownMenuItem(
                                   value: 'Race Report',
                                   child: Text('Race Report'),
                                 ),

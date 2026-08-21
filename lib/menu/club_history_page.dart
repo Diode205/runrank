@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
 import 'package:runrank/menu/team_achievements_page.dart';
+import 'package:runrank/menu/age_group_records_page.dart';
 import 'package:runrank/services/user_service.dart';
 
 class ClubHistoryPage extends StatefulWidget {
@@ -190,13 +191,13 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
 
                           const SizedBox(height: 16),
 
-                          // Three glassy buttons in a single row
+                          // Four glassy buttons in a single row
                           Row(
                             children: [
                               Expanded(
                                 child: _GlassyButton(
                                   icon: Icons.emoji_events_outlined,
-                                  label: 'Individual Records',
+                                  label: 'Individual\nRecords',
                                   borderColor: _cardBorderColor,
                                   iconColor: _primaryColor,
                                   onTap: () => Navigator.push(
@@ -207,11 +208,27 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _GlassyButton(
+                                  icon: Icons.diversity_3_outlined,
+                                  label: 'Age-Group\nRecords',
+                                  borderColor: _cardBorderColor,
+                                  iconColor: _primaryColor,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const AgeGroupRecordsPage(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: _GlassyButton(
                                   icon: Icons.groups_outlined,
-                                  label: 'Team Awards',
+                                  label: 'Team\nAwards',
                                   borderColor: _cardBorderColor,
                                   iconColor: _primaryColor,
                                   onTap: () => Navigator.push(
@@ -223,11 +240,11 @@ class _ClubHistoryPageState extends State<ClubHistoryPage> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: _GlassyButton(
                                   icon: Icons.timeline_outlined,
-                                  label: 'Historical Milestones',
+                                  label: 'Historical\nMilestones',
                                   borderColor: _cardBorderColor,
                                   iconColor: _primaryColor,
                                   onTap: () => Navigator.push(
@@ -509,14 +526,14 @@ class _GlassyButton extends StatelessWidget {
                   child: SizedBox.expand(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
+                        horizontal: 3,
                         vertical: 6,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Icon(icon, color: iconColor, size: 20),
+                          Icon(icon, color: iconColor, size: 18),
                           const SizedBox(height: 5),
                           Text(
                             label,
@@ -526,7 +543,7 @@ class _GlassyButton extends StatelessWidget {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
-                              fontSize: 11,
+                              fontSize: 10,
                               height: 1.1,
                             ),
                           ),

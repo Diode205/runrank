@@ -30,6 +30,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
 
   bool _saving = false;
   String _relayTeamPrefix = '';
+  late bool _requiresFoodMenu;
 
   // Host selection
   List<Map<String, dynamic>> _hosts = [];
@@ -65,6 +66,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
     selectedDate = DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day);
     selectedTime = TimeOfDay(hour: e.dateTime.hour, minute: e.dateTime.minute);
     marshalCallDate = e.marshalCallDate;
+    _requiresFoodMenu = e.requiresFoodMenu;
 
     _loadHosts();
   }
@@ -84,6 +86,10 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
 
   bool get _isRelayEvent =>
       widget.event.eventType.toLowerCase().replaceAll(' ', '_') == 'relay';
+
+  bool get _isSpecialEvent =>
+      widget.event.eventType.toLowerCase().replaceAll(' ', '_') ==
+      'special_event';
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -225,6 +231,7 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
               widget.event.eventType == 'handicap_series')
           ? marshalCallDate?.toIso8601String().split('T').first
           : null,
+      if (_isSpecialEvent) 'requires_food_menu': _requiresFoodMenu,
     };
 
     setState(() => _saving = true);
@@ -278,6 +285,23 @@ class _AdminEditEventPageState extends State<AdminEditEventPage> {
                   decoration: const InputDecoration(
                     labelText: 'Relay team',
                     hintText: 'Team name',
+                  ),
+                ),
+              ],
+              if (_isSpecialEvent) ...[
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _requiresFoodMenu,
+                  onChanged: (value) {
+                    setState(() => _requiresFoodMenu = value);
+                  },
+                  title: const Text(
+                    'Requires food menu (Runners Banquet)',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: const Text(
+                    "When on, the Runners Banquet link/order form appears on this event's page.",
                   ),
                 ),
               ],

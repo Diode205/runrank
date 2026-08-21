@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/club_records_service.dart';
+import 'package:runrank/services/age_group_records_service.dart';
 import 'package:runrank/menu/club_records_page.dart';
 import 'package:runrank/standards_data.dart';
 import 'calculator_logic.dart';
@@ -50,6 +51,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     'Ultra',
   ];
   final _clubRecordsService = ClubRecordsService();
+  final _ageGroupRecordsService = AgeGroupRecordsService();
 
   bool _loading = true;
   bool _error = false;
@@ -1061,6 +1063,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
           raceName: safeRaceName,
           raceDate: selectedDate,
           previousHolder: previousHolder,
+        );
+
+        await _ageGroupRecordsService.notifyIfPerformanceSetAgeGroupRecord(
+          userId: user.id,
+          distance: r.distance,
+          timeSeconds: parsedSeconds,
+          raceName: safeRaceName,
+          raceDate: selectedDate,
+          age: effectiveAge,
         );
       }
 

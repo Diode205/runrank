@@ -8,8 +8,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const DELETED_MEMBER_NAME = "Deleted member";
-
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -46,6 +44,91 @@ function isConstraintError(error: { code?: string; message?: string } | null) {
   if (!error) return false;
 
   return error.code === "23502" || error.code === "23503";
+}
+
+const CLUB_RECORD_DISTANCES = [
+  "5K",
+  "5M",
+  "10K",
+  "10M",
+  "Half M",
+  "Marathon",
+  "20M",
+  "Ultra",
+];
+const AGE_GROUP_DISTANCES = [
+  "5K",
+  "5M",
+  "10K",
+  "10M",
+  "Half M",
+  "Marathon",
+  "20M",
+];
+
+function normalizeDistance(raw: string | null | undefined) {
+  const value = (raw ?? "").trim();
+  const lower = value.toLowerCase();
+  if (["20m", "20 mile", "20 miles"].includes(lower)) return "20M";
+  const match = CLUB_RECORD_DISTANCES.find((d) => d.toLowerCase() === lower);
+  return match ?? null;
+}
+
+function normalizeGender(raw: string | null | undefined) {
+  const value = (raw ?? "").trim().toUpperCase();
+  if (value === "M" || value === "MALE" || value === "MEN'S") return "M";
+  if (value === "F" || value === "FEMALE" || value === "WOMEN'S") return "F";
+  return null;
+}
+
+function isNRRClub(club: string | null | undefined) {
+  return (club ?? "").toLowerCase().includes("norwich road runners");
+}
+
+// Mirrors lib/standards_data.dart's ageGroupForClub band boundaries.
+function ageGroupBand(age: number, club: string | null | undefined) {
+  if (isNRRClub(club)) {
+    if (age <= 34) return "Under35";
+    if (age >= 75) return "75+";
+    if (age <= 39) return "35-39";
+    if (age <= 44) return "40-44";
+    if (age <= 49) return "45-49";
+    if (age <= 54) return "50-54";
+    if (age <= 59) return "55-59";
+    if (age <= 64) return "60-64";
+    if (age <= 69) return "65-69";
+    return "70-74";
+  }
+
+  if (age <= 29) return "18-29";
+  if (age <= 34) return "30-34";
+  if (age <= 39) return "35-39";
+  if (age <= 44) return "40-44";
+  if (age <= 49) return "45-49";
+  if (age <= 54) return "50-54";
+  if (age <= 59) return "55-59";
+  if (age <= 64) return "60-64";
+  if (age <= 69) return "65-69";
+  if (age <= 74) return "70-74";
+  if (age <= 79) return "75-79";
+  if (age <= 84) return "80-84";
+  return "18-29";
+}
+
+function ageAtDate(dobString: string | null | undefined, dateString: string) {
+  if (!dobString) return null;
+  const dob = new Date(dobString);
+  const date = new Date(dateString);
+  if (isNaN(dob.getTime()) || isNaN(date.getTime())) return null;
+
+  let years = date.getFullYear() - dob.getFullYear();
+  const hasHadBirthday =
+    date.getMonth() > dob.getMonth() ||
+    (date.getMonth() === dob.getMonth() && date.getDate() >= dob.getDate());
+  if (!hasHadBirthday) years--;
+
+  if (years <= 0 || years > 120) return null;
+  return years;
 }
 
 serve(async (req) => {
@@ -122,7 +205,7 @@ serve(async (req) => {
 
     const { data: targetProfile, error: targetProfileError } = await adminClient
       .from("user_profiles")
-      .select("id, club, full_name, avatar_url")
+      .select("id, club, full_name, avatar_url, gender, date_of_birth")
       .eq("id", userId)
       .maybeSingle();
 
@@ -159,23 +242,6 @@ serve(async (req) => {
         throw new Error(`Failed deleting ${table}`);
       }
       summary[table] = "deleted";
-    };
-
-    const safeUpdate = async (
-      table: string,
-      values: Record<string, unknown>,
-      column: string,
-    ) => {
-      const { error } = await adminClient.from(table).update(values).eq(column, userId);
-      if (error) {
-        if (isMissingResourceError(error)) {
-          summary[table] = "not present";
-          return;
-        }
-        console.error(`Update failed for ${table}.${column}`, error);
-        throw new Error(`Failed updating ${table}`);
-      }
-      summary[table] = "anonymised";
     };
 
     const deleteAuthoredPosts = async () => {
@@ -231,6 +297,133 @@ serve(async (req) => {
       summary.club_posts = "deleted authored posts";
     };
 
+    // Preserve the departing member's fastest performances (with their real
+    // name intact) in the club/age-group historical record tables before
+    // their race_results rows are hard-deleted below.
+    const archiveDepartingMemberRecords = async () => {
+      const { data: results, error: resultsError } = await adminClient
+        .from("race_results")
+        .select("distance, race_name, time_seconds, raceDate, age, gender")
+        .eq("user_id", userId);
+
+      if (resultsError) {
+        if (isMissingResourceError(resultsError)) return;
+        console.warn("Could not load race_results to archive", resultsError);
+        return;
+      }
+
+      const rows = results ?? [];
+      if (rows.length === 0) {
+        summary.archived_records = "no race results to archive";
+        return;
+      }
+
+      let canonicalClub: string | null = targetProfile.club ?? null;
+      try {
+        const { data: canonical } = await adminClient.rpc(
+          "canonical_club_name",
+          { raw_club: targetProfile.club },
+        );
+        if (typeof canonical === "string" && canonical.length > 0) {
+          canonicalClub = canonical;
+        }
+      } catch (e) {
+        console.warn("canonical_club_name RPC unavailable, using raw club", e);
+      }
+
+      let archivedClubRecords = 0;
+      let archivedAgeGroupRecords = 0;
+
+      for (const row of rows) {
+        const distance = normalizeDistance(row.distance);
+        if (!distance) continue;
+
+        const timeSeconds = Number(row.time_seconds);
+        const raceDate = row.raceDate as string | null;
+        if (!Number.isFinite(timeSeconds) || timeSeconds <= 0 || !raceDate) {
+          continue;
+        }
+
+        const raceName = (row.race_name as string | null)?.trim() || "Untitled race";
+        const gender = normalizeGender(row.gender) ?? normalizeGender(targetProfile.gender);
+
+        const { data: existingClubRecord } = await adminClient
+          .from("club_records")
+          .select("id")
+          .eq("distance", distance)
+          .eq("time_seconds", timeSeconds)
+          .eq("race_date", raceDate)
+          .eq("runner_name", targetProfile.full_name)
+          .maybeSingle();
+
+        if (!existingClubRecord) {
+          const { error: insertClubRecordError } = await adminClient
+            .from("club_records")
+            .insert({
+              distance,
+              time_seconds: timeSeconds,
+              runner_name: targetProfile.full_name,
+              user_id: null,
+              club: canonicalClub,
+              gender,
+              race_name: raceName,
+              race_date: raceDate,
+              is_historical: true,
+            });
+          if (insertClubRecordError) {
+            console.warn("Could not archive club record", insertClubRecordError);
+          } else {
+            archivedClubRecords++;
+          }
+        }
+
+        if (!AGE_GROUP_DISTANCES.includes(distance) || !gender) continue;
+
+        const ageRaw = Number(row.age);
+        const age =
+          Number.isFinite(ageRaw) && ageRaw > 0
+            ? ageRaw
+            : ageAtDate(targetProfile.date_of_birth, raceDate);
+        if (!age) continue;
+
+        const ageGroup = ageGroupBand(age, canonicalClub);
+
+        const { data: existingAgeGroupRecord } = await adminClient
+          .from("age_group_records")
+          .select("id")
+          .eq("distance", distance)
+          .eq("time_seconds", timeSeconds)
+          .eq("race_date", raceDate)
+          .eq("runner_name", targetProfile.full_name)
+          .maybeSingle();
+
+        if (!existingAgeGroupRecord) {
+          const { error: insertAgeGroupError } = await adminClient
+            .from("age_group_records")
+            .insert({
+              distance,
+              age_group: ageGroup,
+              age_at_race: age,
+              gender,
+              time_seconds: timeSeconds,
+              runner_name: targetProfile.full_name,
+              user_id: null,
+              club: canonicalClub,
+              race_name: raceName,
+              race_date: raceDate,
+              is_historical: true,
+            });
+          if (insertAgeGroupError) {
+            console.warn("Could not archive age-group record", insertAgeGroupError);
+          } else {
+            archivedAgeGroupRecords++;
+          }
+        }
+      }
+
+      summary.archived_records = `club:${archivedClubRecords}, age_group:${archivedAgeGroupRecords}`;
+    };
+
     const avatarPath = extractAvatarPath(targetProfile.avatar_url);
     if (avatarPath) {
       const { error } = await adminClient.storage.from("avatars").remove([
@@ -250,6 +443,7 @@ serve(async (req) => {
     await safeDelete("event_comments", "user_id");
     await safeDelete("event_comment_reactions", "user_id");
     await safeDelete("club_event_responses", "user_id");
+    await archiveDepartingMemberRecords();
     await safeDelete("race_results", "user_id");
 
     const { error: deleteSenderMessagesError } = await adminClient
@@ -305,14 +499,9 @@ serve(async (req) => {
 
     await deleteAuthoredPosts();
 
-    await safeUpdate(
-      "club_records",
-      {
-        runner_name: DELETED_MEMBER_NAME,
-      },
-      "user_id",
-    );
-
+    // Keep the runner's real name on historical club/age-group records
+    // (only the account link is cleared) so they remain visible in the
+    // club's Individual Top 10 and Age-Group Top 3 leaderboards.
     const { error: clearClubRecordUserError } = await adminClient
       .from("club_records")
       .update({ user_id: null })
@@ -331,6 +520,23 @@ serve(async (req) => {
       } else {
         console.warn("Could not null club_records.user_id", clearClubRecordUserError);
       }
+    } else {
+      summary.club_records = "user_id cleared, name preserved";
+    }
+
+    const { error: clearAgeGroupRecordUserError } = await adminClient
+      .from("age_group_records")
+      .update({ user_id: null })
+      .eq("user_id", userId);
+    if (clearAgeGroupRecordUserError) {
+      if (!isMissingResourceError(clearAgeGroupRecordUserError)) {
+        console.warn(
+          "Could not null age_group_records.user_id",
+          clearAgeGroupRecordUserError,
+        );
+      }
+    } else {
+      summary.age_group_records = "user_id cleared, name preserved";
     }
 
     const { error: clearCreatedEventsError } = await adminClient

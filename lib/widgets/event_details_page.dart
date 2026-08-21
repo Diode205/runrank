@@ -44,6 +44,7 @@ class EventDetailsPage extends StatelessWidget {
       case 'special_event':
       case 'social_run':
       case 'parkrun_tourism':
+      case 'social_meet':
       case 'meet_&_drink':
       case 'swim_or_cycle':
       case 'others':

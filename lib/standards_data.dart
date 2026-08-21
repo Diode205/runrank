@@ -1173,6 +1173,54 @@ bool clubSupportsStandardDistance(String? clubName, String distance) {
   return awardDistancesForClub(clubName).contains(distance);
 }
 
+/// Ordered age-group band labels (gender-agnostic) for the given club.
+/// YCRR (and any other non-NRR club) uses the NNBR bands.
+const List<String> nnbrAgeGroupOrder = <String>[
+  '18-29',
+  '30-34',
+  '35-39',
+  '40-44',
+  '45-49',
+  '50-54',
+  '55-59',
+  '60-64',
+  '65-69',
+  '70-74',
+  '75-79',
+  '80-84',
+];
+
+const List<String> nrrAgeGroupOrder = <String>[
+  'Under35',
+  '35-39',
+  '40-44',
+  '45-49',
+  '50-54',
+  '55-59',
+  '60-64',
+  '65-69',
+  '70-74',
+  '75+',
+];
+
+List<String> ageGroupOrderForClub(String? clubName) {
+  return isNRRClubName(clubName) ? nrrAgeGroupOrder : nnbrAgeGroupOrder;
+}
+
+/// Plain (gender-agnostic) age-group band label for the given age/club,
+/// e.g. "18-29" or "Under35". Strips the gender prefix from [ageGroupForClub].
+String ageGroupLabelForClub({required int age, String? clubName}) {
+  final key = ageGroupForClub(gender: 'M', age: age, clubName: clubName);
+  return key.substring(1);
+}
+
+/// Friendly display label for an age-group band, e.g. "Under35" -> "Under 35".
+String displayAgeGroupLabel(String band) {
+  if (band == 'Under35') return 'Under 35';
+  if (band == '75+') return '75+';
+  return band;
+}
+
 // For age-grading/world-best references (in seconds).
 // This is used by the age grade calculation: map key to a world-best reference (seconds)
 final Map<String, int> worldBestSeconds = {

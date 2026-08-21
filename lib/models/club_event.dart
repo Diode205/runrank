@@ -34,6 +34,9 @@ class ClubEvent {
   final List<Map<String, dynamic>>? relayStages; // parsed JSON
   final bool expectedTimeRequired;
 
+  /// Whether this Special Event requires food menu options (Runners Banquet).
+  final bool requiresFoodMenu;
+
   ClubEvent({
     required this.id,
     required this.createdAt,
@@ -59,6 +62,7 @@ class ClubEvent {
     required this.cancelledAt,
     required this.relayStages,
     required this.expectedTimeRequired,
+    required this.requiresFoodMenu,
   });
 
   bool isVisibleInCalendarAt(DateTime now) {
@@ -136,6 +140,7 @@ class ClubEvent {
           : DateTime.parse(row['cancelled_at']),
       relayStages: stages,
       expectedTimeRequired: row['expected_time_required'] ?? false,
+      requiresFoodMenu: row['requires_food_menu'] ?? false,
     );
   }
 }

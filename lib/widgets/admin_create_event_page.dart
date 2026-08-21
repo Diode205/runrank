@@ -375,7 +375,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
       "Special Event",
     ];
 
-    socialTypes = ["Social Run", "Parkrun Tourism"];
+    socialTypes = ["Social Run", "Parkrun Tourism", "Social Meet"];
 
     // Default NNBR race list; this may be overridden once we know the club.
     raceNames = ["Holt 10K", "Worstead 5M", "Chase The Train"];
@@ -505,6 +505,7 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
     'Awards Night',
   ];
   String? _selectedSpecialEventType;
+  bool _requiresFoodMenu = false;
 
   // Controllers
   final hostCtrl = TextEditingController();
@@ -1143,6 +1144,8 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
         return "Special Event";
       case "Parkrun Tourism":
         return "Parkrun Tourism";
+      case "Social Meet":
+        return "Social Meet";
       default:
         return eventType;
     }
@@ -1256,6 +1259,9 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
             : null,
         "expected_time_required":
             _usesHandicapDetails || selectedEventType == "Relay" ? true : false,
+        "requires_food_menu": selectedEventType == "Special Event"
+            ? _requiresFoodMenu
+            : false,
         "created_by": createdByUserId,
       };
     });
@@ -1607,6 +1613,27 @@ class _AdminCreateEventPageState extends State<AdminCreateEventPage> {
                     },
                     decoration: const InputDecoration(
                       labelText: 'Choose special event',
+                    ),
+                  ),
+                ),
+
+              if (selectedEventType == "Special Event")
+                _section(
+                  "Food Menu Options",
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _requiresFoodMenu,
+                    onChanged: (value) {
+                      setState(() {
+                        _requiresFoodMenu = value;
+                      });
+                    },
+                    title: const Text(
+                      "Requires food menu (Runners Banquet)",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: const Text(
+                      "When on, the Runners Banquet link/order form appears on this event's page.",
                     ),
                   ),
                 ),

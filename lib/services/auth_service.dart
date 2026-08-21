@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:runrank/services/club_config_service.dart';
 import 'package:runrank/services/club_records_service.dart';
+import 'package:runrank/services/age_group_records_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -266,6 +267,7 @@ class AuthService {
           ? normalizedGender
           : null;
       final recordsService = ClubRecordsService();
+      final ageGroupRecordsService = AgeGroupRecordsService();
       final previousHolder = await recordsService.getClubRecordHolder(
         distance,
         genderFilter: genderFilter,
@@ -290,6 +292,15 @@ class AuthService {
         raceName: raceName,
         raceDate: raceDate ?? DateTime.now(),
         previousHolder: previousHolder,
+      );
+
+      await ageGroupRecordsService.notifyIfPerformanceSetAgeGroupRecord(
+        userId: user.id,
+        distance: distance,
+        timeSeconds: finishSeconds,
+        raceName: raceName,
+        raceDate: raceDate ?? DateTime.now(),
+        age: age,
       );
 
       return true;
