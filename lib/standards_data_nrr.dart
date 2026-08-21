@@ -1135,8 +1135,8 @@ final Map<String, Map<String, Map<String, int>>> nrrClubStandardsSeconds = {
       'Platinum': _nrrSeconds('00:57:31'),
       'Gold': _nrrSeconds('01:04:09'),
       'Silver': _nrrSeconds('01:09:30'),
-      'Bronze': 0,
-      'Copper': 0,
+      'Bronze': _nrrSeconds('01:14:42'),
+      'Copper': _nrrSeconds('01:25:06'),
     },
     '10M': {
       'Diamond': _nrrSeconds('01:20:26'),
