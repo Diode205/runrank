@@ -39,8 +39,24 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
     return club == 'nrr' || club.contains('norwich road runners');
   }
 
-  Color get _primaryColor =>
-      _isNrrClub ? const Color(0xFFD32F2F) : const Color(0xFFF5C542);
+  bool get _isYcrrClub {
+    final club = _clubName?.trim().toLowerCase() ?? '';
+    return club == 'ycrr' || club.contains('your club road runners');
+  }
+
+  Color get _primaryColor => _isNrrClub
+      ? const Color(0xFFD32F2F)
+      : _isYcrrClub
+      ? const Color(0xFFFFD300)
+      : const Color(0xFFF5C542);
+
+  Color get _secondaryColor => _isNrrClub
+      ? Colors.white
+      : _isYcrrClub
+      ? const Color(0xFF16803A)
+      : const Color(0xFF0057B7);
+
+  Color get _cardBorderColor => _isNrrClub ? _primaryColor : _secondaryColor;
 
   List<String> get _ageGroupOrder => ageGroupOrderForClub(_clubName);
 
@@ -299,9 +315,9 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: _cardBorderColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: _cardBorderColor, width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

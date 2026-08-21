@@ -74,14 +74,6 @@ class AuthService {
     }.where((value) => value.isNotEmpty).toList(growable: false);
   }
 
-  static bool _isYcrrClub(String? club) {
-    final compact = (club ?? '').toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]'),
-      '',
-    );
-    return compact == 'ycrr' || compact.contains('yourclubroadrunners');
-  }
-
   // -------------------------------------------------------
   // CHECK LOGIN STATUS
   // -------------------------------------------------------
@@ -147,7 +139,6 @@ class AuthService {
       final userId = user.id;
       // ignore: avoid_print
       print("✅ USER CREATED: $userId");
-      final isYcrrDemoAdmin = _isYcrrClub(club);
 
       // 2) Insert profile row (matches table EXACTLY)
       await _supabase.from('user_profiles').insert({
@@ -164,10 +155,8 @@ class AuthService {
         "emergency_contact_relation": emergencyContactRelation,
         "emergency_details_consent": emergencyDetailsConsent,
         "medical_notes": medicalNotes,
-        "is_admin": isYcrrDemoAdmin,
-        "admin_since": isYcrrDemoAdmin
-            ? DateTime.now().toIso8601String()
-            : null,
+        "is_admin": false,
+        "admin_since": null,
         "member_since": memberSince,
       });
 

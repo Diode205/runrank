@@ -32,14 +32,11 @@ class UserService {
 
     final row = await _client
         .from('user_profiles')
-        .select('is_admin, club')
+        .select('is_admin')
         .eq('id', user.id)
         .maybeSingle();
 
-    final club = row?['club'] as String?;
-    final isYcrrDemo = _isYcrrClubName(club);
-
-    return row != null && (row['is_admin'] == true || isYcrrDemo);
+    return row != null && row['is_admin'] == true;
   }
 
   static Future<bool> currentProfileExists() async {
