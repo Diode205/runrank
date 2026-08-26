@@ -5,7 +5,16 @@ import 'package:runrank/services/user_service.dart';
 import 'package:runrank/standards_data.dart';
 
 class AgeGroupRecordsPage extends StatefulWidget {
-  const AgeGroupRecordsPage({super.key});
+  final String? initialDistance;
+  final String? initialAgeGroup;
+  final String? initialGender;
+
+  const AgeGroupRecordsPage({
+    super.key,
+    this.initialDistance,
+    this.initialAgeGroup,
+    this.initialGender,
+  });
 
   @override
   State<AgeGroupRecordsPage> createState() => _AgeGroupRecordsPageState();
@@ -33,6 +42,8 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
   ];
   late final PageController _pageController;
   int _currentIndex = 0;
+  String? _pendingAgeGroupScroll;
+  final Map<String, GlobalKey> _ageGroupKeys = {};
 
   bool get _isNrrClub {
     final club = _clubName?.toLowerCase() ?? '';
@@ -63,6 +74,13 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDistance != null) {
+      final i = _distances.indexOf(widget.initialDistance!);
+      _currentIndex = i >= 0 ? i : 0;
+    }
+    if (widget.initialAgeGroup != null) {
+      _pendingAgeGroupScroll = widget.initialAgeGroup;
+    }
     _pageController = PageController(initialPage: _currentIndex);
     _loadData();
   }
@@ -72,11 +90,20 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
 
     _clubName = await _recordsService.getClubName();
     _isAdmin = await UserService.isAdmin();
-    final defaultGender = await _recordsService.getDefaultGenderFilter();
-    _currentGender = (defaultGender == 'F') ? 'F' : 'M';
+
+    // Opening this page from Club History should take a runner straight to
+    // their own current category unless a specific record link overrides it.
+    _pendingAgeGroupScroll ??= await _recordsService.getCurrentUserAgeGroup();
+
+    final normalizedInitial = _normalizeGender(widget.initialGender);
+    if (normalizedInitial != null) {
+      _currentGender = normalizedInitial;
+    } else {
+      final defaultGender = await _recordsService.getDefaultGenderFilter();
+      _currentGender = (defaultGender == 'F') ? 'F' : 'M';
+    }
 
     await _loadRecordsForGender(_currentGender);
-    setState(() => _loading = false);
   }
 
   Future<void> _loadRecordsForGender(String gender) async {
@@ -97,7 +124,42 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
     _currentGender = gender;
 
     setState(() => _loading = false);
+    _scrollToPendingAgeGroup();
   }
+
+  String? _normalizeGender(String? raw) {
+    final normalized = raw?.trim().toUpperCase();
+    if (normalized == 'M' || normalized == 'MALE' || normalized == "MEN'S") {
+      return 'M';
+    }
+    if (normalized == 'F' ||
+        normalized == 'FEMALE' ||
+        normalized == "WOMEN'S") {
+      return 'F';
+    }
+    return null;
+  }
+
+  void _scrollToPendingAgeGroup() {
+    final target = _pendingAgeGroupScroll;
+    if (target == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingAgeGroupScroll != target) return;
+      final distance = _distances[_currentIndex];
+      final ctx = _ageGroupKeys[_ageGroupKey(distance, target)]?.currentContext;
+      if (ctx == null) return;
+      _pendingAgeGroupScroll = null;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.08,
+      );
+    });
+  }
+
+  String _ageGroupKey(String distance, String ageGroup) =>
+      '$distance::$ageGroup';
 
   @override
   Widget build(BuildContext context) {
@@ -151,10 +213,16 @@ class _AgeGroupRecordsPageState extends State<AgeGroupRecordsPage> {
                               _buildDistanceHeader(distance),
                               const SizedBox(height: 16),
                               for (final band in _ageGroupOrder) ...[
-                                _buildAgeGroupSection(
-                                  distance,
-                                  band,
-                                  byGroup[band] ?? const [],
+                                Container(
+                                  key: _ageGroupKeys.putIfAbsent(
+                                    _ageGroupKey(distance, band),
+                                    () => GlobalKey(),
+                                  ),
+                                  child: _buildAgeGroupSection(
+                                    distance,
+                                    band,
+                                    byGroup[band] ?? const [],
+                                  ),
                                 ),
                                 const SizedBox(height: 16),
                               ],

@@ -11,8 +11,11 @@ import 'package:runrank/menu/malcolm_ball_award_page.dart';
 import 'package:runrank/widgets/post_detail_page.dart';
 import 'package:runrank/menu/policies_forms_notices_page.dart';
 import 'package:runrank/menu/club_records_page.dart';
+import 'package:runrank/menu/age_group_records_page.dart';
 import 'package:runrank/menu/team_achievements_page.dart';
 import 'package:runrank/menu/club_milestones_page.dart';
+import 'package:runrank/chat/chat_room_page.dart';
+import 'package:runrank/services/chat_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -31,7 +34,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   // Extract a route tag from text like: "[route:malcolm_ball_award] ..."
   String? _extractRoute(String text) {
-    final match = RegExp(r"\[route:([\w\-/]+)\]").firstMatch(text);
+    final match = RegExp(r"\[route:([\w\-/+]+)\]").firstMatch(text);
     return match != null ? match.group(1) : null;
   }
 
@@ -417,6 +420,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             builder: (_) => ClubRecordsPage(
               initialDistance: initialDistance,
               initialGender: initialGender,
+            ),
+          ),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route.startsWith('age_group_records')) {
+        // Route may be:
+        // - age_group_records
+        // - age_group_records/<distance>
+        // - age_group_records/<distance>/<age_group>
+        // - age_group_records/<distance>/<age_group>/<gender>
+        String? initialDistance;
+        String? initialAgeGroup;
+        String? initialGender;
+        final parts = route.split('/');
+        if (parts.length > 1 && parts[1].isNotEmpty) {
+          // Decode distance token (e.g. 'Half_M' -> 'Half M')
+          initialDistance = parts[1].replaceAll('_', ' ');
+        }
+        if (parts.length > 2 && parts[2].isNotEmpty) {
+          initialAgeGroup = parts[2].replaceAll('_', ' ');
+        }
+        if (parts.length > 3 && parts[3].isNotEmpty) {
+          initialGender = _normalizeClubRecordGenderRoute(parts[3]);
+        }
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AgeGroupRecordsPage(
+              initialDistance: initialDistance,
+              initialAgeGroup: initialAgeGroup,
+              initialGender: initialGender,
+            ),
+          ),
+        ).then((_) => loadData());
+        return;
+      }
+
+      if (route.startsWith('chat_thread/')) {
+        final threadId = route.substring('chat_thread/'.length);
+        if (threadId.isEmpty || !mounted) return;
+        final display = await ChatService.threadDisplay(threadId);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatRoomPage(
+              threadId: threadId,
+              title: display['title'] ?? 'Support Group Chat',
+              subtitle: display['subtitle'],
             ),
           ),
         ).then((_) => loadData());

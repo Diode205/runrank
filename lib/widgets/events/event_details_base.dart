@@ -258,6 +258,91 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
+  Future<void> createSupportGroupChat({bool marshalGroup = false}) async {
+    final creator = supabase.auth.currentUser;
+    if (creator == null || event.createdBy != creator.id) {
+      showResponseListRestrictedMessage();
+      return;
+    }
+
+    final selectedResponses = marshalGroup ? volunteers : supporters;
+    final optedInIds = {
+      for (final response in selectedResponses)
+        if (response['user_id'] is String &&
+            (response['user_id'] as String).isNotEmpty)
+          response['user_id'] as String,
+    };
+    if (optedInIds.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              marshalGroup ? 'No marshals yet.' : 'No support crew yet.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final names = await fetchNamesForIds(optedInIds);
+    final eventType = event.eventType.toLowerCase();
+    final relayTeam = event.relayTeam?.trim() ?? '';
+    // Relay calendars can contain several teams on the same date. The team
+    // name is the useful chat context, rather than the generic "Relay" title.
+    final isHandicap =
+        eventType == 'handicap_series' || eventType == 'one_mile_handicap';
+    final eventTitle = eventType == 'relay' && relayTeam.isNotEmpty
+        ? relayTeam
+        : isHandicap && (event.handicapDistance?.trim().isNotEmpty ?? false)
+        ? event.handicapDistance!.trim()
+        : (event.title ?? 'Event').trim();
+    final groupTitle = isHandicap
+        ? 'Handicap Support'
+        : marshalGroup
+        ? 'Marshal Group'
+        : 'Support Group';
+    try {
+      final group = await ChatService.createEventSupportGroup(
+        title: groupTitle,
+        eventId: event.id,
+        eventTitle: eventTitle,
+        eventDate: event.dateTime,
+        members: [
+          for (final id in optedInIds)
+            ChatMember(id: id, name: names[id] ?? 'Member'),
+        ],
+      );
+
+      if (group.wasCreated) {
+        for (final userId in {...optedInIds, creator.id}) {
+          await NotificationService.notifyUser(
+            userId: userId,
+            title: 'Support group chat created',
+            body: 'You have been added to $groupTitle for $eventTitle.',
+            eventId: event.id,
+            route: 'chat_thread/${group.threadId}',
+          );
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            group.wasCreated
+                ? 'Support group chat created and invitations sent.'
+                : 'This event support group already exists.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create group chat: $e')),
+      );
+    }
+  }
+
   Future<void> loadComments({bool showLoading = true}) async {
     if (_baseCommentsTableMissing) return;
 
@@ -537,6 +622,7 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
     List<String>? relayRoles,
     int? predictedPace,
     int? predictedTimeSeconds,
+    String? responseTypeOverride,
   }) async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -571,6 +657,9 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
           dbType = type;
           action = 'responded to';
       }
+      if (responseTypeOverride != null) {
+        dbType = responseTypeOverride;
+      }
 
       await supabase.from('club_event_responses').upsert({
         'event_id': event.id,
@@ -589,6 +678,52 @@ mixin EventDetailsBaseMixin<T extends StatefulWidget> on State<T> {
         'predicted_pace': predictedPace,
         'expected_time_seconds': predictedTimeSeconds,
       }, onConflict: 'event_id,user_id');
+
+      // If the event host has already created the relevant support group,
+      // add later marshals/support crew immediately and give them one invite.
+      try {
+        final isHandicap =
+            event.eventType.toLowerCase() == 'handicap_series' ||
+            event.eventType.toLowerCase() == 'one_mile_handicap';
+        final isMarshal = dbType == 'marshalling';
+        final isSupport = relayRoles?.isNotEmpty ?? false;
+        final groupTitles = <String>[
+          if (isHandicap && isMarshal)
+            'Handicap Support'
+          else ...[
+            if (isMarshal) 'Marshal Group',
+            if (isSupport) 'Support Group',
+          ],
+        ];
+        if (groupTitles.isNotEmpty) {
+          final profile = await supabase
+              .from('user_profiles')
+              .select('full_name')
+              .eq('id', user.id)
+              .maybeSingle();
+          final name = (profile?['full_name'] as String?)?.trim();
+          final joinedThreads = await ChatService.addToEventSupportGroups(
+            eventId: event.id,
+            groupTitles: groupTitles,
+            member: ChatMember(
+              id: user.id,
+              name: name?.isNotEmpty == true ? name! : 'A member',
+            ),
+          );
+          for (final threadId in joinedThreads) {
+            await NotificationService.notifyUser(
+              userId: user.id,
+              title: 'You joined an event support group',
+              body: 'Your event response has added you to a support chat.',
+              eventId: event.id,
+              route: 'chat_thread/$threadId',
+            );
+          }
+        }
+      } catch (e) {
+        // A chat update must never prevent the event response from saving.
+        debugPrint('Could not add responder to event support chat: $e');
+      }
 
       // Notify event creator about new response (but avoid
       // sending the creator a second alert for their own

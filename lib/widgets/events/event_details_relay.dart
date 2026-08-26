@@ -627,7 +627,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                     ),
                     if (showResponseControls)
                       GestureDetector(
-                        onTap: () => _deleteRole('type'),
+                        onTap: () => _deleteRole('running'),
                         child: const Text('❌', style: TextStyle(fontSize: 18)),
                       ),
                   ],
@@ -681,7 +681,7 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
                     ),
                     if (showResponseControls)
                       GestureDetector(
-                        onTap: () => _deleteRole('type'),
+                        onTap: () => _deleteRole('marshal'),
                         child: const Text('❌', style: TextStyle(fontSize: 18)),
                       ),
                   ],
@@ -772,7 +772,15 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
             // Marshal button
             FilledButton(
               onPressed: canMarshal
-                  ? () => _submitRelayResponse(type: "volunteer")
+                  ? () => _submitRelayResponse(
+                      type: "volunteer",
+                      relayStages: myRelayStages.isNotEmpty
+                          ? myRelayStages
+                          : null,
+                      relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
+                      predictedPace: myPredictedPace,
+                      responseTypeOverride: 'marshalling',
+                    )
                   : () => ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -952,20 +960,17 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
   }
 
   Future<void> _deleteRole(String roleType, [String? specificRole]) async {
+    final hasMarshal = myResponse?['response_type'] == 'marshalling';
     switch (roleType) {
-      case 'type':
-        // Clear entire response
-        await cancelMyPlan();
-        if (mounted) {
-          setState(() {
-            myResponse = null;
-            myRelayStages = [];
-            myRelayRoles = [];
-            myPredictedPace = null;
-            myPredictedFinishHHMMSS = null;
-          });
-        }
-        return;
+      case 'running':
+        myRelayStages = [];
+        myPredictedPace = null;
+        myPredictedFinishHHMMSS = null;
+        break;
+      case 'marshal':
+        // Marshalling is the primary database type, but stages and support
+        // roles are independent selections and must remain intact.
+        break;
       case 'roles':
         // Clear all support roles
         myRelayRoles = [];
@@ -980,8 +985,8 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
       case 'role':
         if (specificRole != null) {
           myRelayRoles.remove(specificRole);
-          // If no more roles, clear the entire response
-          if (myRelayRoles.isEmpty && myRelayStages.isEmpty) {
+          // Only cancel if there is no running, support, or marshal role.
+          if (myRelayRoles.isEmpty && myRelayStages.isEmpty && !hasMarshal) {
             await cancelMyPlan();
             if (mounted) {
               setState(() {
@@ -996,13 +1001,37 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         break;
     }
 
-    // Update response after deletion
+    final removingMarshal = roleType == 'marshal';
+    final responseType = removingMarshal
+        ? (myRelayStages.isNotEmpty
+              ? 'running'
+              : myRelayRoles.isNotEmpty
+              ? 'supporting'
+              : null)
+        : hasMarshal
+        ? 'marshalling'
+        : myRelayStages.isNotEmpty
+        ? 'running'
+        : myRelayRoles.isNotEmpty
+        ? 'supporting'
+        : null;
+
+    if (responseType == null) {
+      await cancelMyPlan();
+      if (mounted) {
+        setState(() => myResponse = null);
+      }
+      return;
+    }
+
+    // Update only the removed role while retaining every other selection.
     if (mounted) {
       _submitRelayResponse(
-        type: myResponse?["response_type"] ?? "unavailable",
+        type: responseType,
         relayStages: myRelayStages.isNotEmpty ? myRelayStages : null,
         relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
         predictedPace: myPredictedPace,
+        responseTypeOverride: responseType,
       );
     }
   }
@@ -1012,12 +1041,14 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     List<int>? relayStages,
     List<String>? relayRoles,
     int? predictedPace,
+    String? responseTypeOverride,
   }) async {
     await submitResponse(
       type: type,
       relayStages: relayStages,
       relayRoles: relayRoles,
       predictedPace: predictedPace,
+      responseTypeOverride: responseTypeOverride,
     );
     if (mounted) {
       setState(() => _isChangingResponse = false);
@@ -1067,14 +1098,23 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
     if (choice == 'running') {
       await showRelayRunningDialog();
     } else if (choice == 'marshal') {
-      await _submitRelayResponse(type: "volunteer");
+      await _submitRelayResponse(
+        type: "volunteer",
+        relayStages: myRelayStages.isNotEmpty ? myRelayStages : null,
+        relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
+        predictedPace: myPredictedPace,
+        responseTypeOverride: 'marshalling',
+      );
     } else if (choice == 'support') {
       await showRelaySupportingDialog();
     }
   }
 
   Future<void> showRelayRunningDialog() async {
-    if (!_isEkidenRelay) {
+    // Standard non-stage relays only need a simple running response. Both
+    // Ekiden and RNR relays use the stage/pace picker; RNR runners can also
+    // hold support roles, which must be preserved when their run is updated.
+    if (_usesRunningOnlyFlow && !_isEkidenRelay) {
       myRelayStages = [];
       myPredictedPace = null;
       myPredictedFinishHHMMSS = null;
@@ -1118,6 +1158,9 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         relayStages: myRelayStages,
         relayRoles: myRelayRoles.isNotEmpty ? myRelayRoles : null,
         predictedPace: myPredictedPace,
+        responseTypeOverride: myResponse?['response_type'] == 'marshalling'
+            ? 'marshalling'
+            : 'running',
       );
     }
   }
@@ -1136,6 +1179,11 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
         relayRoles: myRelayRoles,
         relayStages: myRelayStages.isNotEmpty ? myRelayStages : null,
         predictedPace: myPredictedPace,
+        responseTypeOverride: myResponse?['response_type'] == 'marshalling'
+            ? 'marshalling'
+            : myRelayStages.isNotEmpty
+            ? 'running'
+            : 'supporting',
       );
     }
   }
@@ -1599,6 +1647,12 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
             icon: const Icon(Icons.send),
             label: const Text("Publish"),
           ),
+          if (event.createdBy == supabase.auth.currentUser?.id)
+            TextButton.icon(
+              onPressed: () => createSupportGroupChat(marshalGroup: true),
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Create Support Group Chat'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Close"),
@@ -1729,6 +1783,12 @@ class _RelayEventDetailsPageState extends State<RelayEventDetailsPage>
             icon: const Icon(Icons.send),
             label: const Text("Publish"),
           ),
+          if (event.createdBy == supabase.auth.currentUser?.id)
+            TextButton.icon(
+              onPressed: createSupportGroupChat,
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Create Support Group Chat'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Close"),

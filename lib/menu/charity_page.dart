@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:runrank/services/charity_service.dart';
 import 'package:runrank/services/user_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -62,9 +61,6 @@ class _CharityPageState extends State<CharityPage> {
     );
     return compact == 'ycrr' || compact.contains('yourclubroadrunners');
   }
-
-  bool get _useAppleSafeCharityPage =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   List<Color> get _brandGradient => UserService.clubBrandGradient(_clubName);
 
@@ -381,12 +377,6 @@ class _CharityPageState extends State<CharityPage> {
                   fontSize: 16,
                 ),
               ),
-            )
-          : _useAppleSafeCharityPage
-          ? _ReadOnlyCharityWebsitePreview(
-              uri: websiteUri,
-              primaryColor: _primaryColor,
-              onVisitWebsite: () => _launchExternal(websiteUri),
             )
           : _BrowsableCharityWebsitePreview(
               uri: websiteUri,

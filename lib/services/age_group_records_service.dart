@@ -216,6 +216,36 @@ class AgeGroupRecordsService {
 
   Future<String?> getClubName() => _getCurrentUserClub();
 
+  /// The signed-in runner's current, gender-neutral age-group band.
+  ///
+  /// This is used to focus the records page on the category most relevant to
+  /// the runner. Race records themselves still use the runner's age on race
+  /// day when deciding which group they belong to.
+  Future<String?> getCurrentUserAgeGroup() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final row = await _supabase
+          .from('user_profiles')
+          .select('date_of_birth')
+          .eq('id', user.id)
+          .maybeSingle();
+      final age = _ageOnDate(
+        dobString: row?['date_of_birth'] as String?,
+        date: DateTime.now(),
+      );
+      if (age == null) return null;
+      return ageGroupLabelForClub(
+        age: age,
+        clubName: await _getCurrentUserClub(),
+      );
+    } catch (e) {
+      print('Error fetching current user age group: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, Map<String, dynamic>>> _getClubProfiles(
     String? genderFilter,
   ) async {
@@ -422,7 +452,14 @@ class AgeGroupRecordsService {
           byGroup[band] ?? const [],
         );
         groupRecords.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
-        ordered[band] = groupRecords.take(limitPerGroup).toList();
+        // A leaderboard place belongs to a runner, not a performance. Since
+        // the list is best-first, keep only each runner's fastest submitted
+        // or historical result before applying the top-three limit.
+        final representedRunners = <String>{};
+        ordered[band] = groupRecords
+            .where((record) => representedRunners.add(_runnerKey(record)))
+            .take(limitPerGroup)
+            .toList();
       }
 
       return ordered;
@@ -430,6 +467,22 @@ class AgeGroupRecordsService {
       print('Error fetching age-group records for $distance: $e');
       return {};
     }
+  }
+
+  String _runnerKey(AgeGroupRecord record) {
+    final normalizedName = record.runnerName.trim().toLowerCase().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+    // Admin-entered historical records may not have a user ID; using a
+    // normalized name also combines them with that runner's submitted times.
+    if (normalizedName.isNotEmpty && normalizedName != 'unknown') {
+      return 'name:$normalizedName';
+    }
+    final userId = record.userId?.trim();
+    return userId == null || userId.isEmpty
+        ? 'record:${record.id}'
+        : 'id:$userId';
   }
 
   /// Get the fastest record for a distance+age-group (band record holder).

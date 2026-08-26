@@ -856,6 +856,13 @@ class _RaceEventDetailsPageState extends State<RaceEventDetailsPage>
             icon: const Icon(Icons.send),
             label: const Text("Publish"),
           ),
+          if (responseType == 'marshalling' &&
+              widget.event.createdBy == supabase.auth.currentUser?.id)
+            TextButton.icon(
+              onPressed: () => createSupportGroupChat(marshalGroup: true),
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Create Support Group Chat'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Close"),

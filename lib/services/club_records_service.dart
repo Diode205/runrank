@@ -320,7 +320,6 @@ class ClubRecordsService {
 
   Future<List<ClubRecord>> _fetchLegacyRecords(
     String distance, {
-    int limit = 5,
     String? genderFilter,
   }) async {
     final userIds = await _getLegacyClubUserIds(genderFilter);
@@ -335,13 +334,11 @@ class ClubRecordsService {
                 .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
                 .inFilter('user_id', userIdList)
                 .order('time_seconds', ascending: true)
-                .limit(limit)
           : await _supabase
                 .from('club_records')
                 .select()
                 .inFilter('distance', ['20M', '20m', '20 mile', '20 Mile'])
-                .order('time_seconds', ascending: true)
-                .limit(limit);
+                .order('time_seconds', ascending: true);
 
       return (response as List)
           .map((json) => ClubRecord.fromJson(json))
@@ -372,7 +369,7 @@ class ClubRecordsService {
         return a.timeSeconds.compareTo(b.timeSeconds);
       });
 
-      return all.length > limit ? all.take(limit).toList() : all;
+      return all;
     }
 
     final response = applyClubFilter
@@ -382,13 +379,11 @@ class ClubRecordsService {
               .eq('distance', distance)
               .inFilter('user_id', userIdList)
               .order('time_seconds', ascending: true)
-              .limit(limit)
         : await _supabase
               .from('club_records')
               .select()
               .eq('distance', distance)
-              .order('time_seconds', ascending: true)
-              .limit(limit);
+              .order('time_seconds', ascending: true);
 
     return (response as List).map((json) => ClubRecord.fromJson(json)).toList();
   }
@@ -405,7 +400,6 @@ class ClubRecordsService {
 
   Future<List<ClubRecord>> _fetchSupplementalClubRecords(
     String distance, {
-    int limit = 5,
     String? genderFilter,
   }) async {
     try {
@@ -418,7 +412,6 @@ class ClubRecordsService {
       if (_isMissingScopedClubRecordColumns(e)) {
         final records = await _fetchLegacyRecords(
           distance,
-          limit: limit,
           genderFilter: genderFilter,
         );
         return records.where(_isSupplementalClubRecord).toList();
@@ -429,7 +422,6 @@ class ClubRecordsService {
 
   Future<List<ClubRecord>> _fetchLiveRaceRecords(
     String distance, {
-    int limit = 5,
     String? genderFilter,
   }) async {
     final profilesById = await _getClubProfiles(genderFilter);
@@ -493,7 +485,26 @@ class ClubRecordsService {
       records.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
     }
 
-    return records.length > limit ? records.take(limit).toList() : records;
+    // Keep every performance until sources have been merged and each runner
+    // has been reduced to their best result. Limiting here can otherwise hide
+    // a slower runner who should fill a later leaderboard place.
+    return records;
+  }
+
+  String _runnerKey(ClubRecord record) {
+    final normalizedName = record.runnerName.trim().toLowerCase().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+    // Historical records do not always have a user ID, so name is the shared
+    // identity that lets live and admin-entered records collapse together.
+    if (normalizedName.isNotEmpty && normalizedName != 'unknown') {
+      return 'name:$normalizedName';
+    }
+    final userId = record.userId?.trim();
+    return userId == null || userId.isEmpty
+        ? 'record:${record.id}'
+        : 'id:$userId';
   }
 
   List<ClubRecord> _mergeRecordSources(
@@ -531,7 +542,12 @@ class ClubRecordsService {
       merged.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
     }
 
-    return merged;
+    // Records are already sorted best-first, so retaining the first result
+    // for every runner gives one best performance per leaderboard place.
+    final representedRunners = <String>{};
+    return merged
+        .where((record) => representedRunners.add(_runnerKey(record)))
+        .toList();
   }
 
   /// Fetch top N records for a specific distance
@@ -543,13 +559,11 @@ class ClubRecordsService {
     try {
       final liveRecords = await _fetchLiveRaceRecords(
         distance,
-        limit: limit,
         genderFilter: genderFilter,
       );
 
       final supplementalRecords = await _fetchSupplementalClubRecords(
         distance,
-        limit: limit,
         genderFilter: genderFilter,
       );
 

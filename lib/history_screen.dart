@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:runrank/services/club_records_service.dart';
 import 'package:runrank/services/age_group_records_service.dart';
 import 'package:runrank/menu/club_records_page.dart';
+import 'package:runrank/menu/age_group_records_page.dart';
 import 'package:runrank/standards_data.dart';
 import 'calculator_logic.dart';
 
@@ -58,6 +59,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Map<String, List<RaceRecord>> _byDistance = {};
   Map<String, ClubRecord?> _clubRecords = {};
+  Map<String, AgeGroupRecord?> _ageGroupRecords = {};
   String? _currentUserId;
   String? _currentUserGender;
   String? _currentUserClub;
@@ -105,7 +107,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final profile = await client
           .from('user_profiles')
-          .select('club, date_of_birth')
+          .select('club, date_of_birth, gender')
           .eq('id', user.id)
           .maybeSingle();
       _currentUserClub = (profile?['club'] as String?)?.trim();
@@ -113,6 +115,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _currentUserDob = (dobRaw != null && dobRaw.isNotEmpty)
           ? DateTime.tryParse(dobRaw)
           : null;
+      _currentUserGender = _normalizeGender(profile?['gender'] as String?);
 
       final rows = await client
           .from('race_results')
@@ -216,8 +219,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _loading = false;
       });
 
-      // Fetch club records for all distances
-      _fetchClubRecords();
+      // Fetch the overall and current-age-group record holders for all
+      // standard distances once the profile details are available.
+      _fetchRecordHolders();
     } catch (e) {
       setState(() {
         _error = true;
@@ -226,7 +230,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _fetchClubRecords() async {
+  String? _normalizeGender(String? raw) {
+    final gender = raw?.trim().toUpperCase();
+    if (gender == 'M' || gender == 'MALE' || gender == "MEN'S") return 'M';
+    if (gender == 'F' || gender == 'FEMALE' || gender == "WOMEN'S") return 'F';
+    return null;
+  }
+
+  Future<void> _fetchRecordHolders() async {
     try {
       // Resolve the current user's gender once so that club record
       // holders are filtered appropriately (men's vs women's records).
@@ -253,8 +264,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 : null,
         };
       });
+
+      await _fetchCurrentAgeGroupRecords(gender);
     } catch (e) {
       print('Error fetching club records: $e');
+    }
+  }
+
+  Future<void> _fetchCurrentAgeGroupRecords(String? gender) async {
+    final age = _ageOnDate(DateTime.now());
+    if (age == null) return;
+    final ageGroup = ageGroupLabelForClub(age: age, clubName: _currentUserClub);
+    try {
+      final holders = await Future.wait(
+        _distances
+            .where((distance) => distance != 'Ultra')
+            .map(
+              (distance) => _ageGroupRecordsService.getAgeGroupRecordHolder(
+                distance,
+                ageGroup,
+                genderFilter: gender,
+              ),
+            ),
+      );
+      if (!mounted) return;
+      final standardDistances = _distances.where((d) => d != 'Ultra').toList();
+      setState(() {
+        _ageGroupRecords = {
+          for (var i = 0; i < standardDistances.length; i++)
+            standardDistances[i]: holders[i],
+        };
+      });
+    } catch (e) {
+      print('Error fetching current age-group records: $e');
     }
   }
 
@@ -379,6 +421,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .join('   •   ');
 
     final clubRecord = _clubRecords[distance];
+    final ageGroupRecord = _ageGroupRecords[distance];
+    final currentAge = _ageOnDate(DateTime.now());
+    final currentAgeGroup = currentAge == null
+        ? null
+        : ageGroupLabelForClub(age: currentAge, clubName: _currentUserClub);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -401,7 +448,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Club Record Holder - prominently displayed
+          // Individual club record holder.
           if (clubRecord != null) ...[
             Material(
               color: Colors.transparent,
@@ -411,8 +458,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ClubRecordsPage(initialDistance: distance),
+                      builder: (_) => ClubRecordsPage(
+                        initialDistance: distance,
+                        initialGender: _currentUserGender,
+                      ),
                     ),
                   );
                 },
@@ -439,7 +488,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'CLUB RECORD',
+                              'INDIVIDUAL CLUB RECORD',
                               style: TextStyle(
                                 color: Color(0xFFFFD700),
                                 fontSize: 11,
@@ -472,6 +521,86 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
             ),
+          ],
+
+          // The top runner in the signed-in runner's current age category.
+          if (ageGroupRecord != null && currentAgeGroup != null) ...[
+            if (clubRecord != null) const SizedBox(height: 12),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AgeGroupRecordsPage(
+                        initialDistance: distance,
+                        initialAgeGroup: currentAgeGroup,
+                        initialGender: _currentUserGender,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.groups_2,
+                        color: Color(0xFFFFD700),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'AGE-GROUP CLUB RECORD (${displayAgeGroupLabel(currentAgeGroup).toUpperCase()})',
+                              style: const TextStyle(
+                                color: Color(0xFFFFD700),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              ageGroupRecord.runnerName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        ageGroupRecord.formattedTime,
+                        style: const TextStyle(
+                          color: Color(0xFFFFD700),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          if (clubRecord != null || ageGroupRecord != null) ...[
             const SizedBox(height: 12),
             const Divider(color: Colors.white24, height: 1),
             const SizedBox(height: 12),

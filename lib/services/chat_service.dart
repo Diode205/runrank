@@ -67,6 +67,13 @@ class ChatThread {
   bool get hasUnread => unreadCount > 0;
 }
 
+class CreatedChatGroup {
+  final String threadId;
+  final bool wasCreated;
+
+  const CreatedChatGroup({required this.threadId, required this.wasCreated});
+}
+
 class ChatService {
   ChatService._();
 
@@ -288,6 +295,23 @@ class ChatService {
     return _contextSubtitle(title, date);
   }
 
+  static Future<Map<String, String?>> threadDisplay(String threadId) async {
+    final row = await _supabase
+        .from('chat_threads')
+        .select('title, context_title, context_date')
+        .eq('id', threadId)
+        .maybeSingle();
+    final title = (row?['title'] as String?)?.trim();
+    final contextTitle = (row?['context_title'] as String?)?.trim();
+    return {
+      'title': title?.isNotEmpty == true ? title : 'Support Group Chat',
+      'subtitle': _contextSubtitle(
+        contextTitle?.isNotEmpty == true ? contextTitle : null,
+        _date(row?['context_date']),
+      ),
+    };
+  }
+
   static String _monthName(int month) {
     const names = [
       'Jan',
@@ -494,6 +518,92 @@ class ChatService {
         },
     ]);
     return threadId;
+  }
+
+  /// Creates one support chat per event. Re-opening a response list must not
+  /// create duplicate groups or send a second round of invitations.
+  static Future<CreatedChatGroup> createEventSupportGroup({
+    required String title,
+    required String eventId,
+    required String eventTitle,
+    required DateTime eventDate,
+    required List<ChatMember> members,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    final club = await _currentClubKey();
+    if (user == null || club == null || club.isEmpty) {
+      throw StateError('You must be signed in to create a group.');
+    }
+
+    final dateOnly = DateTime(eventDate.year, eventDate.month, eventDate.day);
+    final existing = await _supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('club', club)
+        .eq('is_group', true)
+        .eq('created_by', user.id)
+        .eq('event_id', eventId)
+        .eq('title', title.trim())
+        .eq('context_title', eventTitle)
+        .eq('context_date', dateOnly.toIso8601String().split('T').first)
+        .maybeSingle();
+    final existingId = existing?['id'] as String?;
+    if (existingId != null && existingId.isNotEmpty) {
+      return CreatedChatGroup(threadId: existingId, wasCreated: false);
+    }
+
+    final thread = await _supabase
+        .from('chat_threads')
+        .insert({
+          'club': club,
+          'title': title.trim(),
+          'is_group': true,
+          'created_by': user.id,
+          'event_id': eventId,
+          'context_title': eventTitle,
+          'context_date': dateOnly.toIso8601String().split('T').first,
+        })
+        .select('id')
+        .single();
+    final threadId = thread['id'] as String;
+    final participantIds = {user.id, ...members.map((member) => member.id)};
+    await _supabase.from('chat_participants').insert([
+      for (final id in participantIds)
+        {
+          'thread_id': threadId,
+          'user_id': id,
+          if (id == user.id) 'last_read_at': DateTime.now().toIso8601String(),
+        },
+    ]);
+    return CreatedChatGroup(threadId: threadId, wasCreated: true);
+  }
+
+  /// Adds a late responder to any matching event support groups exactly once.
+  static Future<List<String>> addToEventSupportGroups({
+    required String eventId,
+    required List<String> groupTitles,
+    required ChatMember member,
+  }) async {
+    if (groupTitles.isEmpty) return const [];
+    final rows = await _supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('is_group', true)
+        .inFilter('title', groupTitles);
+    final joined = <String>[];
+    for (final row in rows as List) {
+      final threadId = (row as Map)['id'] as String;
+      final members = await threadParticipants(threadId);
+      if (members.any((existing) => existing.id == member.id)) continue;
+      await _supabase.from('chat_participants').insert({
+        'thread_id': threadId,
+        'user_id': member.id,
+      });
+      await sendMessage(threadId, '${member.name} has joined the group.');
+      joined.add(threadId);
+    }
+    return joined;
   }
 
   static Future<List<ChatMessage>> listMessages(String threadId) async {
