@@ -216,12 +216,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _byDistance = grouped;
         _currentUserId = user.id;
-        _loading = false;
       });
 
-      // Fetch the overall and current-age-group record holders for all
-      // standard distances once the profile details are available.
-      _fetchRecordHolders();
+      // Keep the page in its loading state until every summary holder is
+      // available, so the individual and age-group cards appear together.
+      await _fetchRecordHolders();
+      if (!mounted) return;
+      setState(() => _loading = false);
     } catch (e) {
       setState(() {
         _error = true;
@@ -250,10 +251,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _currentUserGender = gender;
       }
 
-      final topRecords = await _clubRecordsService.getAllTopRecords(
+      final topRecordsFuture = _clubRecordsService.getAllTopRecords(
         limitPerDistance: 1,
         genderFilter: gender,
       );
+      final ageGroupRecordsFuture = _fetchCurrentAgeGroupRecords(gender);
+      final results = await Future.wait([
+        topRecordsFuture,
+        ageGroupRecordsFuture,
+      ]);
+      final topRecords = results[0] as Map<String, List<ClubRecord>>;
+      final ageGroupRecords = results[1] as Map<String, AgeGroupRecord?>;
 
       if (!mounted) return;
       setState(() {
@@ -263,17 +271,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ? topRecords[distance]!.first
                 : null,
         };
+        _ageGroupRecords = ageGroupRecords;
       });
-
-      await _fetchCurrentAgeGroupRecords(gender);
     } catch (e) {
       print('Error fetching club records: $e');
     }
   }
 
-  Future<void> _fetchCurrentAgeGroupRecords(String? gender) async {
+  Future<Map<String, AgeGroupRecord?>> _fetchCurrentAgeGroupRecords(
+    String? gender,
+  ) async {
     final age = _ageOnDate(DateTime.now());
-    if (age == null) return;
+    if (age == null) return {};
     final ageGroup = ageGroupLabelForClub(age: age, clubName: _currentUserClub);
     try {
       final holders = await Future.wait(
@@ -287,16 +296,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
       );
-      if (!mounted) return;
       final standardDistances = _distances.where((d) => d != 'Ultra').toList();
-      setState(() {
-        _ageGroupRecords = {
-          for (var i = 0; i < standardDistances.length; i++)
-            standardDistances[i]: holders[i],
-        };
-      });
+      return {
+        for (var i = 0; i < standardDistances.length; i++)
+          standardDistances[i]: holders[i],
+      };
     } catch (e) {
       print('Error fetching current age-group records: $e');
+      return {};
     }
   }
 
